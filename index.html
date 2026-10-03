@@ -1048,6 +1048,356 @@ html, body {
   }
 }
 
+
+/* ===== KITCH MOBILE APP WORKSPACE FIX ===== */
+@media (max-width:760px){
+
+  /* Logged-in workspace header: keep it compact, black, and readable */
+  #app .side{
+    position:relative!important;
+    top:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    padding:12px 14px 10px!important;
+    background:#0b0b0b!important;
+    color:#fff!important;
+    border-right:0!important;
+    border-bottom:1px solid #242424!important;
+    overflow:visible!important;
+  }
+
+  #app .side .brand{
+    color:#fff!important;
+    font-size:22px!important;
+  }
+
+  #app .side .sub{
+    color:#8f8f8f!important;
+  }
+
+  #app .side .user{
+    margin:10px 0 9px!important;
+    padding:10px 12px!important;
+    background:#171717!important;
+    border:1px solid #282828!important;
+    border-radius:13px!important;
+    color:#fff!important;
+  }
+
+  #app .side .user b,
+  #app #userName{
+    color:#fff!important;
+    font-weight:800!important;
+  }
+
+  #app .side .user small,
+  #app #userRole,
+  #app #userScope{
+    color:#a9a9a9!important;
+  }
+
+  /* Keep the module navigation visible like desktop, but scroll smoothly on phone */
+  #app .nav{
+    display:flex!important;
+    gap:7px!important;
+    width:100%!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    padding:1px 0 7px!important;
+    margin-top:8px!important;
+    scroll-snap-type:x proximity;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+
+  #app .nav::-webkit-scrollbar{display:none}
+
+  #app .nav button{
+    flex:0 0 auto!important;
+    min-width:max-content!important;
+    width:auto!important;
+    margin:0!important;
+    padding:9px 12px!important;
+    border-radius:10px!important;
+    background:#121212!important;
+    color:#aaa!important;
+    font-size:12px!important;
+    font-weight:700!important;
+    scroll-snap-align:start;
+  }
+
+  #app .nav button.active{
+    background:#fff!important;
+    color:#111!important;
+  }
+
+  #app .upgradeNav{
+    display:none!important;
+  }
+
+  /* Main area closer to desktop proportions */
+  #app .main{
+    padding:14px 12px 28px!important;
+    background:#f3f3f1!important;
+  }
+
+  #app .top{
+    margin-bottom:14px!important;
+  }
+
+  #app .top h1{
+    font-size:24px!important;
+  }
+
+  /* Do not stack the KPI cards one-by-one on phone */
+  #app .grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;
+  }
+
+  #app .card{
+    min-height:96px!important;
+    padding:14px!important;
+    border-radius:14px!important;
+  }
+
+  #app .card span{
+    font-size:9px!important;
+    line-height:1.2!important;
+  }
+
+  #app .card b{
+    font-size:21px!important;
+  }
+
+  /* Recipe panel: keep desktop table structure with a dedicated horizontal scroll */
+  #app .panel{
+    padding:14px!important;
+    overflow:hidden!important;
+  }
+
+  #app .panel > table,
+  #app .panel table{
+    display:block!important;
+    width:100%!important;
+    min-width:680px!important;
+    max-width:none!important;
+    overflow-x:auto!important;
+    overflow-y:hidden!important;
+    -webkit-overflow-scrolling:touch!important;
+    white-space:nowrap!important;
+  }
+
+  #app .actions{
+    display:flex!important;
+    flex-wrap:wrap!important;
+    gap:8px!important;
+  }
+
+  #app .actions .btn{
+    flex:0 0 auto!important;
+  }
+}
+
+@media (max-width:390px){
+  #app .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+
+  #app .card{
+    min-height:90px!important;
+    padding:12px!important;
+  }
+
+  #app .card b{
+    font-size:19px!important;
+  }
+
+  #app .top h1{
+    font-size:22px!important;
+  }
+}
+
+
+/* ===== KITCH MOBILE SIGN-IN MODAL FIX ===== */
+@media (max-width:760px){
+  #publicModal.publicModal{
+    padding:
+      calc(12px + env(safe-area-inset-top))
+      14px
+      calc(12px + env(safe-area-inset-bottom))!important;
+    place-items:center!important;
+    overflow-y:auto!important;
+    background:rgba(0,0,0,.64)!important;
+  }
+
+  #publicModal .publicBox{
+    position:relative!important;
+    width:min(430px,100%)!important;
+    max-width:430px!important;
+    max-height:calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom))!important;
+    overflow-y:auto!important;
+    padding:22px 18px 20px!important;
+    border-radius:22px!important;
+    box-sizing:border-box!important;
+    -webkit-overflow-scrolling:touch!important;
+  }
+
+  #publicModal .closePublic{
+    position:absolute!important;
+    top:16px!important;
+    right:16px!important;
+    float:none!important;
+    width:38px!important;
+    height:38px!important;
+    display:grid!important;
+    place-items:center!important;
+    background:#efefef!important;
+    color:#999!important;
+    border:0!important;
+    border-radius:50%!important;
+    font-size:24px!important;
+    line-height:1!important;
+    z-index:2!important;
+  }
+
+  #publicModal .publicBrand{
+    margin:0 48px 24px 0!important;
+  }
+
+  #publicModal .publicBrand b{
+    font-size:25px!important;
+    line-height:1!important;
+    color:#111!important;
+  }
+
+  #publicModal .publicBrand span{
+    margin-top:5px!important;
+    font-size:7px!important;
+    line-height:1.25!important;
+    letter-spacing:.18em!important;
+    color:#aaa!important;
+  }
+
+  #publicModal h2{
+    margin:0 0 8px!important;
+    font-size:38px!important;
+    line-height:.98!important;
+    letter-spacing:-.04em!important;
+  }
+
+  #publicModal h2 + .muted{
+    margin:0!important;
+    font-size:12.5px!important;
+    line-height:1.42!important;
+  }
+
+  /* Management / Team segmented control */
+  #publicModal .loginTabs{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+    margin:18px 0 20px!important;
+    width:100%!important;
+  }
+
+  #publicModal .loginTabs .btn{
+    width:100%!important;
+    min-width:0!important;
+    min-height:44px!important;
+    height:44px!important;
+    margin:0!important;
+    padding:0 12px!important;
+    border:1px solid #d8d8d8!important;
+    border-radius:999px!important;
+    background:#fff!important;
+    color:#111!important;
+    font-size:13px!important;
+    font-weight:800!important;
+    text-align:center!important;
+    display:flex!important;
+    align-items:center!important;
+    justify-content:center!important;
+    appearance:none!important;
+    -webkit-appearance:none!important;
+  }
+
+  #publicModal .loginTabs .btn.black{
+    background:#111!important;
+    color:#fff!important;
+    border-color:#111!important;
+  }
+
+  #publicModal .field{
+    margin-bottom:14px!important;
+  }
+
+  #publicModal .field label{
+    display:block!important;
+    margin-bottom:7px!important;
+    color:#666!important;
+    font-size:10px!important;
+    font-weight:800!important;
+    letter-spacing:.04em!important;
+  }
+
+  #publicModal .field input{
+    width:100%!important;
+    height:52px!important;
+    min-height:52px!important;
+    box-sizing:border-box!important;
+    padding:0 14px!important;
+    border:1px solid #d7d7d7!important;
+    border-radius:14px!important;
+    background:#fff!important;
+    color:#111!important;
+    font-size:16px!important;
+  }
+
+  #publicModal .passwordWrap{
+    width:100%!important;
+  }
+
+  #publicModal .passwordWrap input{
+    padding-right:48px!important;
+  }
+
+  #publicModal .passwordEye{
+    right:12px!important;
+    color:#888!important;
+  }
+
+  #publicModal .primary{
+    width:100%!important;
+    min-height:50px!important;
+    border-radius:999px!important;
+    font-size:14px!important;
+    margin-top:2px!important;
+  }
+
+  #publicModal .primary + .muted{
+    margin:14px 4px 0!important;
+    text-align:center!important;
+    font-size:11.5px!important;
+    line-height:1.4!important;
+  }
+}
+
+@media (max-width:390px){
+  #publicModal .publicBox{
+    padding:19px 16px 18px!important;
+  }
+
+  #publicModal h2{
+    font-size:34px!important;
+  }
+
+  #publicModal .loginTabs .btn{
+    font-size:12.5px!important;
+  }
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1503,7 +1853,7 @@ function toggleMobileMenu(open){
  m.classList.toggle('open',!!open);
  document.body.classList.toggle('kitch-menu-open',!!open);
 }
-function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" onclick="closePublicModal();openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" onclick="closePublicModal();openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="teamLogin()">Team sign in</button>`}`)}
+function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" onclick="closePublicModal();openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" onclick="closePublicModal();openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="teamLogin()">Team sign in</button>`}`)}
 function openCreateWorkspace(){closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>NEW WORKSPACE</span></div><h2>Create your KITCH</h2><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="newCompany"></div><div class="field"><label>FIRST BRANCH NAME</label><input id="newBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="newEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="newPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('newPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="createWorkspace()">Create workspace</button>`)}
 async function createWorkspace(){
  const company=newCompany.value.trim(),branch=newBranch.value.trim(),em=newEmail.value.trim(),pw=newPassword.value;
