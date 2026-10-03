@@ -578,6 +578,44 @@ input,select,textarea{max-width:100%}
   .mobileMenuBtn{width:42px;height:42px}
 }
 
+
+/* ===== SINGLE HORIZONTAL SCROLLBAR FIX =====
+   Keep horizontal scrolling inside wide tables only.
+   Prevent the whole main page/panel from creating a second scrollbar.
+*/
+html, body {
+  overflow-x: hidden !important;
+}
+
+.main {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  min-width: 0 !important;
+}
+
+.panel {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden !important;
+}
+
+.panel table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Prevent nested/duplicate horizontal scrolling */
+#content,
+#content > div {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
