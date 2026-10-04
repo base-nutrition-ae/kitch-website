@@ -2021,14 +2021,16 @@ function departmentName(id){return departments().find(x=>String(x.id)===String(i
 
 function locationsPage(){
  const {loc,dep}=ensureStructure();
+ const business=hasCentralStore();
  return `<div class="grid">
- <div class="card"><span>PACKAGE</span><b style="font-size:18px">${hasCentralStore()?'Unlimited Locations':'One Branch'}</b></div>
+ <div class="card"><span>PACKAGE</span><b style="font-size:18px">${business?'Business':'Starter'}</b></div>
  <div class="card"><span>ACTIVE LOCATIONS</span><b>${loc.filter(x=>x.status==='Active').length}</b></div>
  <div class="card"><span>BRANCHES</span><b>${loc.filter(x=>x.type==='Branch').length}</b></div>
- <div class="card"><span>CENTRAL STORE</span><b style="font-size:18px">${hasCentralStore()?'Fixed':'Not Included'}</b></div></div>
+ ${business?'<div class="card"><span>CENTRAL STORE</span><b style="font-size:18px">Active</b></div>':''}
+ </div>
  <div class="panel"><h2>Locations & Departments</h2>
- <p class="muted">${hasCentralStore()?'<b>Central Store</b> is fixed for Business. Main Office can create and name unlimited branches.':'Starter has one client-named restaurant location and no Central Store.'}</p>
- <div class="actions">${hasCentralStore()?'<button class="btn black" onclick="openAddBranch()">+ Add Location</button>':'<button class="btn black" onclick="openRenameSingleBranch()">Name Branch</button><button class="btn" onclick="openUpgradePrompt()">+ Add Another Location</button>'}</div>
+ <p class="muted">${business?'<b>Business</b> supports multiple restaurant locations and company-wide operations.':'Starter includes one restaurant location.'}</p>
+ <div class="actions">${business?'<button class="btn black" onclick="openAddBranch()">+ Add Location</button>':'<button class="btn black" onclick="openRenameSingleBranch()">Name Branch</button>'}</div>
  <table><tr><th>LOCATION</th><th>TYPE</th><th>DEPARTMENTS</th><th>STATUS</th><th>ACTION</th></tr>
  ${loc.map(x=>`<tr><td><b>${esc(x.name)}</b>${x.fixed?'<br><small>System location</small>':''}</td><td>${esc(x.type)}</td><td>${dep.filter(d=>d.location_id===x.id&&d.status==='Active').map(d=>esc(d.name)).join(' · ')||'—'}</td><td>${x.status}</td><td>${x.fixed?'Fixed':`<button class="btn" onclick="openEditLocation('${x.id}')">Edit</button> <button class="btn" onclick="openDepartment('${x.id}')">+ Department</button>`}</td></tr>`).join('')}</table></div>`;
 }
