@@ -1876,18 +1876,66 @@ function publicInfo(type){
  };const x=data[type];publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:38px">${x[0]}</h2><div class="policyText">${x[1]}</div>`)
 }
 function openSubscribe(){
- publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>SUBSCRIPTION</span></div><h2 style="font-size:38px;margin-bottom:8px">Choose your KITCH</h2><p class="muted">Start with the operating structure that matches your business.</p><div class="planGrid" style="grid-template-columns:repeat(2,1fr)"><div class="plan"><b>Starter</b><strong>AED 299 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>1 restaurant location</li><li>Main Office control</li><li>Kitchen Manager + Production Staff</li><li>Receiving, inventory, recipes & production</li><li>Waste, stock count & variance</li><li>Reports & staff access</li></ul><button class="primary" onclick="startSubscription('starter')">Choose Starter</button></div><div class="plan"><b>Business</b><strong>AED 599 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>Central Store</li><li>Multiple restaurant branches</li><li>Branch-level inventory & managers</li><li>Stock requests & transfers</li><li>Company-wide + location reporting</li><li>Main Office control</li></ul><button class="primary" onclick="startSubscription('business')">Choose Business</button></div></div><div class="note"><b>Testing build:</b> payment is not connected yet. No card will be charged.</div>`)
+ publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>SUBSCRIPTION</span></div><h2 style="font-size:38px;margin-bottom:8px">Choose your KITCH</h2><p class="muted">Start with the operating structure that matches your business.</p><div class="planGrid" style="grid-template-columns:repeat(2,1fr)"><div class="plan"><b>Starter</b><strong>AED 299 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>1 restaurant location</li><li>Main Office control</li><li>Kitchen Manager + Production Staff</li><li>Receiving, inventory, recipes & production</li><li>Waste, stock count & variance</li><li>Reports & staff access</li></ul><button class="primary" onclick="startSubscription('starter')">Choose Starter</button></div><div class="plan"><b>Business</b><strong>AED 599 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>Central Store</li><li>Multiple restaurant branches</li><li>Branch-level inventory & managers</li><li>Stock requests & transfers</li><li>Company-wide + location reporting</li><li>Main Office control</li></ul><button class="primary" onclick="startSubscription('business')">Choose Business</button></div></div><div class="note"><b>Stripe sandbox connected:</b> use Stripe test cards only. No real card will be charged.</div>`)
 }
 function startSubscription(plan){
  const label=plan==='business'?'Business · AED 599/month':'Starter · AED 299/month';
- closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>ACCOUNT SETUP</span></div><h2>${label}</h2><p class="muted">Create the management account and company details. Workspace activation will happen only after the payment-success step.</p><div class="formGrid"><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="subCompany"></div><div class="field"><label>${plan==='business'?'FIRST RESTAURANT BRANCH':'RESTAURANT LOCATION'}</label><input id="subBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="subEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="subPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('subPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div></div><div class="note"><b>Next:</b> test payment confirmation. Real payment processing is not connected in this build.</div><button class="primary" onclick="testSubscriptionPayment('${plan}')">Continue to Test Payment</button>`)
+ closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>ACCOUNT SETUP</span></div><h2>${label}</h2><p class="muted">Create the management account and company details. Workspace activation will happen only after the payment-success step.</p><div class="formGrid"><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="subCompany"></div><div class="field"><label>${plan==='business'?'FIRST RESTAURANT BRANCH':'RESTAURANT LOCATION'}</label><input id="subBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="subEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="subPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('subPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div></div><div class="note"><b>Next:</b> secure Stripe sandbox checkout. Use a Stripe test card only.</div><button class="primary" onclick="testSubscriptionPayment('${plan}')">Continue to Stripe</button>`)
 }
+const STRIPE_PAYMENT_LINKS={
+ starter:'https://buy.stripe.com/test_8x214n9bJaNog7c6Hn43S00',
+ business:'https://buy.stripe.com/test_3cI28r1Jh8Fg8EK3vb43S01'
+};
+
 async function testSubscriptionPayment(plan){
- const company=subCompany.value.trim(),branch=subBranch.value.trim(),em=subEmail.value.trim(),pw=subPassword.value;
+ const company=subCompany.value.trim(),branch=subBranch.value.trim(),em=subEmail.value.trim().toLowerCase(),pw=subPassword.value;
  if(!company||!branch||!em||pw.length<8)return alert('Complete all fields. Password must be at least 8 characters.');
- const payload={plan,company,branch,email:em,password:pw};sessionStorage.setItem('kitch_pending_subscription',JSON.stringify(payload));
- closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>TEST PAYMENT</span></div><h2>Activate ${plan==='business'?'Business':'Starter'}</h2><div class="note"><b>TEST MODE — NO CHARGE</b><br>This simulates a successful payment so the onboarding flow can be tested before a real payment provider is connected.</div><button class="primary" onclick="activateTestSubscription()">Simulate Successful Payment</button><button class="btn" style="width:100%;margin-top:10px" onclick="closePublicModal();openSubscribe()">Back to Packages</button>`)
+
+ const payload={plan,company,branch,email:em,password:pw};
+ sessionStorage.setItem('kitch_pending_subscription',JSON.stringify(payload));
+
+ let {data:{session:activeSession}}=await sb.auth.getSession();
+ const activeEmail=String(activeSession?.user?.email||'').trim().toLowerCase();
+
+ if(activeSession&&activeEmail!==em){
+   await sb.auth.signOut({scope:'local'});
+   activeSession=null;
+ }
+
+ if(!activeSession){
+   const signIn=await sb.auth.signInWithPassword({email:em,password:pw});
+   if(signIn.data?.session){
+     activeSession=signIn.data.session;
+   }else{
+     const signUp=await sb.auth.signUp({
+       email:em,
+       password:pw,
+       options:{data:{kitch_plan:plan,kitch_company:company,kitch_branch:branch}}
+     });
+
+     if(signUp.error){
+       const retry=await sb.auth.signInWithPassword({email:em,password:pw});
+       if(retry.data?.session)activeSession=retry.data.session;
+       else return alert('This email may already have a KITCH account with a different password. Use Management Sign In or use another email.');
+     }else if(signUp.data?.session){
+       activeSession=signUp.data.session;
+     }else{
+       return alert('Your KITCH account was created, but email confirmation is required before payment can continue.');
+     }
+   }
+ }
+
+ const user=activeSession?.user;
+ if(!user?.id)return alert('Could not start the KITCH account session.');
+
+ const base=STRIPE_PAYMENT_LINKS[plan];
+ const checkoutUrl=base
+   +'?client_reference_id='+encodeURIComponent(user.id)
+   +'&locked_prefilled_email='+encodeURIComponent(em);
+
+ window.location.href=checkoutUrl;
 }
+
 async function activateTestSubscription(){
  const payload=JSON.parse(sessionStorage.getItem('kitch_pending_subscription')||'null');
  if(!payload)return alert('Subscription setup expired. Start again.');
@@ -1956,13 +2004,27 @@ async function finishActivatedLogin(){
 function openUpgradePrompt(){publicModal(`<h2>Add another location</h2><p class="muted">Your current Starter package includes one restaurant location.</p><div class="note"><b>Upgrade to Business</b> to add Central Store and additional restaurant branches while keeping Main Office control and location-by-location reporting.</div><button class="primary" onclick="closePublicModal();openPage('Subscription Setup')">View Upgrade</button>`)}
 
 function subscriptionPage(){const p=packageType();if(p==='multi')return `<div class="grid"><div class="card"><span>PACKAGE</span><b style="font-size:18px">Business</b></div><div class="card"><span>STOCK FLOW</span><b style="font-size:16px">Central Store → Restaurants</b></div></div><div class="panel"><h2>Business Package Active</h2><p class="muted">This workspace has already been upgraded to Business.</p><div class="note"><b>Included:</b> Central Store, unlimited restaurant branches, Store Team access, stock requests & transfers, branch inventory and company-wide reporting.<br><br>The Starter upgrade option is no longer shown after Business is active.</div></div>`;return `<div class="grid"><div class="card"><span>PACKAGE</span><b style="font-size:18px">Starter</b></div><div class="card"><span>STOCK FLOW</span><b style="font-size:16px">Restaurant</b></div></div><div class="panel"><h2>Starter Package</h2><p class="muted">One restaurant location with no separate Central Store.</p><div class="actions"><button class="btn black" onclick="setPackage('multi')">Upgrade to Business</button></div><div class="note"><b>Business:</b> adds Central Store, additional restaurant branches, Store Team access, stock requests & transfers and company-wide reporting.</div></div>`}
-function setPackage(p){
- if(packageType()==='multi'&&p!=='multi')return alert('Business is already active for this workspace.');
+async function setPackage(p){
+ if(packageType()==='multi')return alert('Business is already active for this workspace.');
  if(p!=='multi')return;
- localStorage.setItem(PACKAGE_KEY,'multi');
- ensureStructure();
- renderNav();
- openPage('Subscription Setup');
+
+ const {data:{session:activeSession}}=await sb.auth.getSession();
+ if(!activeSession?.user)return alert('Please sign in again before upgrading.');
+
+ const currentCompany=(document.querySelector('#userScope')?.textContent||'KITCH').trim()||'KITCH';
+ const currentBranch=(localStorage.getItem('kitch_cloud_branch_name')||'Main Branch').trim();
+ const email=String(activeSession.user.email||'').trim().toLowerCase();
+
+ sessionStorage.setItem('kitch_pending_subscription',JSON.stringify({
+   plan:'business',
+   company:currentCompany,
+   branch:currentBranch,
+   email
+ }));
+
+ window.location.href=STRIPE_PAYMENT_LINKS.business
+   +'?client_reference_id='+encodeURIComponent(activeSession.user.id)
+   +'&locked_prefilled_email='+encodeURIComponent(email);
 }
 
 
@@ -3370,6 +3432,71 @@ function reportsPage(){
  <h3 style="margin-top:28px">Stock Adjustments</h3><table><tr><th>REFERENCE</th><th>ITEM</th><th>QTY</th><th>LOCATION</th><th>REASON</th><th>RECORDED BY</th><th>DATE</th></tr>${adjustments.slice().reverse().map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.ingredient)}</td><td>${Number(x.qty)>0?'+':''}${cleanQty(x.qty)} ${esc(x.unit)}</td><td>${esc(x.location||'—')}</td><td>${esc(x.reason||'—')}</td><td>${esc(x.recorded_by||'Legacy record')}</td><td>${esc(String(x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No stock adjustments yet.</td></tr>'}</table></div>`
 }
 
+
+async function completeStripeReturn(){
+ const params=new URLSearchParams(window.location.search);
+ if(params.get('stripe')!=='success')return false;
+
+ const {data:{session:activeSession}}=await sb.auth.getSession();
+ if(!activeSession?.user){
+   alert('Payment returned successfully, but your KITCH session is not available. Sign in with the email used for payment.');
+   return false;
+ }
+
+ const pending=JSON.parse(sessionStorage.getItem('kitch_pending_subscription')||'null');
+
+ let subscription=null;
+ for(let i=0;i<20;i++){
+   const {data,error}=await sb.from('kitch_subscriptions')
+     .select('plan,status,stripe_subscription_id')
+     .eq('user_id',activeSession.user.id)
+     .maybeSingle();
+
+   if(!error&&data&&['active','trialing'].includes(String(data.status||'').toLowerCase())){
+     subscription=data;
+     break;
+   }
+   await new Promise(r=>setTimeout(r,500));
+ }
+
+ if(!subscription){
+   publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>PAYMENT CONFIRMATION</span></div>
+   <h2>Payment received</h2>
+   <div class="note"><b>Stripe is still confirming your subscription.</b><br>Please wait a few seconds, then press Continue.</div>
+   <button class="primary" onclick="closePublicModal();completeStripeReturn()">Continue</button>`);
+   return false;
+ }
+
+ const plan=String(subscription.plan||pending?.plan||'starter').toLowerCase()==='business'?'business':'starter';
+ const company=(pending?.company||'KITCH').trim();
+ const branch=(pending?.branch||localStorage.getItem('kitch_cloud_branch_name')||'Main Branch').trim();
+
+ const {error:we}=await sb.rpc('kitch_create_owner_workspace',{
+   p_company:company,
+   p_branch:branch,
+   p_plan:plan,
+   p_operation:plan==='business'?'multi':'restaurant'
+ });
+
+ if(we&&!String(we.message||'').toLowerCase().includes('already')){
+   alert('Payment is confirmed, but workspace activation failed: '+we.message);
+   return false;
+ }
+
+ applyActivatedSubscription({plan,company,branch});
+ sessionStorage.removeItem('kitch_pending_subscription');
+ history.replaceState({},document.title,window.location.pathname);
+
+ cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:activeSession.user};
+ await loadCloudWorkspace();
+ await syncPackageFromCloud();
+ await cloudLoadIngredients();
+ currentStaff=null;
+ closePublicModal();
+ enter('owner');
+ return true;
+}
+
 // LIVE CLIENT BOOT:
 // The cloud workspace is the source of truth. Never display old local demo
 // locations (Central Store / Main Branch / Base) before the signed-in client's
@@ -3402,6 +3529,11 @@ function reportsPage(){
     app.classList.add('hidden');
     login.classList.remove('hidden');
     return;
+  }
+
+  if(new URLSearchParams(window.location.search).get('stripe')==='success'){
+    const activated=await completeStripeReturn();
+    if(activated)return;
   }
 
   const workspaceOk=await loadCloudWorkspace();
