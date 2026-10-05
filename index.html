@@ -1621,6 +1621,130 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-se
 }
 </style>
 
+
+<style id="kitch-mobile-desktop-layout-fix">
+/* KITCH mobile: keep the desktop visual hierarchy, scaled cleanly for phone */
+@media (max-width:850px){
+  .app{
+    display:grid!important;
+    grid-template-columns:92px minmax(0,1fr)!important;
+    min-height:100vh!important;
+    align-items:start!important;
+  }
+  .side{
+    position:sticky!important;
+    top:0!important;
+    width:92px!important;
+    height:100vh!important;
+    min-height:100vh!important;
+    padding:18px 9px!important;
+    overflow:hidden!important;
+    border-right:1px solid #242424!important;
+  }
+  .side .brand{
+    font-size:0!important;
+    margin:0 0 18px!important;
+    min-height:42px!important;
+  }
+  .side .brand img,.side img[src*="kitch-logo"]{
+    width:42px!important;
+    height:42px!important;
+    object-fit:contain!important;
+    display:block!important;
+    margin:0 auto!important;
+  }
+  .side .sub{display:none!important}
+  .side .user{
+    margin:10px 0 14px!important;
+    padding:9px 6px!important;
+    border-radius:12px!important;
+    text-align:center!important;
+  }
+  .side .user b{
+    font-size:11px!important;
+    white-space:nowrap!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+  }
+  .side .user small{
+    font-size:8px!important;
+    line-height:1.25!important;
+    margin-top:3px!important;
+  }
+  .nav{
+    display:block!important;
+    overflow-y:auto!important;
+    overflow-x:hidden!important;
+    padding:0!important;
+  }
+  .nav button{
+    width:100%!important;
+    min-width:0!important;
+    padding:10px 5px!important;
+    margin:3px 0!important;
+    border-radius:10px!important;
+    text-align:center!important;
+    white-space:normal!important;
+    font-size:9px!important;
+    line-height:1.15!important;
+    font-weight:700!important;
+  }
+  .upgradeNav{
+    margin-top:auto!important;
+    padding-top:8px!important;
+  }
+  .upgradeNav button{
+    font-size:9px!important;
+    padding:8px 4px!important;
+    white-space:normal!important;
+  }
+  .main{
+    min-width:0!important;
+    padding:18px 14px 30px!important;
+    overflow-x:hidden!important;
+  }
+  .top{
+    margin-bottom:18px!important;
+    gap:10px!important;
+    align-items:flex-start!important;
+  }
+  .top h1{font-size:26px!important;line-height:1.05!important}
+  .logout{padding:9px 12px!important;font-size:10px!important}
+  .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:9px!important;
+  }
+  .card{
+    border-radius:14px!important;
+    padding:14px!important;
+    min-width:0!important;
+  }
+  .card span{font-size:8px!important;letter-spacing:.06em!important}
+  .card b{font-size:20px!important;line-height:1.1!important}
+  .panel{
+    border-radius:14px!important;
+    padding:15px!important;
+    margin-top:10px!important;
+    overflow-x:auto!important;
+  }
+  .panel h2{font-size:18px!important}
+  .actions{gap:6px!important;margin-top:12px!important}
+  .btn{font-size:9px!important;padding:7px 9px!important;min-height:30px!important}
+  table{min-width:620px!important}
+  th,td{padding:9px!important;font-size:10px!important}
+  th{font-size:8px!important}
+  .matrixGrid{grid-template-columns:1fr!important}
+  .dashKpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .dashMainGrid{grid-template-columns:1fr!important}
+}
+@media (max-width:430px){
+  .app{grid-template-columns:82px minmax(0,1fr)!important}
+  .side{width:82px!important;padding-left:7px!important;padding-right:7px!important}
+  .main{padding:16px 11px 28px!important}
+  .grid,.dashKpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+</style>
+
 </head>
 <body>
 
