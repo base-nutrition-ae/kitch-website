@@ -1836,6 +1836,38 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-se
 }
 </style>
 
+
+<style id="kitch-mobile-safari-bottom-fix">
+/* Mobile Safari: keep the public landing background continuous to the browser chrome. */
+@media (max-width:700px){
+  html{background:#050505!important;}
+  body:has(#login.publicLanding:not(.hidden)){
+    background:#050505!important;
+    min-height:100dvh!important;
+  }
+  #login.publicLanding{
+    height:100dvh!important;
+    min-height:100dvh!important;
+    max-height:none!important;
+    margin:0!important;
+    background-color:#050505!important;
+    background-size:cover!important;
+    background-position:center center!important;
+  }
+  #login.publicLanding::after{
+    content:"";
+    position:absolute;
+    left:0;right:0;bottom:-2px;
+    height:calc(env(safe-area-inset-bottom) + 4px);
+    background:inherit;
+    background-position:center bottom!important;
+    background-size:cover!important;
+    pointer-events:none;
+    z-index:0;
+  }
+  #login.publicLanding .publicFooter{z-index:2!important;}
+}
+</style>
 </head>
 <body>
 
