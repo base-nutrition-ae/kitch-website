@@ -1632,7 +1632,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-se
   body:has(#app:not(.hidden)) #login,
   body:has(#app:not(.hidden)) #publicLanding{display:none!important}
 
-  #app.app{
+  #app.app:not(.hidden){
     display:block!important;
     min-height:100vh!important;
     width:100%!important;
@@ -1773,6 +1773,15 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-se
 }
 </style>
 
+
+<style id="kitch-mobile-visibility-critical-fix">
+@media(max-width:850px){
+  #app.hidden{display:none!important;}
+  #app.hidden .appMobileMenu,#app.hidden .appSideBackdrop,#app.hidden .side,#app.hidden .main{display:none!important;}
+  #login.hidden{display:none!important;}
+  #app:not(.hidden) .appMobileMenu{display:flex!important;}
+}
+</style>
 </head>
 <body>
 
