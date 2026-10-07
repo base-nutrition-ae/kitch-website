@@ -4058,10 +4058,10 @@ async function completeStripeReturn(){
  if(!subscription){
    publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>PAYMENT CONFIRMATION</span></div>
    <h2>Payment received</h2>
-   <div class="note"><b>Stripe is still confirming your subscription.</b><br>Please wait a few seconds, then press Continue.</div>
-   <button class="primary" onclick="closePublicModal();completeStripeReturn()">Continue</button>`);
+   <div class="note"><b>Your Stripe payment was received, but KITCH has not received the subscription activation yet.</b><br><br>Please do not pay again. Press Retry confirmation. If it remains pending, the Stripe → Supabase webhook needs to be replayed/fixed.</div>
+   <button class="primary" onclick="closePublicModal();completeStripeReturn()">Retry confirmation</button>`);
    return false;
- }
+  }
 
  const plan=String(subscription.plan||pending?.plan||'starter').toLowerCase()==='business'?'business':'starter';
  const company=(pending?.company||'KITCH').trim();
