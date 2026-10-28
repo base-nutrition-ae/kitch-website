@@ -2392,8 +2392,8 @@ function startSubscription(plan){
  closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>ACCOUNT SETUP</span></div><h2>${label}</h2><p class="muted">Create the management account and company details. Workspace activation will happen only after the payment-success step.</p><div class="formGrid"><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="subCompany"></div><div class="field"><label>${plan==='business'?'FIRST RESTAURANT BRANCH':'RESTAURANT LOCATION'}</label><input id="subBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="subEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="subPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('subPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div></div><div class="note"><b>Next:</b> secure Stripe sandbox checkout. Use a Stripe test card only.</div><button class="primary" onclick="testSubscriptionPayment('${plan}')">Continue to Stripe</button>`)
 }
 const STRIPE_PAYMENT_LINKS={
- starter:'https://buy.stripe.com/test_8x214n9bJaNog7c6Hn43S00',
- business:'https://buy.stripe.com/test_3cI28r1Jh8Fg8EK3vb43S01'
+ starter:'https://buy.stripe.com/test_fZueVd73MaYR26ocIr6Ri00',
+ business:'https://buy.stripe.com/test_fZu5kDafY9UN9yQaAj6Ri01'
 };
 
 async function testSubscriptionPayment(plan){
