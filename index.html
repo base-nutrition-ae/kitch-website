@@ -1419,25 +1419,6 @@ html, body {
 /* KITCH Main Office dashboard — compact SaaS layout */
 .mainOfficeDash{display:flex;flex-direction:column;gap:14px}.mainOfficeDash .dashTop{display:flex;align-items:center;justify-content:space-between;gap:18px}.mainOfficeDash .dashTitle h2{font-size:25px;margin:0 0 4px}.mainOfficeDash .dashTitle p{margin:0;color:#777;font-size:12px}.mainOfficeDash .dashPeriod{display:flex;gap:7px;flex-wrap:wrap}.mainOfficeDash .dashPeriod .btn{padding:8px 13px}.mainOfficeDash .dashKpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.mainOfficeDash .dashKpi{background:#fff;border:1px solid #e4e4e1;border-radius:15px;padding:16px 17px;min-height:112px}.mainOfficeDash .dashKpiTop{display:flex;align-items:center;justify-content:space-between;gap:10px}.mainOfficeDash .dashKpiIcon{width:31px;height:31px;border:1px solid #e5e5e2;border-radius:9px;display:grid;place-items:center;font-size:14px}.mainOfficeDash .dashKpi span{font-size:10px;color:#777;font-weight:800;letter-spacing:.07em}.mainOfficeDash .dashKpi b{display:block;font-size:24px;line-height:1.05;margin-top:15px;letter-spacing:-.035em}.mainOfficeDash .dashKpi small{display:block;color:#777;font-size:10px;margin-top:7px}.mainOfficeDash .dashMainGrid{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(270px,.72fr);gap:12px}.mainOfficeDash .dashBox{background:#fff;border:1px solid #e4e4e1;border-radius:15px;padding:18px}.mainOfficeDash .dashBoxHead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}.mainOfficeDash .dashBox h3{margin:0;font-size:16px}.mainOfficeDash .dashBox .muted{font-size:11px}.mainOfficeDash .trendChart{height:230px;position:relative;margin-top:8px;border-bottom:1px solid #ecece9;background:linear-gradient(to bottom,transparent 24%,#f1f1ef 25%,transparent 26%,transparent 49%,#f1f1ef 50%,transparent 51%,transparent 74%,#f1f1ef 75%,transparent 76%)}.mainOfficeDash .trendChart svg{width:100%;height:100%;overflow:visible}.mainOfficeDash .chartLegend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:#666}.mainOfficeDash .legendLine{display:inline-block;width:17px;height:2px;background:#111;vertical-align:middle;margin-right:6px}.mainOfficeDash .legendLine.orange{background:#ff5a14}.mainOfficeDash .controlRows{display:flex;flex-direction:column}.mainOfficeDash .controlRow{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #eee;font-size:11px}.mainOfficeDash .controlRow:last-child{border-bottom:0}.mainOfficeDash .controlRow b{font-size:15px}.mainOfficeDash .activityTable{overflow:auto}.mainOfficeDash table{margin-top:8px}.mainOfficeDash th{font-size:9px}.mainOfficeDash td{font-size:11px}.mainOfficeDash .dashSectionTitle{display:flex;justify-content:space-between;align-items:center;gap:12px}.mainOfficeDash .dashSectionTitle h3{margin:0;font-size:16px}@media(max-width:1050px){.mainOfficeDash .dashKpis{grid-template-columns:repeat(2,1fr)}.mainOfficeDash .dashMainGrid{grid-template-columns:1fr}}@media(max-width:650px){.mainOfficeDash .dashTop{align-items:flex-start;flex-direction:column}.mainOfficeDash .dashKpis{grid-template-columns:1fr 1fr}.mainOfficeDash .dashKpi{padding:13px;min-height:100px}.mainOfficeDash .dashKpi b{font-size:20px}.mainOfficeDash .trendChart{height:180px}}
 </style>
-<script>
-/* KITCH login tab reliability patch: capture clicks before legacy inline handlers. */
-(function(){
-  document.addEventListener('click', function(e){
-    const button=e.target.closest && e.target.closest('#publicModal .loginTabs button');
-    if(!button) return;
-    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-    const selected=(button.textContent||'').trim().toLowerCase()==='management'?'management':'team';
-    try {
-      if(typeof window.openPublicSignIn!=='function') throw new Error('Login scripts did not load');
-      window.openPublicSignIn(selected);
-    } catch(err) {
-      const box=document.querySelector('#publicModal .publicBox');
-      if(box){let notice=box.querySelector('#kitchLoginError');if(!notice){notice=document.createElement('p');notice.id='kitchLoginError';notice.style.cssText='color:#b42318;margin:12px 0;font-weight:600';box.appendChild(notice);}notice.textContent='Unable to switch login: '+err.message;}
-      console.error('KITCH login switch failed',err);
-    }
-  },true);
-})();
-</script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -1948,11 +1929,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-se
 <script>
 const SUPABASE_URL='https://rtovpjgrezwxuvantxgt.supabase.co';
 const SUPABASE_KEY='sb_publishable_ERMt86IhOTqRSRXE05CQ-A_JXi27ode';
-const KITCH_SUPABASE_AVAILABLE=!!(window.supabase && typeof window.supabase.createClient==='function');
-const sb=KITCH_SUPABASE_AVAILABLE
- ? window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}})
- : {auth:{getSession:async()=>({data:{session:null},error:new Error('Supabase library unavailable')}),getUser:async()=>({data:{user:null},error:new Error('Supabase library unavailable')}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),signInWithPassword:async()=>({data:null,error:new Error('Cannot connect to Supabase. Check internet connection or deploy this file to your website.')}),signUp:async()=>({data:null,error:new Error('Cannot connect to Supabase. Check internet connection or deploy this file to your website.')})},from(){throw new Error('Supabase library unavailable. Check internet connection.');},functions:{invoke:async()=>({data:null,error:new Error('Supabase library unavailable')})}};
-if(!KITCH_SUPABASE_AVAILABLE){window.addEventListener('DOMContentLoaded',()=>{const notice=document.createElement('div');notice.id='kitchConnectionNotice';notice.setAttribute('role','status');notice.style.cssText='position:fixed;bottom:14px;left:14px;right:14px;z-index:99999;max-width:560px;margin:auto;background:#fff5e8;color:#643c00;border:1px solid #f2c879;padding:13px 17px;border-radius:12px;font:13px Arial;box-shadow:0 4px 18px #0002';notice.textContent='KITCH connection unavailable: Supabase library did not load. Menus can open, but sign-in and subscriptions need an internet connection and a working Supabase script.';document.body.appendChild(notice);});}
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});
 const KITCH_AUTH_BUILD='2026-10-02-final-all-in-one-v1';
 let cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
 let teamCloudAuth=null;
@@ -2080,7 +2057,7 @@ async function syncPackageFromCloud(){
 async function cloudLoadIngredients(){
  if(!cloud.restaurant_id)return;
  const {data,error}=await sb.from('ingredients').select('id,sku,name,base_unit,category,last_unit_cost,receiving_type,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('name');
- if(error){console.error('Ingredient Master cloud read failed',error);window.__kitchIngredientLoadError=error.message||'Could not load Ingredient Master';return;} window.__kitchIngredientLoadError='';
+ if(error){console.error(error);return alert('Could not load Ingredient Master from KITCH Cloud.')}
  const existing=ingredients();
  const byCloud=new Map(existing.filter(x=>x.cloud_id).map(x=>[String(x.cloud_id),x]));
  const byName=new Map(existing.map(x=>[String(x.name||'').trim().toLowerCase(),x]));
@@ -2088,45 +2065,7 @@ async function cloudLoadIngredients(){
   const prev=byCloud.get(String(x.id))||byName.get(String(x.name||'').trim().toLowerCase())||{};
   return {cloud_id:x.id,sku:x.sku||prev.sku||'',name:x.name,category:x.category||prev.category||'',supplier:prev.supplier||'',receiving_type:receivingTypeLabel(x.receiving_type||prev.receiving_type||'Room Temperature'),base_unit:x.base_unit,cost:Number(x.last_unit_cost||0),reference_cost:Number(x.reference_cost!=null?x.reference_cost:(x.last_unit_cost||0)),latest_cost:Number(x.last_unit_cost||0),par:Number(x.par_target||0),minimum:Number(x.minimum_stock||0),opening_stock:Number(prev.opening_stock||0),opening_unit_cost:Number(prev.opening_unit_cost||0),stock:Number(prev.stock||0),stock_canonical:Number(prev.stock_canonical||0),branch_stock_canonical:prev.branch_stock_canonical||{},restaurant_stock_canonical:Number(prev.restaurant_stock_canonical||0),stock_location:prev.stock_location||localStorage.getItem('kitch_cloud_branch_name')||'Main Branch'};
  });
- // Restore actual quantities from saved cloud stock movements, not stale browser cache.
- // Read-only: no stock movements are created or changed here.
- try{
-  const {data:movements,error:movementError}=await sb.from('inventory_movements')
-   .select('ingredient_id,branch_id,quantity_delta,unit')
-   .eq('restaurant_id',cloud.restaurant_id).order('occurred_at',{ascending:true}).limit(10000);
-  if(movementError)throw movementError;
-  const {data:cloudBranches,error:branchError}=await sb.from('branches')
-   .select('id,name,branch_type').eq('restaurant_id',cloud.restaurant_id);
-  if(branchError)throw branchError;
-  const branchNames=new Map((cloudBranches||[]).map(b=>[String(b.id),String(b.name||'').trim().toLowerCase()]));
-  const centralIds=new Set((cloudBranches||[]).filter(b=>b.branch_type==='central_store').map(b=>String(b.id)));
-  const localBranches=(typeof branches==='function'?branches():[]);
-  const totals=new Map();
-  for(const m of (movements||[])){
-   const key=String(m.ingredient_id)+'|'+String(m.branch_id);
-   totals.set(key,(totals.get(key)||0)+Number(m.quantity_delta||0));
-  }
-  for(const x of a){
-   const localByBranch={};let mainTotal=0,centralTotal=0;
-   for(const b of (cloudBranches||[])){
-    const qty=Math.max(0,totals.get(String(x.cloud_id)+'|'+String(b.id))||0);
-    if(centralIds.has(String(b.id))){centralTotal+=qty;continue;}
-    mainTotal+=qty;
-    // Branches stored in the UI may have local IDs rather than cloud UUIDs.
-    localByBranch[String(b.id)]=qty;
-    for(const local of localBranches){
-     if(String(local.name||'').trim().toLowerCase()===branchNames.get(String(b.id)))localByBranch[String(local.id)]=qty;
-    }
-   }
-   x.branch_stock_canonical=localByBranch;
-   x.restaurant_stock_canonical=mainTotal;
-   x.stock_canonical=centralTotal;
-   x.stock=fromCanonical(centralTotal,x.base_unit);
-  }
- }catch(stockError){console.warn('Could not restore KITCH cloud stock:',stockError);}
- // Never replace previously saved ingredients with an empty result during a
- // temporary cloud/RLS issue. An explicit empty master may be handled separately.
- if(a.length||!existing.length)localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
+ localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
 }
 async function ensureSupabaseAuth(){
  // Supabase-js already persists and refreshes sessions. getUser() validates the
@@ -2226,15 +2165,7 @@ function setBranchStockCanonical(ing,branchId,value){
 }
 function contextStockCanonical(ing){
  if(!hasCentralStore())return centralStockCanonical(ing);
- if(session==='store')return centralStockCanonical(ing);
- const branchQty=branchStockCanonical(ing);
- // Cloud branch UUIDs and local UI branch IDs can differ. When this workspace
- // has only one restaurant branch, show its persisted cloud total instead of 0.
- const map=ing.branch_stock_canonical||{};
- const positiveKeys=Object.keys(map).filter(k=>Number(map[k])>0);
- if(branchQty>0||!positiveKeys.length)return branchQty;
- const cloudTotal=Number(ing.restaurant_stock_canonical||0);
- return cloudTotal>0?cloudTotal:branchQty;
+ return session==='store'?centralStockCanonical(ing):branchStockCanonical(ing);
 }
 const roles={
  owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
@@ -2321,29 +2252,39 @@ async function syncTeamWorkspaceContext(){
  if(currentStaff&&assigned){currentStaff.location_id=assigned.id;currentStaff.location_name=assigned.name;}
 }
 async function teamLogin(){
- const name=document.getElementById('teamStaffName').value.trim(),p=pin.value.trim();
- if(!name||!/^\d{4}$/.test(p))return alert('Enter staff name and 4-digit PIN.');
- // Final team-login rule: staff never types a workspace code. The backend resolves
- // the company/workspace from the staff record created by Main Office.
- let {data,error}=await sb.rpc('kitch_team_login',{p_staff_name:name,p_pin:p});
- if(error){
-  // Compatibility fallback for an older database: if this browser already knows the
-  // workspace, use the workspace-scoped RPC without showing that field to staff.
-  const workspace=(localStorage.getItem('kitch_last_workspace_code')||localStorage.getItem('kitch_cloud_workspace_code')||'').trim();
-  if(workspace){({data,error}=await sb.rpc('kitch_team_login_workspace',{p_workspace_code:workspace,p_staff_name:name,p_pin:p}));}
- }
- if(error)return alert('Team sign in failed. The KITCH team-login database function must accept Staff Name + PIN.');
- const row=Array.isArray(data)?data[0]:data;if(!row)return alert('Incorrect staff name or PIN.');
- const role=String(row.role||'').toLowerCase();
- if(!['kitchen_manager','executive_chef','store_manager','receiving_staff','production_staff','viewer'].includes(role))return alert('This staff role is not enabled for Team sign in.');
- teamCloudAuth={workspace_code:row.workspace_code||'',pin:p,staff_name:name};
- if(row.workspace_code){localStorage.setItem('kitch_last_workspace_code',row.workspace_code);localStorage.setItem('kitch_cloud_workspace_code',row.workspace_code);}
- cloud.restaurant_id=row.restaurant_id||null;cloud.branch_id=row.branch_id||null;cloud.workspace_code=row.workspace_code||null;
- activateWorkspaceBrowserScope();
- currentStaff={id:row.staff_id||'',name:row.staff_name||name,role:role.replaceAll('_',' '),location_id:row.branch_id||'',location_name:row.branch_name||'',workspace_name:row.restaurant_name||'',department_id:'',status:'Active'};
- await syncTeamWorkspaceContext();
- const r=(role==='kitchen_manager'||role==='executive_chef')?'manager':((role==='store_manager'||role==='receiving_staff')?'store':'production');
- enter(r);
+ const button=document.getElementById('kitchTeamSubmit');
+ const status=document.getElementById('kitchTeamStatus');
+ const say=(message,isError=true)=>{if(status){status.textContent=message;status.style.color=isError?'#b42318':'#555';status.style.display='block';}else alert(message);};
+ const name=(document.getElementById('teamStaffName')?.value||'').trim();
+ const p=(document.getElementById('pin')?.value||'').trim();
+ if(!name||!/^\d{4}$/.test(p)){say('Enter staff name and a 4-digit PIN.');return;}
+ if(!window.supabase||!sb){say('Connection library unavailable. Refresh the page and check your internet connection.');return;}
+ if(button){button.disabled=true;button.textContent='Signing in…';}
+ say('Checking staff credentials…',false);
+ try{
+  const timedRpc=async(fn,args)=>Promise.race([sb.rpc(fn,args),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Connection timed out. Please try again.')),15000))]);
+  let {data,error}=await timedRpc('kitch_team_login',{p_staff_name:name,p_pin:p});
+  if(error){
+   const workspace=(localStorage.getItem('kitch_last_workspace_code')||localStorage.getItem('kitch_cloud_workspace_code')||'').trim();
+   if(workspace){({data,error}=await timedRpc('kitch_team_login_workspace',{p_workspace_code:workspace,p_staff_name:name,p_pin:p}));}
+  }
+  if(error){say('Team sign in failed: '+(error.message||'Database login error'));return;}
+  const row=Array.isArray(data)?data[0]:data;
+  if(!row){say('Incorrect staff name or PIN, or the staff account is not active.');return;}
+  const role=String(row.role||'').toLowerCase();
+  if(!['kitchen_manager','executive_chef','store_manager','receiving_staff','production_staff','viewer'].includes(role)){say('This staff role is not enabled for Team sign in.');return;}
+  teamCloudAuth={workspace_code:row.workspace_code||'',pin:p,staff_name:name};
+  if(row.workspace_code){localStorage.setItem('kitch_last_workspace_code',row.workspace_code);localStorage.setItem('kitch_cloud_workspace_code',row.workspace_code);}
+  cloud.restaurant_id=row.restaurant_id||null;cloud.branch_id=row.branch_id||null;cloud.workspace_code=row.workspace_code||null;
+  activateWorkspaceBrowserScope();
+  currentStaff={id:row.staff_id||'',name:row.staff_name||name,role:role.replaceAll('_',' '),location_id:row.branch_id||'',location_name:row.branch_name||'',workspace_name:row.restaurant_name||'',department_id:'',status:'Active'};
+  say('Credentials accepted. Opening dashboard…',false);
+  try{await Promise.race([syncTeamWorkspaceContext(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Workspace sync timed out')),8000))]);}
+  catch(syncError){console.warn('Team workspace sync:',syncError);}
+  const r=(role==='kitchen_manager'||role==='executive_chef')?'manager':((role==='store_manager'||role==='receiving_staff')?'store':'production');
+  enter(r);
+ }catch(e){console.error('KITCH team login error',e);say('Unable to sign in: '+(e?.message||String(e)));}
+ finally{if(button){button.disabled=false;button.textContent='Team sign in';}}
 }
 function enter(r){closePublicModal();session=r;login.classList.add('hidden');document.getElementById('publicLanding')?.classList.add('hidden');app.classList.remove('hidden');userName.textContent=currentStaff?.name||roles[r].name;userRole.textContent=(currentStaff?`${currentStaff.role} · ${currentStaff.location_name||locationName(currentStaff.location_id)}`:roles[r].label);userScope.textContent=currentStaff?.workspace_name||cloud.workspace_code||primaryRestaurantName();renderNav();openPage(roles[r].nav[0])}
 async function logout(){toggleAppMobileMenu(false);session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
@@ -2431,18 +2372,7 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-let kitchIngredientRefreshInFlight=false;
-async function refreshKitchIngredientsOnView(){
- if(kitchIngredientRefreshInFlight||!cloud.restaurant_id)return;
- kitchIngredientRefreshInFlight=true;
- try{
-  await cloudLoadIngredients();
-  if(pageTitle.textContent==='Inventory')content.innerHTML=page('Inventory');
-  if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes');
- }catch(err){console.error('Ingredient refresh failed',err)}
- finally{kitchIngredientRefreshInFlight=false}
-}
-function openPage(name){void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if((name==='Inventory'||name==='Recipes')&&cloud.restaurant_id)void refreshKitchIngredientsOnView();if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+function openPage(name){void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -2471,28 +2401,15 @@ function page(n){
 
 
 
-/* KITCH emergency UI recovery: make public navigation work even if later app initialization fails. */
-window.addEventListener('error',function(e){console.error('KITCH runtime:',e.message);});
-document.addEventListener('click',function(e){
- const b=e.target.closest('button[onclick]'); if(!b)return;
- const action=b.getAttribute('onclick')||'';
- if(!/^(openPublicSignIn\(|openSubscribe\(|publicInfo\(|toggleMobileMenu\()/.test(action))return;
- const name=action.slice(0,action.indexOf('('));
- if(typeof window[name]==='function')return;
- console.error('KITCH button handler unavailable:',name);
-},true);
-function publicModal(html){closePublicModal();toggleMobileMenu(false);document.body.insertAdjacentHTML('beforeend',`<div id="publicModal" class="publicModal"><div class="publicBox"><button class="closePublic" onclick="closePublicModal()">×</button>${html}</div></div>`)}
-function closePublicModal(){document.querySelectorAll('#publicModal').forEach(el=>el.remove())}
-document.getElementById('mobilePublicMenu')?.setAttribute('inert','');
+function publicModal(html){document.body.insertAdjacentHTML('beforeend',`<div id="publicModal" class="publicModal"><div class="publicBox"><button class="closePublic" onclick="closePublicModal()">×</button>${html}</div></div>`)}
+function closePublicModal(){document.getElementById('publicModal')?.remove()}
 function toggleMobileMenu(open){
  const m=document.getElementById('mobilePublicMenu');
  if(!m)return;
  m.classList.toggle('open',!!open);
- m.inert=!open;
- m.setAttribute('aria-hidden',String(!open));
  document.body.classList.toggle('kitch-menu-open',!!open);
 }
-function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" type="button" onclick="openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" type="button" onclick="openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="teamLogin()">Team sign in</button>`}`)}
+function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" onclick="closePublicModal();openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" onclick="closePublicModal();openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button type="button" id="kitchTeamSubmit" class="primary" onclick="teamLogin()">Team sign in</button><div id="kitchTeamStatus" role="status" aria-live="polite" style="display:none;margin-top:12px;font-size:13px;line-height:1.5"></div>`}`)}
 function openCreateWorkspace(){closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>NEW WORKSPACE</span></div><h2>Create your KITCH</h2><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="newCompany"></div><div class="field"><label>FIRST BRANCH NAME</label><input id="newBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="newEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="newPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('newPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="createWorkspace()">Create workspace</button>`)}
 async function createWorkspace(){
  const company=newCompany.value.trim(),branch=newBranch.value.trim(),em=newEmail.value.trim(),pw=newPassword.value;
@@ -2606,7 +2523,7 @@ async function activateTestSubscription(){
     activeSession=signUp.data.session;
    }else{
     closePublicModal();
-    return publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>ACCOUNT CREATED</span></div><h2>Confirm your email</h2><div class="note"><b>Your KITCH account was created.</b><br>Supabase email confirmation is currently enabled, so a browser session cannot start until the email is confirmed.</div><p class="muted">Confirm the email from your inbox, then return to KITCH and use Management Sign In. Your selected package and company setup remain saved in this browser and the workspace will finish activating after the first confirmed sign-in.</p><button class="primary" onclick="openPublicSignIn('management')">Go to Sign In</button>`);
+    return publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>ACCOUNT CREATED</span></div><h2>Confirm your email</h2><div class="note"><b>Your KITCH account was created.</b><br>Supabase email confirmation is currently enabled, so a browser session cannot start until the email is confirmed.</div><p class="muted">Confirm the email from your inbox, then return to KITCH and use Management Sign In. Your selected package and company setup remain saved in this browser and the workspace will finish activating after the first confirmed sign-in.</p><button class="primary" onclick="closePublicModal();openPublicSignIn('management')">Go to Sign In</button>`);
    }
   }
  }
@@ -2911,13 +2828,16 @@ function kitchLegacyParCanonical(x){
 function kitchSupplierPrice(x,field){
  const n=Number((x[field]??(field==='latest_cost'?x.cost:0))||0);
  const u=unit(x.base_unit);
- // Tiny imported prices (e.g. AED 0.013/g) are stored per smallest unit.
- // Do not alter the saved supplier record.
- return (u==='kg'||u==='ltr')&&n>0&&n<0.1?n*1000:n;
+ // CSV unit prices are per g or ml when base unit is g/ml.
+ // Convert to supplier purchase price per kg or L for display and valuation.
+ if(u==='g'||u==='ml')return n*1000;
+ // Backward compatibility with older imports saved as kg/L with per-g/ml prices.
+ if((u==='kg'||u==='ltr')&&n>0&&n<0.1)return n*1000;
+ return n;
 }
 function kitchCostLabel(price,base){
  const n=Number(price||0),u=unit(base),suffix=(u==='kg'||u==='g')?'kg':(u==='ltr'||u==='ml')?'L':'pc';
- const amount=(u==='kg'||u==='ltr')&&n>0&&n<0.1?n*1000:n;
+ const amount=(u==='g'||u==='ml'||((u==='kg'||u==='ltr')&&n>0&&n<0.1))?n*1000:n;
  return n>0?'AED '+amount.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+'/'+suffix:'—';
 }
 function kitchStockValue(x){
@@ -2927,12 +2847,12 @@ function kitchStockValue(x){
 }
 function inventoryPage(){
  const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager'&&!hasCentralStore(),storeMaster=hasCentralStore()&&session==='store';
- const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(unit(x.base_unit)==='ltr'||unit(x.base_unit)==='ml'?'L':unit(x.base_unit)==='kg'||unit(x.base_unit)==='g'?'kg':x.base_unit)}</td><td><b>${kitchQuantityLabel(contextStockCanonical(x),x.base_unit)}</b></td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost'),x.base_unit)}</td><td><b>AED ${kitchStockValue(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></td><td>${displayStock(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':displayStock(x)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
- return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>displayStock(x)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
- <div class="panel"><div class="note" style="margin-bottom:14px">Inventory values use recorded stock only. Zero means no available stock is recorded for this location; confirm opening stock before relying on LOW/OUT counts. Supplier prices are shown as currently recorded; verify imported costs against invoices before using inventory valuation.</div><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
+ const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(unit(x.base_unit)==='ltr'||unit(x.base_unit)==='ml'?'L':unit(x.base_unit)==='kg'||unit(x.base_unit)==='g'?'kg':x.base_unit)}</td><td><b>${kitchQuantityLabel(contextStockCanonical(x),x.base_unit)}</b></td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(x.latest_cost,x.base_unit)}</td><td><b>AED ${kitchStockValue(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></td><td>${displayStock(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':displayStock(x)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
+ return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>displayStock(x)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
+ <div class="panel"><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
  <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster||session==='manager')?'<button class="btn" onclick="openImport()">Upload / Import Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
- <table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>SUPPLIER PRICE</th><th>STOCK VALUE</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="11" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div>`;
+ <table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>REFERENCE COST</th><th>LATEST COST</th><th>STOCK VALUE</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="12" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div>`;
 }
 
 function openBranchOpeningStock(){
@@ -2967,7 +2887,6 @@ function modal(body){
   document.documentElement.classList.add('modal-open');
   document.body.classList.add('modal-open');
  }
- document.getElementById('modal')?.remove();
  document.body.insertAdjacentHTML('beforeend',`<div id="modal" class="modal"><div class="modalBox">${body}</div></div>`);
 }
 function closeModal(){
@@ -3006,24 +2925,601 @@ let importRows=[];
 async function readExcel(file){
  if(!file)return;if(typeof XLSX==='undefined')return preview.innerHTML='<div class="note bad">Excel reader could not load. Check your internet connection and reopen the file.</div>';
  try{
-  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Recipe Import')?'Recipe Import':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  const pick=(o,names)=>{for(const n of names)if(Object.prototype.hasOwnProperty.call(o,n))return o[n];return''};
+  importRows=rows.map(r=>{const ref=Number(pick(r,['Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED'])||0),open=Number(pick(r,['Opening Stock','Opening Quantity'])||0),openCost=Number(pick(r,['Opening Unit Cost AED','Opening Cost AED'])||ref||0);return {name:String(pick(r,['Ingredient Name','Ingredient'])).trim(),category:String(pick(r,['Category'])).trim(),supplier:String(pick(r,['Supplier','Supplier Name','Default Supplier'])).trim(),base_unit:unit(pick(r,['Base Unit'])),cost:openCost||ref,reference_cost:ref,opening_stock:open,opening_unit_cost:openCost,par:Number(pick(r,['PAR Target Stock','PAR Level','PAR'])||0),minimum:Number(pick(r,['Minimum Stock','Min Stock'])||0),receiving_type:correctedReceivingType(String(pick(r,['Ingredient Name','Ingredient','Name'])||'').trim(),String(pick(r,['Receiving Type','Storage Type'])||'Room Temperature').trim()||'Room Temperature')}}).filter(x=>x.name);
+  const existing=ingredients();
+  // Import preview only: raw Excel amounts are in grams or millilitres.
+  const shortImportQty=(value,base)=>{
+    const n=Number(value||0);
+    if(!Number.isFinite(n))return '—';
+    const liquid=['l','ltr','liter','litre','ml'].includes(String(base||'').toLowerCase());
+    const fmt=v=>Number(v.toFixed(3)).toString();
+    return n>=1000?fmt(n/1000)+(liquid?' L':' kg'):fmt(n)+(liquid?' ml':' g');
+  };
+  preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Duplicate names will update the existing ingredient instead of creating another one.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${shortImportQty(x.par,x.base_unit)}</td><td>${shortImportQty(x.minimum,x.base_unit)}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Ingredients</button>`;
+ }catch(e){preview.innerHTML='<div class="note bad">Could not read this Excel file.</div>'}
+}
+let ingredientImportBusy=false;
+async function confirmImport(){
+ if(ingredientImportBusy)return;
+ if(!importRows.length)return alert('Choose an Excel file first.');
+ ingredientImportBusy=true;
+ const button=document.querySelector('#preview button.primary');
+ const total=importRows.length;
+ let added=0,updated=0,completed=0;
+ const a=ingredients();
+ const status=document.createElement('div');
+ status.id='ingredientImportStatus';
+ status.setAttribute('role','status');
+ status.setAttribute('aria-live','polite');
+ status.style.cssText='margin:14px 0;padding:14px;background:#f5f5f2;border-radius:14px;font-size:13px';
+ status.innerHTML='<b>Preparing secure import…</b><div style="height:8px;background:#ddd;border-radius:9px;overflow:hidden;margin-top:10px"><div id="ingredientImportBar" style="height:100%;width:0%;background:#111;transition:width .18s ease"></div></div><div id="ingredientImportCount" style="margin-top:8px;color:#666">0 / '+total+' ingredients</div>';
+ if(button){button.disabled=true;button.style.opacity='.65';button.textContent='Importing…';button.before(status)}
+ const updateProgress=()=>{
+  const bar=document.getElementById('ingredientImportBar');
+  const count=document.getElementById('ingredientImportCount');
+  if(bar)bar.style.width=Math.round(completed/total*100)+'%';
+  if(count)count.textContent=completed+' / '+total+' ingredients saved';
+  if(button)button.textContent='Importing '+completed+' / '+total+'…';
+ };
+ try{
+  if(!teamCloudAuth?.pin){
+   const ok=await ensureCloudWorkspace();
+   if(!ok||!cloud.restaurant_id)throw new Error('Management workspace is not loaded. Sign in again.');
+  }
+  for(const x0 of importRows){
+   const e=a.find(z=>z.name.toLowerCase()===x0.name.toLowerCase());
+   if(e){
+    const candidate={...e,...x0,stock:e.stock,stock_canonical:e.stock_canonical,branch_stock_canonical:e.branch_stock_canonical,restaurant_stock_canonical:e.restaurant_stock_canonical,opening_stock:e.opening_stock,opening_unit_cost:e.opening_unit_cost,stock_location:e.stock_location||assignedLocationName()};
+    await cloudUpsertIngredient(candidate);
+    Object.assign(e,candidate);updated++;
+   }else{
+    const x={...x0,sku:'ING-'+String(a.length+1).padStart(3,'0'),stock:Number(x0.opening_stock||0),stock_canonical:toCanonical(Number(x0.opening_stock||0),x0.base_unit),stock_location:assignedLocationName()};
+    await cloudUpsertIngredient(x);
+    a.push(x);added++;
+   }
+   completed++;
+   saveIngredients(a);
+   updateProgress();
+   // Yield to the browser periodically so progress and controls stay responsive.
+   if(completed%5===0)await new Promise(resolve=>setTimeout(resolve,0));
+  }
+  importRows=[];
+  if(status)status.innerHTML='<b style="color:#26733a">✓ Import complete</b><div style="margin-top:6px">'+added+' added · '+updated+' updated</div>';
+  if(button){button.textContent='Import complete';button.style.opacity='1'}
+  await new Promise(resolve=>setTimeout(resolve,650));
+  closeModal();openPage('Inventory');
+ }catch(e){
+  saveIngredients(a);
+  if(status)status.innerHTML='<b style="color:#b42318">Import stopped after '+completed+' of '+total+' ingredients.</b><div style="margin-top:6px">'+esc(String(e.message||e))+'</div><div style="margin-top:6px">Saved items are kept. Check the connection and retry; matching ingredient names will be updated.</div>';
+  if(button){button.textContent='Retry import';button.style.opacity='1'}
+ }finally{
+  ingredientImportBusy=false;
+  if(button)button.disabled=false;
+ }
+}
+
+function downloadMaster(){
+ const a=ingredients();if(!a.length)return alert('Ingredient Master is empty.');
+ if(typeof XLSX==='undefined')return alert('Excel export needs an internet connection.');
+ const data=a.map(x=>({'SKU':x.sku,'Ingredient Name':x.name,'Category':x.category,'Supplier':x.supplier||'','Receiving Type':receivingTypeLabel(x.receiving_type),'Base Unit':x.base_unit,'Reference Cost AED':Number(x.reference_cost||x.cost||0),'Opening Stock':Number(x.opening_stock||x.stock||0),'Opening Unit Cost AED':Number(x.opening_unit_cost||x.cost||0),'PAR Target Stock':x.par,'Minimum Stock':x.minimum,'Current Stock':x.stock}));
+ const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,'Ingredient Master');XLSX.writeFile(wb,'KITCH_INGREDIENT_MASTER.xlsx');
+}
+
+
+const SUP_KEY='kitch_demo_suppliers_v1',PO_KEY='kitch_demo_pos_v1';
+function getArr(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return[]}}
+function setArr(k,a){localStorage.setItem(k,JSON.stringify(a))}
+function supplierProducts(){return getArr('kitch_supplier_products_v2')}
+function setSupplierProducts(a){setArr('kitch_supplier_products_v2',a)}
+function purchaseStatus(x){return x.status||'Pending Approval'}
+function purchaseOrderRows(po){
+ if(!po.length)return '<tr><td colspan="9" class="empty">No purchase requests or orders yet.</td></tr>';
+ const groups=[];po.forEach(x=>{let g=groups.find(v=>v.po===x.po);if(!g){g={po:x.po,rows:[]};groups.push(g)}g.rows.push(x)});
+ return groups.map(g=>{const first=g.rows[0],status=purchaseStatus(first),total=g.rows.reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0),items=g.rows.map(x=>`<div><b>${esc(x.ingredient)}</b> <span class="muted">${cleanQty(x.qty)} ${esc(x.unit)} × ${money(x.price)}</span></div>`).join(''),action=status==='Pending Approval'&&['owner','manager'].includes(session)?`<button class="btn black" onclick="approvePurchase(${first.id})">Approve</button> <button class="btn" onclick="rejectPurchase(${first.id})">Reject</button>`:status==='Approved'?`<button class="btn" onclick="markPOSent(${first.id})">Mark Sent</button>`:'—';return `<tr><td><b>${esc(g.po)}</b><br><small>${g.rows.length} item${g.rows.length===1?'':'s'}</small></td><td>${esc(first.supplier)}</td><td>${items}</td><td>${g.rows.length} line${g.rows.length===1?'':'s'}</td><td>—</td><td><b>${money(total)}</b></td><td>${esc(first.delivery_date||'—')}</td><td><span class="alertBadge ${status==='Pending Approval'?'alertWarning':status==='Rejected'?'alertCritical':'alertInfo'}">${esc(status)}</span></td><td>${action}</td></tr>`}).join('')
+}
+function purchasingPage(){
+ const clean=normalizeSupplierData(),su=clean.su,po=getArr(PO_KEY),sp=clean.sp;
+ const pending=po.filter(x=>purchaseStatus(x)==='Pending Approval').length,open=po.filter(x=>['Approved','Open'].includes(purchaseStatus(x))).length;
+ const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
+ return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
+ <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn" onclick="openSupplierExcel()">Import Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button></div>
+ <h3>Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
+ <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
+}
+
+function viewSupplierProfile(id){
+ const su=getArr(SUP_KEY),x=su.find(v=>String(v.id)===String(id));if(!x)return alert('Supplier not found.');
+ const products=supplierProducts().filter(p=>String(p.supplier||'').toLowerCase()===String(x.name||'').toLowerCase());
+ modal(`<div class="modalHead"><div><h2>${esc(x.name)}</h2><div class="muted">Supplier Profile</div></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:18px">
+ <div class="card"><span>CONTACT PERSON</span><b style="font-size:15px">${esc(x.contact||'—')}</b></div>
+ <div class="card"><span>PHONE</span><b style="font-size:15px">${esc(x.phone||'—')}</b></div>
+ <div class="card"><span>EMAIL</span><b style="font-size:15px">${esc(x.email||'—')}</b></div>
+ <div class="card"><span>TRN / VAT</span><b style="font-size:15px">${esc(x.trn||'—')}</b></div>
+ <div class="card"><span>PAYMENT TERMS</span><b style="font-size:15px">${esc(x.terms||'—')}</b></div>
+ <div class="card"><span>DELIVERY DAYS</span><b style="font-size:15px">${esc(x.days||'—')}</b></div>
+ <div class="card"><span>MINIMUM ORDER</span><b style="font-size:15px">${x.min_order?money(x.min_order):'—'}</b></div>
+ <div class="card"><span>LEAD TIME</span><b style="font-size:15px">${x.lead_time?esc(String(x.lead_time))+' days':'—'}</b></div>
+ <div class="card"><span>PRODUCTS</span><b style="font-size:15px">${products.length}</b></div></div>
+ <div class="panel"><h3>Address / Location</h3><div>${esc(x.address||'—')}</div>${x.notes?`<div class="note" style="margin-top:12px"><b>Notes:</b> ${esc(x.notes)}</div>`:''}</div>
+ <div class="panel"><h3>Supplier Products & Agreed Prices</h3><div style="overflow-x:auto"><table><tr><th>PRODUCT</th><th>SKU</th><th>UNIT</th><th>AGREED PRICE</th><th>LEAD TIME</th><th>NOTES</th></tr>${products.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.sku||'—')}</td><td>${esc(p.unit||'—')}</td><td>${money(Number(p.price||0))}</td><td>${p.lead_time?esc(String(p.lead_time))+' days':'—'}</td><td>${esc(p.notes||'—')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No supplier products.</td></tr>'}</table></div></div>`);
+}
+function openSupplier(){modal(`<div class="modalHead"><h2>Add Supplier</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid"><div class="field"><label>SUPPLIER NAME</label><input id="sName"></div><div class="field"><label>CONTACT PERSON</label><input id="sContact"></div><div class="field"><label>PHONE NUMBER</label><input id="sPhone"></div><div class="field"><label>EMAIL</label><input id="sEmail" type="email"></div><div class="field"><label>TRN / VAT NUMBER</label><input id="sTrn"></div><div class="field"><label>PAYMENT TERMS</label><input id="sTerms" placeholder="e.g. 30 days"></div><div class="field"><label>DELIVERY DAYS</label><input id="sDays" placeholder="e.g. Sun, Tue, Thu"></div><div class="field"><label>MINIMUM ORDER AED</label><input id="sMin" type="number" min="0" step=".01"></div><div class="field"><label>ADDRESS / LOCATION</label><input id="sAddress"></div><div class="field"><label>LEAD TIME DAYS</label><input id="sLead" type="number" min="0"></div></div><div class="field"><label>NOTES</label><input id="sNotes"></div><button class="primary" onclick="saveSupplier()">Create Supplier</button>`) }
+function saveSupplier(){let name=sName.value.trim();if(!name)return alert('Enter supplier name.');let a=getArr(SUP_KEY);if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert('Supplier already exists.');a.push({id:Date.now(),name,contact:sContact.value.trim(),phone:sPhone.value.trim(),email:sEmail.value.trim(),trn:sTrn.value.trim(),terms:sTerms.value.trim(),days:sDays.value.trim(),min_order:Number(sMin.value||0),address:sAddress.value.trim(),lead_time:sLead.value.trim(),notes:sNotes.value.trim()});setArr(SUP_KEY,a);closeModal();openPage('Suppliers & Purchasing')}
+function openSupplierProduct(){const su=getArr(SUP_KEY);if(!su.length)return alert('Create a supplier first.');modal(`<div class="modalHead"><h2>Add Supplier Product</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid"><div class="field"><label>SUPPLIER</label><select id="spSup">${su.map(x=>`<option>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>PRODUCT / INGREDIENT</label><input id="spName"></div><div class="field"><label>SUPPLIER SKU</label><input id="spSku"></div><div class="field"><label>UNIT</label><select id="spUnit"><option>kg</option><option>g</option><option>ltr</option><option>ml</option><option>pcs</option></select></div><div class="field"><label>PRICE AED</label><input id="spPrice" type="number" min="0" step=".01"></div></div><button class="primary" onclick="saveSupplierProduct()">Save Product</button>`)}
+function saveSupplierProduct(){const name=spName.value.trim(),price=Number(spPrice.value||0);if(!name||price<0)return alert('Complete product and price.');let a=supplierProducts();a.push({id:Date.now(),supplier:spSup.value,name,sku:spSku.value.trim(),unit:spUnit.value,price,previous_price:price,updated_at:new Date().toISOString()});setSupplierProducts(a);closeModal();openPage('Suppliers & Purchasing')}
+function openSupplierExcel(){modal(`<div class="modalHead"><h2>Import Supplier Excel</h2><button class="close" onclick="closeModal()">×</button></div><div class="note">Supported: Supplier, Contact Person, Phone Number, Email, TRN / VAT Number, Payment Terms, Delivery Days, Minimum Order AED, Address / Location, Product, Supplier SKU, Unit, Agreed Price AED, Lead Time Days, Notes. Re-importing updates existing suppliers/products — it does not duplicate them.</div><label class="filePick">Choose Excel file<input id="supplierExcel" type="file" accept=".xlsx,.xls" style="display:none" onchange="importSupplierExcel(this.files[0])"></label>`) }
+function normalizeSupplierData(){
+ let su=getArr(SUP_KEY), sp=supplierProducts();
+ const sm=new Map(); su.forEach(x=>{const k=String(x.name||'').trim().toLowerCase();if(!k)return;const prev=sm.get(k)||{};sm.set(k,{...prev,...x,id:prev.id||x.id,name:x.name||prev.name,contact:x.contact||prev.contact||'',phone:x.phone||prev.phone||'',email:x.email||prev.email||'',trn:x.trn||prev.trn||'',terms:x.terms||prev.terms||'',days:x.days||prev.days||'',min_order:Number(x.min_order||prev.min_order||0),address:x.address||prev.address||'',lead_time:x.lead_time||prev.lead_time||'',notes:x.notes||prev.notes||''})});
+ const pm=new Map(); sp.forEach(x=>{const supplier=String(x.supplier||'').trim(), sku=String(x.sku||'').trim(), name=String(x.name||'').trim();if(!supplier||!name)return;const k=(supplier+'|'+(sku||name)).toLowerCase();const prev=pm.get(k);pm.set(k,prev?{...prev,...x,id:prev.id||x.id,previous_price:Number(prev.price||prev.previous_price||x.price||0)}:x)});
+ su=[...sm.values()];sp=[...pm.values()];setArr(SUP_KEY,su);setSupplierProducts(sp);return {su,sp};
+}
+function importSupplierExcel(file){if(!file)return;const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let base=normalizeSupplierData(),su=base.su,sp=base.sp,addedS=0,updatedS=0,addedP=0,updatedP=0;rows.forEach(row=>{const supplier=String(row.Supplier||row.supplier||'').trim();if(!supplier)return;let sx=su.find(x=>String(x.name||'').toLowerCase()===supplier.toLowerCase());const details={contact:String(row['Contact Person']||row.Contact||'').trim(),phone:String(row['Phone Number']||row.Phone||'').trim(),email:String(row.Email||'').trim(),trn:String(row['TRN / VAT Number']||row.TRN||'').trim(),terms:String(row['Payment Terms']||'').trim(),days:String(row['Delivery Days']||'').trim(),min_order:Number(row['Minimum Order AED']||row['Minimum Order']||0),address:String(row['Address / Location']||row.Address||'').trim(),lead_time:String(row['Lead Time Days']||'').trim(),notes:String(row.Notes||'').trim()};if(!sx){sx={id:Date.now()+Math.random(),name:supplier,...details};su.push(sx);addedS++}else{Object.keys(details).forEach(k=>{if(details[k]!==''&&details[k]!==0)sx[k]=details[k]});updatedS++}const product=String(row.Product||row.Ingredient||'').trim();if(product){const sku=String(row['Supplier SKU']||row.SKU||'').trim(),unit=String(row.Unit||'kg').trim(),price=Number(row['Agreed Price AED']||row.Price||0),lead=String(row['Lead Time Days']||'').trim(),notes=String(row.Notes||'').trim();let px=sp.find(x=>String(x.supplier||'').toLowerCase()===supplier.toLowerCase()&&((sku&&String(x.sku||'').toLowerCase()===sku.toLowerCase())||(!sku&&String(x.name||'').toLowerCase()===product.toLowerCase())));if(px){if(price!==Number(px.price||0))px.previous_price=Number(px.price||0);Object.assign(px,{supplier,name:product,sku,unit,price,lead_time:lead,notes,updated_at:new Date().toISOString()});updatedP++}else{sp.push({id:Date.now()+Math.random(),supplier,name:product,sku,unit,price,previous_price:price,lead_time:lead,notes,updated_at:new Date().toISOString()});addedP++}}});setArr(SUP_KEY,su);setSupplierProducts(sp);normalizeSupplierData();closeModal();openPage('Suppliers & Purchasing');alert(`Import complete. ${addedS} new suppliers, ${updatedS} supplier rows updated, ${addedP} new products, ${updatedP} products updated. Existing duplicates were cleaned.`)}catch(err){console.error(err);alert('Could not read this Excel file. Check the column names.')}};r.readAsArrayBuffer(file)}
+function openPurchaseRequest(){
+ const su=getArr(SUP_KEY); if(!su.length)return alert('Create or import suppliers first.');
+ window._prLines=[];
+ modal(`<div class="modalHead"><h2>Create Purchase Request</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div class="formGrid"><div class="field"><label>SUPPLIER</label><select id="prSup" onchange="resetPRLines()">${su.map(x=>`<option>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>DELIVERY DATE</label><input id="prDate" type="date"></div></div>
+ <div class="note">Add all products required from this supplier. KITCH will create one Purchase Request and, after approval, one Purchase Order.</div>
+ <div id="prLines"></div>
+ <div class="actions"><button class="btn" onclick="addPRLine()">+ Add Item</button></div>
+ <div class="panel" style="margin-top:14px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><b>ORDER TOTAL</b><b id="prGrandTotal" style="font-size:22px">AED 0.00</b></div></div>
+ <div class="field"><label>NOTES</label><input id="prNotes" placeholder="Optional purchasing note"></div>
+ <button class="primary" onclick="savePurchaseRequest()">Submit for Approval</button>`);
+ const d=new Date();d.setDate(d.getDate()+1);const dateEl=document.getElementById('prDate');if(dateEl)dateEl.value=d.toISOString().slice(0,10);addPRLine();
+}
+function resetPRLines(){window._prLines=[];const box=document.getElementById('prLines');if(box)box.innerHTML='';addPRLine()}
+function prSupplierRows(){const sup=document.getElementById('prSup')?.value||'';return supplierProducts().filter(x=>x.supplier===sup)}
+function addPRLine(){
+ const rows=prSupplierRows();if(!rows.length){const box=document.getElementById('prLines');if(box)box.innerHTML='<div class="empty">No products linked to this supplier.</div>';return}
+ const key='prl_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);window._prLines=window._prLines||[];window._prLines.push(key);
+ const box=document.getElementById('prLines');const div=document.createElement('div');div.id=key;div.className='panel';div.style.cssText='margin-top:12px;padding:16px';
+ div.innerHTML=`<div class="formGrid"><div class="field"><label>PRODUCT</label><select class="prLineProduct" onchange="updatePRLine('${key}')">${rows.map(x=>`<option value="${x.id}">${esc(x.name)} · ${money(x.price)} / ${esc(x.unit)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input class="prLineQty" type="number" min="0" step=".01" value="1" oninput="updatePRLine('${key}')"></div></div><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span class="muted prLineMeta"></span><div><b class="prLineTotal">AED 0.00</b> <button class="btn" type="button" onclick="removePRLine('${key}')">Remove</button></div></div>`;
+ box.appendChild(div);updatePRLine(key)
+}
+function removePRLine(key){const el=document.getElementById(key);if(el)el.remove();window._prLines=(window._prLines||[]).filter(x=>x!==key);updatePRGrandTotal()}
+function updatePRLine(key){const el=document.getElementById(key);if(!el)return;const id=el.querySelector('.prLineProduct')?.value,p=supplierProducts().find(x=>String(x.id)===String(id)),qty=Number(el.querySelector('.prLineQty')?.value||0);el.querySelector('.prLineMeta').textContent=p?`${p.sku||'No SKU'} · ${p.unit} · ${money(p.price)} each`:'';el.querySelector('.prLineTotal').textContent=p?money(qty*Number(p.price||0)):money(0);updatePRGrandTotal()}
+function updatePRGrandTotal(){let total=0;(window._prLines||[]).forEach(key=>{const el=document.getElementById(key);if(!el)return;const p=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value)),q=Number(el.querySelector('.prLineQty')?.value||0);if(p&&q>0)total+=q*Number(p.price||0)});const t=document.getElementById('prGrandTotal');if(t)t.textContent=money(total)}
+function savePurchaseRequest(){
+ const supplier=document.getElementById('prSup')?.value||'',delivery=document.getElementById('prDate')?.value||'',notes=(document.getElementById('prNotes')?.value||'').trim();let lines=[];
+ (window._prLines||[]).forEach(key=>{const el=document.getElementById(key);if(!el)return;const p=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value)),qty=Number(el.querySelector('.prLineQty')?.value||0);if(p&&qty>0)lines.push({p,qty})});
+ if(!supplier||!lines.length)return alert('Add at least one product with a valid quantity.');
+ const existing=getArr(PO_KEY),nums=existing.map(x=>Number(String(x.po||'').match(/(?:PR|PO)-(\d+)/)?.[1]||0)),n=Math.max(0,...nums)+1,pr='PR-'+String(n).padStart(4,'0'),groupId=Date.now();
+ lines.forEach((l,i)=>existing.push({id:groupId+i,request_id:groupId,po:pr,supplier,ingredient:l.p.name,sku:l.p.sku||'',unit:l.p.unit,qty:l.qty,price:l.p.price,delivery_date:delivery,notes,status:'Pending Approval',accepted:0,rejected:0,created_at:new Date().toISOString()}));
+ setArr(PO_KEY,existing);closeModal();openPage('Suppliers & Purchasing')
+}
+function approvePurchase(id){let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const old=seed.po,newPo=old.replace(/^PR-/,'PO-'),now=new Date().toISOString();a.forEach(x=>{if(x.po===old){x.status='Approved';x.po=newPo;x.approved_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
+function rejectPurchase(id){let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po;a.forEach(x=>{if(x.po===key)x.status='Rejected'});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
+function markPOSent(id){let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po,now=new Date().toISOString();a.forEach(x=>{if(x.po===key){x.status='Open';x.sent_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
+function openPO(){openPurchaseRequest()}
+function poIngredientChanged(){}
+function savePO(){}
+function receivingPage(){
+ const po=getArr(PO_KEY);
+ const starter=!hasCentralStore();
+ const direct=starter||session==='store';
+ const title='Receiving';
+ const intro=starter?'Receive supplier deliveries directly into the restaurant with invoice proof. No Purchase Order is required in Starter. Only accepted quantity enters Inventory.':'Central Store receives supplier deliveries directly with invoice proof. Branches request stock from Central Store; Central Store does not create Purchase Orders.';
+ const add=direct?'<div class="actions"><button class="btn black" onclick="openDirectReceive()">+ Receive Supplier Stock</button></div>':'';
+ return `<div class="panel"><h2>${title}</h2><p class="muted">${intro}</p>${add}<table><tr><th>${direct?'RECEIPT':'PO'}</th><th>SUPPLIER</th><th>INGREDIENT</th><th>${direct?'DELIVERED':'ORDERED'}</th><th>STATUS</th><th>ACTION</th></tr>${po.map(x=>`<tr><td>${esc(x.po)}</td><td>${esc(x.supplier)}</td><td><b>${esc(x.ingredient)}</b></td><td>${cleanQty(x.direct_receive?(x.delivered||x.qty):x.qty)} ${esc(x.unit)}</td><td>${x.status}</td><td>${x.status==='Open'?`<button class="btn black" onclick="openReceive(${x.id})">Receive</button>`:`Accepted ${cleanQty(x.accepted)} · Rejected ${cleanQty(x.rejected)}${x.invoice_price!=null?`<br><small class="${x.price_variance_alert?'warn':'ok'}">Price: ${money(x.reference_price)} → ${money(x.invoice_price)} · ${Number(x.price_variance_pct||0)>=0?'+':''}${Number(x.price_variance_pct||0).toFixed(2)}%</small>`:''}${x.receiving_condition_status?`<br><small class="${x.receiving_condition_status==='Passed'?'ok':'bad'}">Condition: ${esc(x.receiving_condition_status)}${x.receiving_temperature!==''&&x.receiving_temperature!=null?` · ${esc(x.receiving_temperature)}°C`:''}</small>`:''}${Number(x.rejected)>0&&x.reject_reason?`<br><small class="warn">Reason: ${esc(x.reject_reason)}${x.reject_note?` · ${esc(x.reject_note)}`:''}</small>`:''}`}</td></tr>`).join('')||`<tr><td colspan="6" class="empty">${direct?'No receiving records yet. Click + Receive Supplier Stock to start.':'No receiving records.'}</td></tr>`}</table></div>`;
+}
+function openDirectReceive(){
+ const ing=sortedIngredients(); if(!ing.length)return alert('Ingredient Master is empty. Add or import ingredients first.');
+ modal(`<div class="modalHead"><h2>Receive Stock</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid">
+ <div class="field"><label>SUPPLIER *</label><input id="drSupplier" placeholder="Supplier name"><small class="muted">Defaults from Ingredient Master. You can change it for this delivery.</small></div>
+ <div class="field"><label>INGREDIENT *</label><select id="drIng" class="ingredientSelect" onchange="directReceiveIngredientChanged()">${ing.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div>
+ <div class="field"><label>DELIVERED QUANTITY *</label><input id="drQty" type="number" min="0" step=".01"></div>
+ <div class="field"><label>INVOICE UNIT PRICE AED *</label><input id="drPrice" type="number" min="0" step=".01"></div></div>
+ <div class="note">Supplier stock is received directly with invoice proof. KITCH checks accepted/rejected quantity, expiry, receiving condition and actual cost before inventory is updated.</div>
+ <button class="primary" onclick="startDirectReceive()">Continue Receiving</button>`); directReceiveIngredientChanged();
+}
+function directReceiveIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('drIng')?.value);const el=document.getElementById('drPrice'),sup=document.getElementById('drSupplier');if(x&&el)el.value=Number(x.reference_cost!=null?x.reference_cost:x.cost||0).toFixed(2);if(x&&sup)sup.value=x.supplier||''}
+function startDirectReceive(){
+ const supplier=(document.getElementById('drSupplier')?.value||'').trim(),sku=document.getElementById('drIng')?.value,qty=Number(document.getElementById('drQty')?.value||0),price=Number(document.getElementById('drPrice')?.value||0),ing=ingredients().find(i=>i.sku===sku);
+ if(!supplier)return alert('Enter supplier name.'); if(!ing||qty<=0)return alert('Enter a valid delivered quantity.'); if(price<0)return alert('Enter a valid invoice price.');
+ let a=getArr(PO_KEY),id=Date.now(),n=a.filter(x=>x.direct_receive).length+1;
+ a.push({id,po:'REC-'+String(n).padStart(4,'0'),supplier,sku:ing.sku,ingredient:ing.name,unit:ing.base_unit,qty,delivered:qty,price,status:'Open',accepted:0,rejected:0,direct_receive:true}); setArr(PO_KEY,a); closeModal(); openReceive(id);
+}
+function receivePriceImpact(id){
+ const x=getArr(PO_KEY).find(p=>p.id===id),ing=ingredients().find(i=>i.sku===x?.sku);if(!x||!ing)return;
+ const ref=Number(ing.reference_cost!=null?ing.reference_cost:ing.cost||0),invoice=Number(document.getElementById('rInvoicePrice')?.value||0);
+ const diff=invoice-ref,pct=ref>0?(diff/ref*100):0,box=document.getElementById('receivePriceImpact');
+ if(!box)return;
+ const cls=Math.abs(pct)>=10?'bad':Math.abs(pct)>=3?'warn':'ok';
+ box.className='note '+cls;
+ box.innerHTML=`<b>Price Control:</b> Reference ${money(ref)} / ${esc(ing.base_unit)} → Invoice ${money(invoice)} / ${esc(ing.base_unit)} · <b>${diff>=0?'+':''}${money(diff)} (${pct>=0?'+':''}${pct.toFixed(2)}%)</b><br><small>${Math.abs(pct)>=3?'Price variance alert will be sent to Main Office.':'Within 3% tolerance — recorded in price history.'}</small>`;
+}
+function openReceive(id){
+ const x=getArr(PO_KEY).find(p=>p.id===id);if(!x)return;
+ const ing=ingredients().find(i=>i.sku===x.sku),ref=Number(ing?.reference_cost!=null?ing.reference_cost:ing?.cost||x.price||0),recvType=correctedReceivingType(ing?.name,ing?.receiving_type);
+ modal(`<div class="modalHead"><h2>Receive ${x.po}</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note"><b>${esc(x.ingredient)}</b> · ${x.direct_receive?'Delivered':'Ordered'} ${x.qty} ${esc(x.unit)} · ${esc(x.supplier)}<br><small>Master reference price: ${money(ref)} / ${esc(x.unit)}</small></div>
+ <div class="formGrid">
+  <div class="field"><label>DELIVERED QUANTITY</label><input id="rDelivered" type="number" min="0" step=".01" value="${x.qty}"></div>
+  <div class="field"><label>REJECTED QUANTITY</label><input id="rRejected" type="number" min="0" step=".01" value="0" oninput="toggleRejectReason()"></div>
+  <div class="field"><label>INVOICE UNIT PRICE AED *</label><input id="rInvoicePrice" type="number" min="0" step=".01" value="${Number(x.price||0).toFixed(2)}" oninput="receivePriceImpact(${id})"></div>
+  <div class="field"><label>PRODUCTION DATE *</label><input id="rProductionDate" type="date"></div>
+  <div class="field"><label>EXPIRY DATE *</label><input id="rExpiry" type="date"></div>
+  <div class="field"><label>INVOICE PROOF *</label><input id="rInvoiceProof" type="file" accept="image/*,.pdf"></div>
+ </div>
+ <div class="note"><b>Receiving Condition Check</b><br><small>Receiving type: <b>${esc(recvType)}</b>. Temperature entry stays open for every delivery. It is required for Chilled and Frozen items and optional for Room Temperature items.</small></div>
+ <div class="formGrid">
+  <div class="field"><label>ACTUAL TEMPERATURE °C ${(['Chilled','Frozen'].includes(recvType))?'*':'· OPTIONAL'}</label><input id="rTemperature" type="number" step=".1" inputmode="decimal" placeholder="Enter actual temperature °C" value=""></div><div class="field"><label>TEMPERATURE CHECK ${(['Chilled','Frozen'].includes(recvType))?'*':''}</label><select id="rTemperatureCheck"><option value="">Select</option><option>Pass</option><option>Fail</option></select></div>
+  <div class="field"><label>PACKAGING CONDITION *</label><select id="rPackagingCheck"><option>Pass</option><option>Fail</option></select></div>
+  <div class="field"><label>PRODUCT QUALITY / APPEARANCE *</label><select id="rQualityCheck"><option>Pass</option><option>Fail</option></select></div>
+  <div class="field"><label>EXPIRY / SHELF LIFE *</label><select id="rShelfLifeCheck"><option>Pass</option><option>Fail</option></select></div>
+  <div class="field"><label>RECEIVING PHOTO / NOTE</label><input id="rConditionNote" placeholder="Optional condition note"></div>
+ </div>
+ <div id="receivePriceImpact" class="note"></div>
+ <div id="rejectReasonBox" class="hidden">
+  <div class="formGrid">
+   <div class="field"><label>REJECT REASON *</label><select id="rReason" onchange="toggleOtherReason()">
+    <option value="">Select reason</option><option>Damaged</option><option>Wrong Item</option><option>Poor Quality</option>
+    <option>Expired / Short Expiry</option><option>Temperature Issue</option><option>Wrong Quantity</option>
+    <option>Packaging Damaged</option><option>Other</option>
+   </select></div>
+   <div id="otherReasonBox" class="field hidden"><label>REJECTION NOTE *</label><input id="rReasonNote" placeholder="Enter rejection reason"></div>
+  </div>
+ </div>
+ <div class="note">Accepted = Delivered − Rejected. Only accepted stock enters Inventory. Invoice price becomes the latest actual cost; the original master reference price is retained.</div>
+ <button class="primary" onclick="confirmReceive(${id})">Confirm Receiving</button>`);
+ receivePriceImpact(id);
+}
+function toggleRejectReason(){
+ const qty=Number(document.getElementById('rRejected')?.value||0);
+ document.getElementById('rejectReasonBox')?.classList.toggle('hidden',qty<=0);
+ if(qty<=0){const r=document.getElementById('rReason');if(r)r.value='';const n=document.getElementById('rReasonNote');if(n)n.value='';}
+}
+function toggleOtherReason(){
+ const other=document.getElementById('rReason')?.value==='Other';
+ document.getElementById('otherReasonBox')?.classList.toggle('hidden',!other);
+}
+function confirmReceive(id){
+ let po=getArr(PO_KEY),x=po.find(p=>p.id===id);if(!x)return;
+ let d=Number(rDelivered.value||0),r=Number(rRejected.value||0),invoicePrice=Number(document.getElementById('rInvoicePrice')?.value||0);
+ const ingMaster=ingredients().find(i=>i.sku===x.sku),receivingType=correctedReceivingType(ingMaster?.name,ingMaster?.receiving_type),tempRequired=receivingType==='Chilled'||receivingType==='Frozen';
+ const temp=(document.getElementById('rTemperature')?.value||'').trim(),tempCheck=document.getElementById('rTemperatureCheck')?.value||'',packagingCheck=document.getElementById('rPackagingCheck')?.value||'Pass',qualityCheck=document.getElementById('rQualityCheck')?.value||'Pass',shelfLifeCheck=document.getElementById('rShelfLifeCheck')?.value||'Pass',conditionNote=(document.getElementById('rConditionNote')?.value||'').trim();
+ const failedChecks=[['Temperature',tempCheck],['Packaging',packagingCheck],['Product Quality',qualityCheck],['Expiry / Shelf Life',shelfLifeCheck]].filter(v=>v[1]==='Fail').map(v=>v[0]);
+ if(tempRequired&&!temp)return alert('Actual receiving temperature is required for '+receivingType+' items.');
+ if(tempRequired&&!tempCheck)return alert('Select Pass or Fail for the temperature check on '+receivingType+' items.');
+ if(failedChecks.length&&r<=0)return alert('A receiving condition failed. Enter the rejected quantity before confirming.');
+ if(d<0||r<0||r>d)return alert('Rejected quantity cannot be greater than delivered quantity.');
+ if(invoicePrice<0)return alert('Enter a valid invoice unit price.');
+ let reason='',note='';
+ if(r>0){reason=(document.getElementById('rReason')?.value||'').trim();note=(document.getElementById('rReasonNote')?.value||'').trim();if(!reason)return alert('Select a reject reason.');if(reason==='Other'&&!note)return alert('Enter the rejection note.');}
+ const productionDate=(document.getElementById('rProductionDate')?.value||'').trim(),expiry=(document.getElementById('rExpiry')?.value||'').trim();if(!productionDate)return alert('Production date is required.');if(!expiry)return alert('Expiry date is required.');if(productionDate>expiry)return alert('Production date cannot be after expiry date.'); const invoiceProof=document.getElementById('rInvoiceProof')?.files?.[0];if(!invoiceProof)return alert('Attach invoice proof before confirming receiving.');
+ let accepted=d-r,a=ingredients(),ing=a.find(i=>i.sku===x.sku);if(!ing)return alert('Ingredient not found.');
+ const referencePrice=Number(ing.reference_cost!=null?ing.reference_cost:ing.cost||0),priceDiff=invoicePrice-referencePrice,pricePct=referencePrice>0?(priceDiff/referencePrice*100):0;
+ if(ing.reference_cost==null)ing.reference_cost=referencePrice;
+ ing.latest_cost=invoicePrice;ing.cost=invoicePrice;
+ ing.stock_canonical=(ing.stock_canonical!=null?Number(ing.stock_canonical):toCanonical(ing.stock,ing.base_unit))+toCanonical(accepted,x.unit);ing.stock=fromCanonical(ing.stock_canonical,ing.base_unit);ing.stock_location=stockLocation();
+ const receivedAt=new Date().toISOString(),priceAlert=Math.abs(pricePct)>=3;
+ Object.assign(x,{status:'Received',delivered:d,rejected:r,accepted,price:invoicePrice,po_price:Number(x.price||0),reference_price:referencePrice,invoice_price:invoicePrice,price_variance:priceDiff,price_variance_pct:pricePct,price_variance_alert:priceAlert,accepted_value:accepted*invoicePrice,price_cost_impact:accepted*priceDiff,location:stockLocation(),reject_reason:reason,reject_note:note,production_date:productionDate,expiry_date:expiry,received_at:receivedAt,receiving_type:receivingType,receiving_temperature:temp,temperature_check:tempCheck,packaging_check:packagingCheck,quality_check:qualityCheck,shelf_life_check:shelfLifeCheck,receiving_condition_note:conditionNote,failed_condition_checks:failedChecks,receiving_condition_status:failedChecks.length?'Failed':'Passed'});
+ saveIngredients(a);setArr(PO_KEY,po);
+ if(accepted>0){let batches=getArr(BATCH_KEY);const nums=batches.map(b=>Number(String(b.lot||'').replace(/\D/g,''))||0);const batchNo='BAT-'+String((nums.length?Math.max(...nums):0)+1).padStart(6,'0');batches.push({id:Date.now(),po:x.po,sku:x.sku,ingredient:x.ingredient,supplier:x.supplier,lot:batchNo,received_date:receivedAt.slice(0,10),production_date:productionDate,expiry_date:expiry,received_qty:accepted,remaining_qty:accepted,remaining_canonical:toCanonical(accepted,x.unit),unit:x.unit,cost:invoicePrice,location:stockLocation()});setArr(BATCH_KEY,batches);}
+ closeModal();openPage('Receiving');
+ alert(`${accepted} ${x.unit} accepted. Receiving condition: ${failedChecks.length?'FAILED ('+failedChecks.join(', ')+')':'PASSED'}. Invoice price ${money(invoicePrice)} vs reference ${money(referencePrice)} (${pricePct>=0?'+':''}${pricePct.toFixed(2)}%).${priceAlert?' Main Office price variance alert created.':''}${failedChecks.length?' Main Office receiving condition alert created.':''}`);
+}
+
+
+const STOCK_REQUEST_KEY='kitch_demo_stock_requests_v1';
+const TRANSFER_KEY='kitch_demo_transfers_v1';
+let transferReceiptPhotoData='';
+let transferDispatchPhotoData='';
+
+function requestStatusLabel(x){
+ const st=x.status||'Requested';
+ return st==='Requested'?'Pending Store':st==='Accepted'?'Store Accepted':st==='In Transfer'?'In Transfer':st==='Received'?'Completed':st;
+}
+function requestTimeline(x){
+ const steps=[
+  ['Requested',x.requested_at||x.created_at||'',x.requested_by||'—'],
+  ['Store Accepted',x.accepted_at||'',x.accepted_by||'—'],
+  ['Sent',x.sent_at||x.fulfilled_at||'',x.sent_by||x.fulfilled_by||'—'],
+  ['Restaurant Received',x.received_at||'',x.received_by||'—']
+ ];
+ return `<div style="display:grid;gap:8px;margin:16px 0">${steps.map(([n,d,u],i)=>`<div class="note" style="margin:0;display:flex;justify-content:space-between;gap:12px"><b>${i+1}. ${n}</b><span>${d?esc(new Date(d).toLocaleString())+' · '+esc(u):'Pending'}</span></div>`).join('')}</div>`;
+}
+function stockRequestsPage(){
+ if(!hasCentralStore())return `<div class="panel"><h2>Stock Requests</h2><p class="muted">Stock Requests are available in Business only.</p></div>`;
+ const all=getArr(STOCK_REQUEST_KEY),req=(session==='manager'?all.filter(x=>x.branch===currentBranchName()):all).slice().reverse(),isBranch=session==='manager',isStore=session==='store',isOwner=session==='owner';
+ const open=req.filter(x=>!['Received','Completed'].includes(x.status)).length,done=req.filter(x=>['Received','Completed'].includes(x.status)).length;
+ return `<div class="grid"><div class="card"><span>OPEN PROCESS</span><b>${open}</b></div><div class="card"><span>COMPLETED</span><b>${done}</b></div><div class="card"><span>FLOW</span><b style="font-size:14px">Request → Store → Receive</b></div><div class="card"><span>PACKAGE</span><b style="font-size:16px">Business</b></div></div>
+ <div class="panel"><h2>${isBranch?'Stock Requests & Receiving':isStore?'Branch Stock Requests':'Stock Request Control'}</h2><p class="muted">${isOwner?'Main Office sees the complete request, dispatch and restaurant receiving audit trail.':isBranch?'Request from Central Store, then confirm the stock physically received at your restaurant.':'Accept branch requests, then send the stock. Branch inventory updates only after the restaurant confirms receipt.'}</p>${isBranch?'<div class="actions"><button class="btn black" onclick="openStockRequest()">+ Stock Request</button></div>':''}
+ <table><tr><th>REQUEST</th><th>BRANCH</th><th>INGREDIENT</th><th>REQUESTED</th><th>STATUS</th><th>REQUESTED BY</th><th>ACTION</th></tr>${req.map(x=>{
+ let action=`<button class="btn" onclick="viewStockRequest(${x.id})">View Details</button>`;
+ if(isStore&&x.status==='Requested')action=`<button class="btn black" onclick="acceptStockRequest(${x.id})">Accept</button> `+action;
+ if(isStore&&x.status==='Accepted')action=`<button class="btn black" onclick="sendStockRequest(${x.id})">Send Stock</button> `+action;
+ if(isBranch&&x.status==='In Transfer')action=`<button class="btn black" onclick="openTransferReceiving(${x.id})">Confirm Receipt</button> `+action;
+ return `<tr><td><b>${esc(x.ref)}</b></td><td>${esc(x.branch)}</td><td><b>${esc(x.ingredient)}</b></td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td><b>${esc(requestStatusLabel(x))}</b></td><td>${esc(x.requested_by||'—')}</td><td>${action}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No stock requests yet.</td></tr>'}</table></div>`;
+}
+function openStockRequest(){
+ if(session!=='manager'||!hasCentralStore())return;
+ const a=sortedIngredients(),branch=currentBranch();if(!a.length)return alert('Ingredient Master is empty.');if(!branch)return alert('No branch is assigned.');
+ modal(`<div class="modalHead"><h2>Request Stock</h2><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>From:</b> Central Store<br><b>To:</b> ${esc(branch.name)}</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="srIng" class="ingredientSelect" onchange="stockRequestIngredientChanged()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="srQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><input id="srUnit" disabled></div></div><button class="primary" onclick="saveStockRequest()">Send Stock Request</button>`);stockRequestIngredientChanged();
+}
+function stockRequestIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('srIng')?.value),e=document.getElementById('srUnit');if(x&&e)e.value=x.base_unit}
+function saveStockRequest(){
+ const sku=document.getElementById('srIng')?.value,x=ingredients().find(i=>i.sku===sku),q=Number(document.getElementById('srQty')?.value||0),branch=currentBranch();if(!x||q<=0)return alert('Enter a valid quantity.');if(!branch)return alert('Branch not found.');
+ let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:x.base_unit,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests');
+}
+function acceptStockRequest(id){
+ if(session!=='store')return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Requested')return;
+ const x=ingredients().find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
+ const have=fromCanonical(centralStockCanonical(x),x.base_unit);if(r.qty>have)return alert(`Not enough Central Store stock. Available: ${cleanQty(have)} ${x.base_unit}`);
+ r.status='Accepted';r.accepted_by=currentActor();r.accepted_at=new Date().toISOString();setArr(STOCK_REQUEST_KEY,req);openPage('Stock Requests');
+}
+function previewTransferDispatchPhoto(file){
+ transferDispatchPhotoData='';const p=document.getElementById('tsPhotoPreview');if(p)p.innerHTML='';
+ if(!file)return;const rd=new FileReader();rd.onload=e=>{transferDispatchPhotoData=e.target.result;if(p)p.innerHTML=`<img src="${transferDispatchPhotoData}" style="display:block;max-width:180px;max-height:130px;margin-top:10px;border-radius:10px;object-fit:cover">`};rd.readAsDataURL(file);
+}
+function sendStockRequest(id){
+ if(session!=='store')return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Accepted')return;
+ let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
+ const have=fromCanonical(centralStockCanonical(x),x.base_unit);
+ transferDispatchPhotoData='';
+ modal(`<div class="modalHead"><div><div class="sub">CENTRAL STORE DISPATCH</div><h2>${esc(r.ref)} · ${esc(r.ingredient)}</h2></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note"><b>Requested by:</b> ${esc(r.branch)} · ${cleanQty(r.qty)} ${esc(r.unit)}<br><b>Central Store available:</b> ${cleanQty(have)} ${esc(x.base_unit)}</div>
+ <div class="formGrid">
+  <div class="field"><label>ACTUAL SENT QTY *</label><input id="tsQty" type="number" min="0" step=".001" value="${Number(r.qty)}"></div>
+  <div class="field"><label>UNIT</label><input value="${esc(r.unit)}" disabled></div>
+  <div class="field"><label>BATCH / LOT *</label><input id="tsBatch" placeholder="Batch or lot number"></div>
+  <div class="field"><label>EXPIRY DATE *</label><input id="tsExpiry" type="date"></div>
+  <div class="field"><label>DISPATCH TEMPERATURE °C</label><input id="tsTemp" type="number" step=".1" placeholder="e.g. 3.5"></div>
+  <div class="field"><label>NOTE</label><input id="tsNote" placeholder="Optional dispatch note"></div>
+ </div>
+ <label class="filePick"><b>DISPATCH PHOTO PROOF *</b><br><small>Attach a photo of the stock being sent.</small><input id="tsPhoto" type="file" accept="image/*" capture="environment" onchange="previewTransferDispatchPhoto(this.files[0])"><div id="tsPhotoPreview"></div></label>
+ <button class="primary" onclick="confirmStockRequestDispatch(${r.id})">Send to Restaurant</button>`);
+}
+function confirmStockRequestDispatch(id){
+ if(session!=='store')return;
+ let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Accepted')return;
+ let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
+ const q=Number(document.getElementById('tsQty')?.value||0),batch=(document.getElementById('tsBatch')?.value||'').trim(),
+       expiry=document.getElementById('tsExpiry')?.value||'',temp=(document.getElementById('tsTemp')?.value||'').trim(),
+       note=(document.getElementById('tsNote')?.value||'').trim();
+ if(q<=0)return alert('Enter the actual quantity being sent.');
+ if(!batch)return alert('Batch / lot number is required.');
+ if(!expiry)return alert('Expiry date is required.');
+ if(!transferDispatchPhotoData)return alert('Dispatch photo proof is required.');
+ const need=toCanonical(q,r.unit),have=centralStockCanonical(x);
+ if(need>have+1e-9)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,x.base_unit))} ${x.base_unit}`);
+ x.stock_canonical=have-need;x.stock=fromCanonical(x.stock_canonical,x.base_unit);x.stock_location='Central Store';saveIngredients(a);
+ const now=new Date().toISOString();
+ Object.assign(r,{status:'In Transfer',sent_qty:q,sent_by:currentActor(),sent_at:now,fulfilled_by:currentActor(),fulfilled_at:now,
+   dispatch_batch:batch,dispatch_expiry:expiry,dispatch_temperature:temp,dispatch_note:note,dispatch_photo:transferDispatchPhotoData});
+ setArr(STOCK_REQUEST_KEY,req);
+ let tr=getArr(TRANSFER_KEY);tr.push({id:Date.now(),request_id:r.id,ref:r.ref,sku:x.sku,ingredient:x.name,qty:q,unit:r.unit,canonical:need,
+   from:'Central Store',to:r.branch,to_location_id:r.branch_id,staff:currentActor(),sent_by:currentActor(),sent_at:now,status:'In Transfer',
+   batch,expiry_date:expiry,dispatch_temperature:temp,note,dispatch_photo:transferDispatchPhotoData});
+ setArr(TRANSFER_KEY,tr);
+ closeModal();openPage('Stock Requests');alert(`${cleanQty(q)} ${r.unit} ${r.ingredient} sent to ${r.branch}. Waiting for restaurant receiving confirmation.`);
+}
+function previewTransferReceiptPhoto(file){
+ transferReceiptPhotoData='';const p=document.getElementById('trPhotoPreview');if(p)p.innerHTML='';
+ if(!file)return;const rd=new FileReader();rd.onload=e=>{transferReceiptPhotoData=e.target.result;if(p)p.innerHTML=`<img src="${transferReceiptPhotoData}" style="display:block;max-width:180px;max-height:130px;margin-top:10px;border-radius:10px;object-fit:cover">`};rd.readAsDataURL(file);
+}
+function openTransferReceiving(id){
+ if(session!=='manager')return;const r=getArr(STOCK_REQUEST_KEY).find(x=>x.id===id&&x.branch===currentBranchName());if(!r||r.status!=='In Transfer')return;
+ transferReceiptPhotoData='';
+ modal(`<div class="modalHead"><div><div class="sub">RESTAURANT RECEIVING</div><h2>${esc(r.ref)} · ${esc(r.ingredient)}</h2></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note"><b>Central Store sent:</b> ${cleanQty(r.sent_qty||r.qty)} ${esc(r.unit)}<br><b>To:</b> ${esc(r.branch)}<br><b>Batch / Lot:</b> ${esc(r.dispatch_batch||'—')}<br><b>Expiry:</b> ${esc(r.dispatch_expiry||'—')}<br><b>Dispatch temperature:</b> ${r.dispatch_temperature!==''&&r.dispatch_temperature!=null?esc(r.dispatch_temperature)+'°C':'Not checked'}</div>
+ <div class="formGrid">
+ <div class="field"><label>ACTUAL DELIVERED QTY</label><input id="trDelivered" type="number" min="0" step=".001" value="${Number(r.sent_qty||r.qty)}"></div>
+ <div class="field"><label>REJECTED QTY</label><input id="trRejected" type="number" min="0" step=".001" value="0"></div>
+ <div class="field"><label>UNIT</label><input value="${esc(r.unit)}" disabled></div>
+ <div class="field"><label>ACTUAL TEMPERATURE °C · OPTIONAL</label><input id="trTemp" type="number" step=".1" placeholder="Leave blank if not checked"></div>
+ <div class="field"><label>TEMPERATURE CHECK</label><select id="trTempCheck"><option>Not Checked</option><option>Pass</option><option>Fail</option></select></div>
+ <div class="field"><label>PACKAGING</label><select id="trPackaging"><option>Pass</option><option>Fail</option></select></div>
+ <div class="field"><label>PRODUCT QUALITY / APPEARANCE</label><select id="trQuality"><option>Pass</option><option>Fail</option></select></div>
+ <div class="field"><label>NOTE / REASON</label><input id="trNote" placeholder="Required for failure, rejection or variance"></div></div>
+ <label class="filePick"><b>PHOTO PROOF *</b><br><small>Take or attach a photo of the stock received.</small><input id="trPhoto" type="file" accept="image/*" capture="environment" onchange="previewTransferReceiptPhoto(this.files[0])"><div id="trPhotoPreview"></div></label>
+ <button class="primary" onclick="confirmTransferReceipt(${r.id})">Confirm Restaurant Receipt</button>`);
+}
+function confirmTransferReceipt(id){
+ let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='In Transfer'||session!=='manager'||r.branch!==currentBranchName())return;
+ const delivered=Number(document.getElementById('trDelivered')?.value||0),rejected=Number(document.getElementById('trRejected')?.value||0),sent=Number(r.sent_qty||r.qty),accepted=delivered-rejected;
+ const temp=(document.getElementById('trTemp')?.value||'').trim(),tempCheck=document.getElementById('trTempCheck')?.value||'Not Checked',pack=document.getElementById('trPackaging')?.value||'Pass',quality=document.getElementById('trQuality')?.value||'Pass',note=(document.getElementById('trNote')?.value||'').trim();
+ if(delivered<0||rejected<0||rejected>delivered)return alert('Check delivered and rejected quantities.');
+ if(!transferReceiptPhotoData)return alert('Photo proof is required.');
+ const variance=delivered-sent,failed=tempCheck==='Fail'||pack==='Fail'||quality==='Fail'||rejected>0||Math.abs(variance)>.000001;
+ if(failed&&!note)return alert('Add a note / reason for rejection, failed check or quantity variance.');
+ let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
+ const acceptedCanonical=toCanonical(accepted,r.unit);setBranchStockCanonical(x,r.branch_id,branchStockCanonical(x,r.branch_id)+acceptedCanonical);saveIngredients(a);
+ const now=new Date().toISOString();Object.assign(r,{status:'Received',delivered_qty:delivered,rejected_qty:rejected,accepted_qty:accepted,transfer_variance_qty:variance,receiving_temperature:temp,temperature_check:tempCheck,packaging_check:pack,quality_check:quality,receiving_note:note,receiving_photo:transferReceiptPhotoData,received_by:currentActor(),received_at:now});setArr(STOCK_REQUEST_KEY,req);
+ let tr=getArr(TRANSFER_KEY),t=tr.find(x=>x.request_id===r.id);if(t)Object.assign(t,{status:'Received',delivered_qty:delivered,rejected_qty:rejected,accepted_qty:accepted,variance_qty:variance,temperature:temp,temperature_check:tempCheck,packaging_check:pack,quality_check:quality,note,photo:transferReceiptPhotoData,received_by:currentActor(),received_at:now});setArr(TRANSFER_KEY,tr);
+ let mv=getArr('kitch_demo_inventory_movements_v1');mv.push({id:Date.now(),type:'Central Store Transfer Received',sku:x.sku,ingredient:x.name,qty:accepted,unit:r.unit,location:r.branch,from:'Central Store',request:r.ref,staff:currentActor(),created_at:now});setArr('kitch_demo_inventory_movements_v1',mv);
+ closeModal();openPage('Stock Requests');alert(`${cleanQty(accepted)} ${r.unit} accepted into ${r.branch} inventory.${Math.abs(variance)>.000001?' Transfer variance recorded: '+cleanQty(variance)+' '+r.unit+'.':''}`);
+}
+function viewStockRequest(id){
+ const r=getArr(STOCK_REQUEST_KEY).find(x=>x.id===id);if(!r)return;
+ const received=['Received','Completed'].includes(r.status),photo=r.receiving_photo?`<div style="margin-top:14px"><b>RECEIVING PHOTO PROOF</b><br><img class="proofImage" src="${r.receiving_photo}" alt="Transfer receiving proof"></div>`:'',dispatchPhoto=r.dispatch_photo?`<div style="margin-top:14px"><b>DISPATCH PHOTO PROOF</b><br><img class="proofImage" src="${r.dispatch_photo}" alt="Store dispatch proof"></div>`:'';
+ modal(`<div class="modalHead"><div><div class="sub">STOCK REQUEST AUDIT TRAIL</div><h2>${esc(r.ref)} · ${esc(r.ingredient)}</h2></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="grid" style="margin-top:16px"><div class="card"><span>BRANCH</span><b style="font-size:16px">${esc(r.branch)}</b></div><div class="card"><span>REQUESTED</span><b style="font-size:16px">${cleanQty(r.qty)} ${esc(r.unit)}</b></div><div class="card"><span>SENT</span><b style="font-size:16px">${r.sent_qty!=null?cleanQty(r.sent_qty)+' '+esc(r.unit):'—'}</b></div><div class="card"><span>ACCEPTED</span><b style="font-size:16px">${r.accepted_qty!=null?cleanQty(r.accepted_qty)+' '+esc(r.unit):'—'}</b></div></div>
+ ${requestTimeline(r)}
+ ${r.sent_at?`<div class="panel" style="margin-top:12px"><h2>Central Store Dispatch Details</h2><table><tr><th>SENT QTY</th><th>BATCH / LOT</th><th>EXPIRY</th><th>DISPATCH TEMP</th><th>SENT BY</th></tr><tr><td>${cleanQty(r.sent_qty||0)} ${esc(r.unit)}</td><td>${esc(r.dispatch_batch||'—')}</td><td>${esc(r.dispatch_expiry||'—')}</td><td>${r.dispatch_temperature!==''&&r.dispatch_temperature!=null?esc(r.dispatch_temperature)+'°C':'Not checked'}</td><td>${esc(r.sent_by||'—')}</td></tr></table><div class="note"><b>Dispatch note:</b> ${esc(r.dispatch_note||'—')}</div>${dispatchPhoto}</div>`:''}
+ ${received?`<div class="panel" style="margin-top:12px"><h2>Restaurant Receiving Details</h2><table><tr><th>DELIVERED</th><th>REJECTED</th><th>VARIANCE</th><th>TEMP</th><th>TEMP CHECK</th><th>PACKAGING</th><th>QUALITY</th></tr><tr><td>${cleanQty(r.delivered_qty)} ${esc(r.unit)}</td><td>${cleanQty(r.rejected_qty)} ${esc(r.unit)}</td><td>${cleanQty(r.transfer_variance_qty||0)} ${esc(r.unit)}</td><td>${r.receiving_temperature!==''&&r.receiving_temperature!=null?esc(r.receiving_temperature)+'°C':'Not checked'}</td><td>${esc(r.temperature_check||'Not Checked')}</td><td>${esc(r.packaging_check||'—')}</td><td>${esc(r.quality_check||'—')}</td></tr></table><div class="note"><b>Received by:</b> ${esc(r.received_by||'—')}<br><b>Note:</b> ${esc(r.receiving_note||'—')}</div>${photo}</div>`:''}`);
+}
+function transferPage(){
+ if(session!=='store')return `<div class="panel"><h2>Stock Transfer</h2><p class="muted">Restaurant Kitchen Managers receive transfers from Stock Requests. Central Store dispatches stock here.</p></div>`;
+ if(!hasCentralStore())return `<div class="panel"><h2>Stock Transfer</h2><p class="muted">This package receives directly into Restaurant stock.</p></div>`;
+ const a=ingredients(),tr=getArr(TRANSFER_KEY).slice().reverse().slice(0,30);
+ return `<div class="panel"><h2>Stock Transfer</h2><p class="muted">Central Store stock leaves when sent. Restaurant stock increases only after the receiving Kitchen Manager confirms the accepted quantity.</p><div class="actions"><button class="btn black" onclick="openTransfer()">+ Direct Transfer</button></div><table><tr><th>INGREDIENT</th><th>CENTRAL STORE</th><th>BASE UNIT</th></tr>${a.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${fromCanonical(centralStockCanonical(x),x.base_unit).toFixed(3)}</td><td>${esc(x.base_unit)}</td></tr>`).join('')}</table></div>${tr.length?`<div class="panel"><h2>Transfer History</h2><table><tr><th>DATE</th><th>REQUEST</th><th>INGREDIENT</th><th>TO</th><th>SENT QTY</th><th>STATUS</th></tr>${tr.map(t=>`<tr><td>${esc(new Date(t.sent_at||t.id).toLocaleString())}</td><td>${esc(t.ref||'Direct')}</td><td><b>${esc(t.ingredient)}</b></td><td>${esc(t.to||'')}</td><td>${cleanQty(t.qty||0)} ${esc(t.unit||'')}</td><td><b>${esc(t.status||'')}</b></td></tr>`).join('')}</table></div>`:''}`;
+}
+function transferSelectedIngredient(){const a=ingredients(),x=a.find(i=>i.sku===document.getElementById('tIng')?.value);if(!x)return;const unitEl=document.getElementById('tUnit'),avail=document.getElementById('tAvailable');if(unitEl)unitEl.value=x.base_unit;if(avail)avail.value=fromCanonical(centralStockCanonical(x),x.base_unit).toFixed(3)+' '+x.base_unit}
+function openTransfer(){
+ const a=ingredients(),dest=locations().filter(x=>x.type==='Branch'&&x.status==='Active');if(!dest.length)return alert('No active restaurant / brand location.');
+ modal(`<div class="modalHead"><h2>Direct Transfer</h2><button class="close" onclick="closeModal()">×</button></div><div class="note">For normal branch replenishment, use Stock Requests. Direct transfers also require restaurant receiving confirmation.</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="tIng" class="ingredientSelect" onchange="transferSelectedIngredient()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>AVAILABLE · CENTRAL STORE</label><input id="tAvailable" disabled></div><div class="field"><label>TRANSFER TO</label><select id="tDestination">${dest.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="tQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><input id="tUnit" disabled></div></div><button class="primary" onclick="confirmTransfer()">Send Direct Transfer</button>`);transferSelectedIngredient();
+}
+function confirmTransfer(){
+ let a=ingredients(),sku=document.getElementById('tIng')?.value,x=a.find(i=>i.sku===sku),q=Number(document.getElementById('tQty')?.value||0),destId=document.getElementById('tDestination')?.value,dest=locations().find(l=>String(l.id)===String(destId)&&l.type==='Branch'&&l.status==='Active');
+ if(!dest||!x||q<=0)return alert('Choose a valid destination and quantity.');
+ const u=x.base_unit,need=toCanonical(q,u),have=centralStockCanonical(x);if(need>have)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,u))} ${u}`);
+ x.stock_canonical=have-need;x.stock=fromCanonical(x.stock_canonical,u);saveIngredients(a);
+ let req=getArr(STOCK_REQUEST_KEY),id=Date.now(),ref='TR-'+String(id).slice(-6),now=new Date().toISOString();req.push({id,ref,branch_id:dest.id,branch:dest.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:'Central Store · Direct Transfer',requested_at:now,accepted_by:currentActor(),accepted_at:now,sent_by:currentActor(),sent_at:now,sent_qty:q,status:'In Transfer'});setArr(STOCK_REQUEST_KEY,req);
+ let tr=getArr(TRANSFER_KEY);tr.push({id:Date.now()+1,request_id:id,ref,sku:x.sku,ingredient:x.name,qty:q,unit:u,canonical:need,from:'Central Store',to:dest.name,to_location_id:dest.id,staff:currentActor(),sent_by:currentActor(),sent_at:now,status:'In Transfer'});setArr(TRANSFER_KEY,tr);
+ closeModal();openPage('Stock Transfer');alert(`${q} ${u} ${x.name} sent to ${dest.name}. Waiting for restaurant confirmation.`);
+}
+
+const BATCH_KEY='kitch_demo_batches_v1';
+function dateOnly(d){return new Date(d+'T00:00:00')}
+function batchStatus(x){
+ const today=new Date();today.setHours(0,0,0,0);
+ const exp=dateOnly(x.expiry_date),days=Math.ceil((exp-today)/86400000);
+ if(days<0)return {label:'EXPIRED',cls:'bad',days};
+ if(days<=3)return {label:'EXPIRING SOON',cls:'warn',days};
+ return {label:'OK',cls:'ok',days};
+}
+function batchesPage(){
+ const a=getArr(BATCH_KEY).slice().sort((x,y)=>String(x.expiry_date).localeCompare(String(y.expiry_date)));
+ const expired=a.filter(x=>batchStatus(x).label==='EXPIRED').length;
+ const soon=a.filter(x=>batchStatus(x).label==='EXPIRING SOON').length;
+ const rows=a.map(x=>{const st=batchStatus(x);return `<tr>
+ <td><b>${esc(x.ingredient)}</b><br><small>${esc(x.sku)}</small></td>
+ <td>${esc(x.supplier)}</td><td>${esc(x.po)}</td><td>${esc(x.lot||'—')}</td>
+ <td>${Number(x.received_qty).toFixed(2)} ${esc(x.unit)}</td>
+ <td>${Number(x.remaining_qty).toFixed(2)} ${esc(x.unit)}</td>
+ <td>${esc(x.received_date)}</td><td>${esc(x.expiry_date)}</td>
+ <td><span class="${st.cls}"><b>${st.label}</b></span>${st.days>=0?`<br><small>${st.days} day${st.days===1?'':'s'} left</small>`:''}</td></tr>`}).join('');
+ return `<div class="grid"><div class="card"><span>ACTIVE BATCHES</span><b>${a.filter(x=>Number(x.remaining_qty)>0).length}</b></div>
+ <div class="card"><span>EXPIRING SOON</span><b>${soon}</b></div><div class="card"><span>EXPIRED</span><b>${expired}</b></div>
+ <div class="card"><span>FEFO</span><b>${a.length?'ON':'—'}</b></div></div>
+ <div class="panel"><h2>Expiry & Batches</h2><p class="muted">Accepted deliveries create batches automatically. Closest expiry is listed first for FEFO control.</p>
+ <table><tr><th>INGREDIENT</th><th>SUPPLIER</th><th>PO</th><th>BATCH / LOT</th><th>RECEIVED</th><th>REMAINING</th><th>RECEIVED DATE</th><th>EXPIRY</th><th>STATUS</th></tr>
+ ${rows||'<tr><td colspan="11" class="empty">No batches yet. Receive an ingredient delivery to create the first batch.</td></tr>'}</table></div>`;
+}
+
+
+function filterIngredients(){
+ const q=(document.getElementById('ingredientSearch')?.value||'').trim().toLowerCase();
+ document.querySelectorAll('.ingredientRow').forEach(row=>{
+   row.style.display=(!q||row.dataset.name.includes(q)||row.dataset.category.includes(q))?'':'none';
+ });
+}
+
+
+const RECIPE_KEY='kitch_demo_recipes_v1';
+function recipes(){return getArr(RECIPE_KEY)}
+function normIngName(v){return String(v||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim()}
+function ingTokenKey(v){return normIngName(v).split(' ').filter(Boolean).sort().join(' ')}
+function editDistance(a,b){a=normIngName(a);b=normIngName(b);const dp=Array(b.length+1).fill(0).map((_,j)=>j);for(let i=1;i<=a.length;i++){let prev=dp[0];dp[0]=i;for(let j=1;j<=b.length;j++){const old=dp[j];dp[j]=Math.min(dp[j]+1,dp[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return dp[b.length]}
+function ingredientForRecipeItem(it,master=ingredients()){
+ if(it.sku){const bySku=master.find(x=>x.sku===it.sku);if(bySku)return bySku}
+ const n=normIngName(it.ingredient);
+ let hits=master.filter(x=>normIngName(x.name)===n);if(hits.length===1)return hits[0];
+ const tk=ingTokenKey(it.ingredient);hits=master.filter(x=>ingTokenKey(x.name)===tk);if(hits.length===1)return hits[0];
+ hits=master.filter(x=>editDistance(x.name,it.ingredient)<=1);if(hits.length===1)return hits[0];
+ return null
+}
+function linkRecipeIngredients(){
+ const a=recipes(),m=ingredients();let changed=false;
+ a.forEach(r=>(r.items||[]).forEach(it=>{const x=ingredientForRecipeItem(it,m);if(x&&it.sku!==x.sku){it.sku=x.sku;changed=true}}));
+ if(changed)setArr(RECIPE_KEY,a);return changed
+}
+function recipeCost(r){
+ const master=ingredients();
+ return r.items.reduce((t,it)=>{
+   const ing=ingredientForRecipeItem(it,master);
+   if(!ing)return t;
+   let q=Number(it.qty||0), iu=unit(it.unit), bu=unit(ing.base_unit);
+   if(iu==='g'&&bu==='kg')q/=1000;
+   else if(iu==='kg'&&bu==='g')q*=1000;
+   else if(iu==='ml'&&bu==='ltr')q/=1000;
+   else if(iu==='ltr'&&bu==='ml')q*=1000;
+   return t+q*Number(ing.cost||ing.latest_cost||ing.reference_cost||0);
+ },0)
+}
+function recipeMissing(r){
+ const m=ingredients();return r.items.filter(it=>!ingredientForRecipeItem(it,m)).map(x=>x.ingredient)
+}
+
+function recipeInput(r){
+ const totals={kg:0,ltr:0,pcs:0,other:[]};
+ r.items.forEach(it=>{
+   let q=Number(it.qty||0),u=unit(it.unit);
+   if(u==='g'){totals.kg+=q/1000}
+   else if(u==='kg'){totals.kg+=q}
+   else if(u==='ml'){totals.ltr+=q/1000}
+   else if(u==='ltr'){totals.ltr+=q}
+   else if(u==='pcs'){totals.pcs+=q}
+   else if(q){totals.other.push(q+' '+u)}
+ });
+ let parts=[];
+ if(totals.kg)parts.push(totals.kg.toFixed(3).replace(/\.?0+$/,'')+' kg');
+ if(totals.ltr)parts.push(totals.ltr.toFixed(3).replace(/\.?0+$/,'')+' ltr');
+ if(totals.pcs)parts.push(totals.pcs+' pcs');
+ return parts.concat(totals.other).join(' + ')||'—';
+}
+function recipesPage(){
+ linkRecipeIngredients();
+ const a=recipes().slice().sort((x,y)=>x.name.localeCompare(y.name));
+ const manage=session==='manager',chef=session==='production';
+ if(chef){
+  const approved=a.filter(r=>!recipeMissing(r).length);
+  return `<div class="grid"><div class="card"><span>MY RECIPES</span><b>${approved.length}</b></div><div class="card"><span>ROLE</span><b style="font-size:18px">Chef Production</b></div><div class="card"><span>PRODUCTION</span><b style="font-size:18px">Ready</b></div><div class="card"><span>LABEL</span><b style="font-size:18px">Ready</b></div></div>
+  <div class="panel"><h2>Approved Recipes</h2><p class="muted">View the recipes assigned for production. Costs and purchasing prices are hidden.</p>
+  <table><tr><th>RECIPE</th><th>CATEGORY</th><th>INGREDIENTS</th><th>INPUT QTY</th><th>PORTIONS</th><th>STATUS</th></tr>
+  ${approved.map(r=>`<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${Number(r.portions||0)||'—'}</td><td><span class="ok"><b>APPROVED</b></span></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No approved recipes assigned yet.</td></tr>'}</table></div>`;
+ }
+ return `<div class="grid"><div class="card"><span>RECIPES</span><b>${a.length}</b></div><div class="card"><span>APPROVED</span><b>${a.filter(x=>!recipeMissing(x).length).length}</b></div><div class="card"><span>NEEDS REVIEW</span><b>${a.filter(x=>recipeMissing(x).length).length}</b></div><div class="card"><span>1 BATCH RULE</span><b>ON</b></div></div>
+ <div class="panel"><h2>Recipe Master</h2><p class="muted">Chef defines ingredient quantities in kg/g/ltr/ml/pcs for exactly 1 Batch. KITCH converts units automatically and Production will deduct from the production location stock.</p>
+ <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button>':''}</div>
+ <table><tr><th>RECIPE</th><th>CATEGORY</th><th>INGREDIENTS</th><th>INPUT QTY</th><th>PORTIONS</th><th>1 BATCH COST</th><th>STATUS</th></tr>
+ ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${Number(r.portions||0)||'—'}</td><td>AED ${cost.toFixed(2)}</td><td>${miss.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length} missing · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
+}
+function openRecipe(){
+ if(session!=='manager')return;
+ const m=ingredients();if(!m.length)return alert('Import the Ingredient Master first.');
+ modal(`<div class="modalHead"><h2>Create 1 Batch Recipe</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div class="formGrid"><div class="field"><label>RECIPE NAME</label><input id="rcName"></div><div class="field"><label>CATEGORY</label><input id="rcCat"></div>
+ <div class="field"><label>PORTIONS PER BATCH</label><input id="rcPortions" type="number" min="0" step="1"></div></div>
+ <h3>Ingredients</h3><div id="rcItems"></div><div class="actions"><button class="btn" onclick="addRecipeLine()">+ Ingredient Line</button></div>
+ <button class="primary" onclick="saveRecipe()">Create 1 Batch Recipe</button>`);
+ addRecipeLine();
+}
+function addRecipeLine(){
+ const m=ingredients().slice().sort((a,b)=>a.name.localeCompare(b.name));
+ document.getElementById('rcItems').insertAdjacentHTML('beforeend',`<div class="formGrid recipeLine" style="border-bottom:1px solid #eee;padding-bottom:12px;margin-bottom:12px">
+ <div class="field"><label>INGREDIENT</label><select class="riIng ingredientSelect" onfocus="openIngredientSelect(this)" onblur="closeIngredientSelect(this)" onchange="closeIngredientSelect(this)">${m.map(x=>`<option value="${esc(x.name)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div>
+ <div class="field"><label>QUANTITY</label><input class="riQty" type="number" min="0" step=".001"></div>
+ <div class="field"><label>UNIT</label><select class="riUnit"><option>kg</option><option>g</option><option>ltr</option><option>ml</option><option>pcs</option></select></div></div>`)
+}
+function saveRecipe(){
+ let name=rcName.value.trim();if(!name)return alert('Enter recipe name.');
+ let items=[...document.querySelectorAll('.recipeLine')].map(x=>{const name=x.querySelector('.riIng').value,master=ingredients().find(i=>i.name===name);return {ingredient:name,sku:master?.sku||'',qty:Number(x.querySelector('.riQty').value||0),unit:x.querySelector('.riUnit').value}}).filter(x=>x.qty>0);
+ if(!items.length)return alert('Add at least one ingredient quantity.');
+ let a=recipes();if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert('Recipe already exists.');
+ a.push({id:Date.now(),name,category:rcCat.value.trim(),portions:Number(rcPortions.value||0),instructions:(document.getElementById('rcMethod')?.value||'').trim(),items});
+ setArr(RECIPE_KEY,a);closeModal();openPage('Recipes')
+}
+let recipeImport=[];
+function openRecipeImport(){
+ if(session!=='manager')return;
+ modal(`<div class="modalHead"><h2>Import Recipes</h2><button class="close" onclick="closeModal()">×</button></div>
+ <p class="muted">One row per ingredient. KITCH groups rows with the same Recipe Name into one locked 1-Batch recipe.</p>
+ <label class="filePick"><b>Choose Recipe Excel</b><br><small>.xlsx, .xls or .csv</small><input type="file" accept=".xlsx,.xls,.csv" hidden onchange="readRecipeExcel(this.files[0])"></label><div id="recipePreview"></div>`)
+}
+async function readRecipeExcel(file){
+ if(!file)return;if(typeof XLSX==='undefined')return recipePreview.innerHTML='<div class="note bad">Excel reader could not load.</div>';
+ try{
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
   const groups={};
-  const col=(row,...names)=>{for(const n of names){if(row[n]!==undefined&&String(row[n]).trim()!=='')return row[n]}return ''};
   rows.forEach(row=>{
-   const name=String(col(row,'Recipe Name','Recipe')).trim(),ing=String(col(row,'Ingredient Name','Ingredient')).trim();if(!name||!ing)return;
-   if(!groups[name])groups[name]={id:Date.now()+Object.keys(groups).length,name,category:String(col(row,'Recipe Category','Category')).trim(),station:String(col(row,'Station')).trim(),yield:0,yield_unit:'kg',portions:Number(col(row,'Portions per Batch','Yield Portions')||0),instructions:String(col(row,'Instructions','Method')).trim(),allergens:String(col(row,'Allergens')).trim(),items:[]};
-   const r=groups[name],yieldValue=col(row,'Expected Yield');
-   if(yieldValue!==''&&Number(yieldValue)>0){r.yield=Number(yieldValue);r.yield_unit=unit(col(row,'Yield Unit')||'kg')}
+   const name=String(row['Recipe Name']||'').trim(),ing=String(row['Ingredient Name']||'').trim();if(!name||!ing)return;
+   if(!groups[name])groups[name]={id:Date.now()+Object.keys(groups).length,name,category:String(row['Recipe Category']||'').trim(),yield:Number(row['Expected Yield']||0),yield_unit:unit(row['Yield Unit']||'kg'),portions:Number(row['Portions per Batch']||0),instructions:String(row['Instructions']||'').trim(),items:[]};
    const matched=ingredientForRecipeItem({ingredient:ing});
-   r.items.push({ingredient:ing,sku:matched?.sku||'',qty:Number(col(row,'Quantity')||0),unit:unit(col(row,'Unit')) ,waste_pct:Number(col(row,'Waste %')||0)});
-   if(!r.instructions&&col(row,'Instructions','Method'))r.instructions=String(col(row,'Instructions','Method')).trim();
+   groups[name].items.push({ingredient:ing,sku:matched?.sku||'',qty:Number(row['Quantity']||0),unit:unit(row['Unit'])});
+   if(!groups[name].instructions&&row['Instructions'])groups[name].instructions=String(row['Instructions']).trim();
   });
   recipeImport=Object.values(groups);
   recipePreview.innerHTML=`<div class="note"><b>${recipeImport.length} recipes found.</b> Ingredient names are checked against the current Ingredient Master before import.</div>
   <table><tr><th>RECIPE</th><th>INGREDIENTS</th><th>YIELD</th><th>PORTIONS</th><th>COST</th><th>CHECK</th></tr>
-  ${recipeImport.map(r=>{let miss=recipeMissing(r);return `<tr><td><b>${esc(r.name)}</b></td><td>${r.items.length}</td><td>${r.yield?r.yield+' '+esc(r.yield_unit):'—'}</td><td>${r.portions||'—'}</td><td>AED ${recipeCost(r).toFixed(2)}</td><td>${miss.length?`<span class="bad">${miss.length} missing</span><br><small>${miss.map(esc).join(', ')}</small>`:'<span class="ok">MATCHED</span>'}</td></tr>`}).join('')}</table>
-  <div class="note">Recipes with missing ingredients can be imported for review, but they will not be marked Approved until the Ingredient Master matches.</div><button class="primary" ${recipeImport.length?'':'disabled'} onclick="confirmRecipeImport()">Import ${recipeImport.length} Recipes</button>`;
- }catch(e){console.error('Recipe import error',e);recipePreview.innerHTML='<div class="note bad">Could not read recipe Excel: '+esc(e.message||'Unknown error')+'</div>'}
+  ${recipeImport.map(r=>{let miss=recipeMissing(r);return `<tr><td><b>${esc(r.name)}</b></td><td>${r.items.length}</td><td>${r.yield} ${esc(r.yield_unit)}</td><td>${r.portions||'—'}</td><td>AED ${recipeCost(r).toFixed(2)}</td><td>${miss.length?`<span class="bad">${miss.length} missing</span><br><small>${miss.map(esc).join(', ')}</small>`:'<span class="ok">MATCHED</span>'}</td></tr>`}).join('')}</table>
+  <div class="note">Recipes with missing ingredients can be imported for review, but they will not be marked Approved until the Ingredient Master matches.</div><button class="primary" onclick="confirmRecipeImport()">Import ${recipeImport.length} Recipes</button>`;
+ }catch(e){recipePreview.innerHTML='<div class="note bad">Could not read this recipe Excel.</div>'}
 }
 function confirmRecipeImport(){
  let a=recipes(),added=0,updated=0;
@@ -3435,7 +3931,7 @@ function notificationsPage(){
 }
 
 // MAIN OFFICE INTELLIGENCE — live operational reporting from the demo records
-function money(n){return 'AED '+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function money(n){return 'AED '+Number(n||0).toFixed(2)}
 function orderedPurchaseValue(rows=getArr(PO_KEY)){return rows.reduce((t,x)=>t+Number(x.qty||0)*Number(x.po_price!=null?x.po_price:x.price||0),0)}
 function acceptedPurchaseValue(rows=getArr(PO_KEY)){return rows.reduce((t,x)=>t+(x.status==='Received'?Number(x.accepted!=null?x.accepted:Math.max(0,Number(x.delivered||0)-Number(x.rejected||0)))*Number(x.price||0):0),0)}
 function openPurchaseCommitmentValue(rows=getArr(PO_KEY)){return rows.reduce((t,x)=>t+(x.status==='Received'?0:Number(x.qty||0)*Number(x.price||0)),0)}
@@ -3766,7 +4262,7 @@ async function completeStripeReturn(){
   // starts exactly like a brand-new customer. Cloud data is never borrowed
   // from a previous account.
   const FRESH_CLIENT_BUILD='kitch_fresh_client_build_2026_10_02_v3_final_zero';
-  if(false && !localStorage.getItem(FRESH_CLIENT_BUILD)){
+  if(!localStorage.getItem(FRESH_CLIENT_BUILD)){
     try{await sb.auth.signOut({scope:'local'});}catch(e){}
     Object.keys(localStorage).filter(k=>k.startsWith('kitch_demo_')||k.startsWith('kitch_final_')||k.startsWith('kitch_cloud_')||k.startsWith('kitch_empty_')).forEach(k=>localStorage.removeItem(k));
     sessionStorage.removeItem('kitch_pending_subscription');
