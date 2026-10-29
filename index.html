@@ -2201,7 +2201,15 @@ function setBranchStockCanonical(ing,branchId,value){
 }
 function contextStockCanonical(ing){
  if(!hasCentralStore())return centralStockCanonical(ing);
- return session==='store'?centralStockCanonical(ing):branchStockCanonical(ing);
+ if(session==='store')return centralStockCanonical(ing);
+ const branchQty=branchStockCanonical(ing);
+ // Cloud branch UUIDs and local UI branch IDs can differ. When this workspace
+ // has only one restaurant branch, show its persisted cloud total instead of 0.
+ const map=ing.branch_stock_canonical||{};
+ const positiveKeys=Object.keys(map).filter(k=>Number(map[k])>0);
+ if(branchQty>0||!positiveKeys.length)return branchQty;
+ const cloudTotal=Number(ing.restaurant_stock_canonical||0);
+ return cloudTotal>0?cloudTotal:branchQty;
 }
 const roles={
  owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
