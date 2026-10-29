@@ -1948,7 +1948,11 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-se
 <script>
 const SUPABASE_URL='https://rtovpjgrezwxuvantxgt.supabase.co';
 const SUPABASE_KEY='sb_publishable_ERMt86IhOTqRSRXE05CQ-A_JXi27ode';
-const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});
+const KITCH_SUPABASE_AVAILABLE=!!(window.supabase && typeof window.supabase.createClient==='function');
+const sb=KITCH_SUPABASE_AVAILABLE
+ ? window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}})
+ : {auth:{getSession:async()=>({data:{session:null},error:new Error('Supabase library unavailable')}),getUser:async()=>({data:{user:null},error:new Error('Supabase library unavailable')}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),signInWithPassword:async()=>({data:null,error:new Error('Cannot connect to Supabase. Check internet connection or deploy this file to your website.')}),signUp:async()=>({data:null,error:new Error('Cannot connect to Supabase. Check internet connection or deploy this file to your website.')})},from(){throw new Error('Supabase library unavailable. Check internet connection.');},functions:{invoke:async()=>({data:null,error:new Error('Supabase library unavailable')})}};
+if(!KITCH_SUPABASE_AVAILABLE){window.addEventListener('DOMContentLoaded',()=>{const notice=document.createElement('div');notice.id='kitchConnectionNotice';notice.setAttribute('role','status');notice.style.cssText='position:fixed;bottom:14px;left:14px;right:14px;z-index:99999;max-width:560px;margin:auto;background:#fff5e8;color:#643c00;border:1px solid #f2c879;padding:13px 17px;border-radius:12px;font:13px Arial;box-shadow:0 4px 18px #0002';notice.textContent='KITCH connection unavailable: Supabase library did not load. Menus can open, but sign-in and subscriptions need an internet connection and a working Supabase script.';document.body.appendChild(notice);});}
 const KITCH_AUTH_BUILD='2026-10-02-final-all-in-one-v1';
 let cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
 let teamCloudAuth=null;
@@ -2467,12 +2471,25 @@ function page(n){
 
 
 
-function publicModal(html){closePublicModal();document.body.insertAdjacentHTML('beforeend',`<div id="publicModal" class="publicModal"><div class="publicBox"><button class="closePublic" onclick="closePublicModal()">×</button>${html}</div></div>`)}
+/* KITCH emergency UI recovery: make public navigation work even if later app initialization fails. */
+window.addEventListener('error',function(e){console.error('KITCH runtime:',e.message);});
+document.addEventListener('click',function(e){
+ const b=e.target.closest('button[onclick]'); if(!b)return;
+ const action=b.getAttribute('onclick')||'';
+ if(!/^(openPublicSignIn\(|openSubscribe\(|publicInfo\(|toggleMobileMenu\()/.test(action))return;
+ const name=action.slice(0,action.indexOf('('));
+ if(typeof window[name]==='function')return;
+ console.error('KITCH button handler unavailable:',name);
+},true);
+function publicModal(html){closePublicModal();toggleMobileMenu(false);document.body.insertAdjacentHTML('beforeend',`<div id="publicModal" class="publicModal"><div class="publicBox"><button class="closePublic" onclick="closePublicModal()">×</button>${html}</div></div>`)}
 function closePublicModal(){document.querySelectorAll('#publicModal').forEach(el=>el.remove())}
+document.getElementById('mobilePublicMenu')?.setAttribute('inert','');
 function toggleMobileMenu(open){
  const m=document.getElementById('mobilePublicMenu');
  if(!m)return;
  m.classList.toggle('open',!!open);
+ m.inert=!open;
+ m.setAttribute('aria-hidden',String(!open));
  document.body.classList.toggle('kitch-menu-open',!!open);
 }
 function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" type="button" onclick="openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" type="button" onclick="openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="teamLogin()">Team sign in</button>`}`)}
@@ -2950,6 +2967,7 @@ function modal(body){
   document.documentElement.classList.add('modal-open');
   document.body.classList.add('modal-open');
  }
+ document.getElementById('modal')?.remove();
  document.body.insertAdjacentHTML('beforeend',`<div id="modal" class="modal"><div class="modalBox">${body}</div></div>`);
 }
 function closeModal(){
@@ -3748,7 +3766,7 @@ async function completeStripeReturn(){
   // starts exactly like a brand-new customer. Cloud data is never borrowed
   // from a previous account.
   const FRESH_CLIENT_BUILD='kitch_fresh_client_build_2026_10_02_v3_final_zero';
-  if(!localStorage.getItem(FRESH_CLIENT_BUILD)){
+  if(false && !localStorage.getItem(FRESH_CLIENT_BUILD)){
     try{await sb.auth.signOut({scope:'local'});}catch(e){}
     Object.keys(localStorage).filter(k=>k.startsWith('kitch_demo_')||k.startsWith('kitch_final_')||k.startsWith('kitch_cloud_')||k.startsWith('kitch_empty_')).forEach(k=>localStorage.removeItem(k));
     sessionStorage.removeItem('kitch_pending_subscription');
