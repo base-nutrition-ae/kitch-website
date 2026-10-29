@@ -2057,7 +2057,7 @@ async function syncPackageFromCloud(){
 async function cloudLoadIngredients(){
  if(!cloud.restaurant_id)return;
  const {data,error}=await sb.from('ingredients').select('id,sku,name,base_unit,category,last_unit_cost,receiving_type,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('name');
- if(error){console.error(error);return alert('Could not load Ingredient Master from KITCH Cloud.')}
+ if(error){console.error('Ingredient Master cloud read failed',error);window.__kitchIngredientLoadError=error.message||'Could not load Ingredient Master';return;} window.__kitchIngredientLoadError='';
  const existing=ingredients();
  const byCloud=new Map(existing.filter(x=>x.cloud_id).map(x=>[String(x.cloud_id),x]));
  const byName=new Map(existing.map(x=>[String(x.name||'').trim().toLowerCase(),x]));
@@ -2101,7 +2101,9 @@ async function cloudLoadIngredients(){
    x.stock=fromCanonical(centralTotal,x.base_unit);
   }
  }catch(stockError){console.warn('Could not restore KITCH cloud stock:',stockError);}
- localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
+ // Never replace previously saved ingredients with an empty result during a
+ // temporary cloud/RLS issue. An explicit empty master may be handled separately.
+ if(a.length||!existing.length)localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
 }
 async function ensureSupabaseAuth(){
  // Supabase-js already persists and refreshes sessions. getUser() validates the
@@ -2406,7 +2408,18 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+let kitchIngredientRefreshInFlight=false;
+async function refreshKitchIngredientsOnView(){
+ if(kitchIngredientRefreshInFlight||!cloud.restaurant_id)return;
+ kitchIngredientRefreshInFlight=true;
+ try{
+  await cloudLoadIngredients();
+  if(pageTitle.textContent==='Inventory')content.innerHTML=page('Inventory');
+  if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes');
+ }catch(err){console.error('Ingredient refresh failed',err)}
+ finally{kitchIngredientRefreshInFlight=false}
+}
+function openPage(name){void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if((name==='Inventory'||name==='Recipes')&&cloud.restaurant_id)void refreshKitchIngredientsOnView();if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -3606,7 +3619,7 @@ function openRecipeImport(){
  <label class="filePick"><b>Choose Recipe Excel</b><br><small>.xlsx, .xls or .csv</small><input type="file" accept=".xlsx,.xls,.csv" hidden onchange="readRecipeExcel(this.files[0])"></label><div id="recipePreview"></div>`)
 }
 async function readRecipeExcel(file){
- if(!file)return;if(typeof XLSX==='undefined')return recipePreview.innerHTML='<div class="note bad">Excel reader could not load.</div>';
+ if(!file)return;if(typeof XLSX==='undefined')return recipePreview.innerHTML='<div class="note bad">Excel reader could not load. Refresh KITCH and try again, or check your connection.</div>';
  try{
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
   const groups={};
