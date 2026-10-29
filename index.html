@@ -2879,7 +2879,7 @@ function kitchStockValue(x){
 function inventoryPage(){
  const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager'&&!hasCentralStore(),storeMaster=hasCentralStore()&&session==='store';
  const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(unit(x.base_unit)==='ltr'||unit(x.base_unit)==='ml'?'L':unit(x.base_unit)==='kg'||unit(x.base_unit)==='g'?'kg':x.base_unit)}</td><td><b>${kitchQuantityLabel(contextStockCanonical(x),x.base_unit)}</b></td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost'),x.base_unit)}</td><td><b>AED ${kitchStockValue(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></td><td>${displayStock(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':displayStock(x)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
- return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>displayStock(x)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
+ return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>displayStock(x)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
  <div class="panel"><div class="note" style="margin-bottom:14px">Inventory values use recorded stock only. Zero means no available stock is recorded for this location; confirm opening stock before relying on LOW/OUT counts. Supplier prices are shown as currently recorded; verify imported costs against invoices before using inventory valuation.</div><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
  <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster||session==='manager')?'<button class="btn" onclick="openImport()">Upload / Import Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
@@ -2956,7 +2956,7 @@ let importRows=[];
 async function readExcel(file){
  if(!file)return;if(typeof XLSX==='undefined')return preview.innerHTML='<div class="note bad">Excel reader could not load. Check your internet connection and reopen the file.</div>';
  try{
-  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Recipe Import')?'Recipe Import':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
   const pick=(o,names)=>{for(const n of names)if(Object.prototype.hasOwnProperty.call(o,n))return o[n];return''};
   // Accept both the simplified KITCH export and older ingredient-master templates.
   const normalized=(r)=>Object.fromEntries(Object.entries(r).map(([k,v])=>[String(k).trim().toLowerCase(),v]));
@@ -3587,8 +3587,8 @@ async function readRecipeExcel(file){
   recipePreview.innerHTML=`<div class="note"><b>${recipeImport.length} recipes found.</b> Ingredient names are checked against the current Ingredient Master before import.</div>
   <table><tr><th>RECIPE</th><th>INGREDIENTS</th><th>YIELD</th><th>PORTIONS</th><th>COST</th><th>CHECK</th></tr>
   ${recipeImport.map(r=>{let miss=recipeMissing(r);return `<tr><td><b>${esc(r.name)}</b></td><td>${r.items.length}</td><td>${r.yield} ${esc(r.yield_unit)}</td><td>${r.portions||'—'}</td><td>AED ${recipeCost(r).toFixed(2)}</td><td>${miss.length?`<span class="bad">${miss.length} missing</span><br><small>${miss.map(esc).join(', ')}</small>`:'<span class="ok">MATCHED</span>'}</td></tr>`}).join('')}</table>
-  <div class="note">Recipes with missing ingredients can be imported for review, but they will not be marked Approved until the Ingredient Master matches.</div><button class="primary" onclick="confirmRecipeImport()">Import ${recipeImport.length} Recipes</button>`;
- }catch(e){recipePreview.innerHTML='<div class="note bad">Could not read this recipe Excel.</div>'}
+  <div class="note">Recipes with missing ingredients can be imported for review, but they will not be marked Approved until the Ingredient Master matches.</div><button class="primary" ${recipeImport.length?'':'disabled'} onclick="confirmRecipeImport()">Import ${recipeImport.length} Recipes</button>`;
+ }catch(e){console.error('Recipe import error',e);recipePreview.innerHTML='<div class="note bad">Could not read recipe Excel: '+esc(e.message||'Unknown error')+'</div>'}
 }
 function confirmRecipeImport(){
  let a=recipes(),added=0,updated=0;
@@ -4000,7 +4000,7 @@ function notificationsPage(){
 }
 
 // MAIN OFFICE INTELLIGENCE — live operational reporting from the demo records
-function money(n){return 'AED '+Number(n||0).toFixed(2)}
+function money(n){return 'AED '+Number(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function orderedPurchaseValue(rows=getArr(PO_KEY)){return rows.reduce((t,x)=>t+Number(x.qty||0)*Number(x.po_price!=null?x.po_price:x.price||0),0)}
 function acceptedPurchaseValue(rows=getArr(PO_KEY)){return rows.reduce((t,x)=>t+(x.status==='Received'?Number(x.accepted!=null?x.accepted:Math.max(0,Number(x.delivered||0)-Number(x.rejected||0)))*Number(x.price||0):0),0)}
 function openPurchaseCommitmentValue(rows=getArr(PO_KEY)){return rows.reduce((t,x)=>t+(x.status==='Received'?0:Number(x.qty||0)*Number(x.price||0)),0)}
