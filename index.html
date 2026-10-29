@@ -2349,7 +2349,7 @@ async function refreshKitchTrialStatus(){
   const plan=String(data.plan||'').toLowerCase()==='business'?'Business':'Starter';
   const status=String(data.status||'').toLowerCase();
   if(status==='trialing' && Number.isFinite(end) && end>now){
-    const days=Math.ceil((end-now)/86400000);
+    const days=Math.max(0,Math.ceil((end-now)/86400000));
     target.textContent=`${plan} free trial · ${days} day${days===1?'':'s'} remaining · Ends ${new Date(end).toLocaleDateString('en-AE',{day:'numeric',month:'short',year:'numeric'})}. No payment card required for your trial.`;
   }else if(Number.isFinite(end)&&end<=now){
     target.textContent=`Your ${plan} trial has ended. Your restaurant data is preserved. Choose a paid plan to continue using subscription features.`;
@@ -2359,7 +2359,7 @@ async function refreshKitchTrialStatus(){
  }catch(err){
   if(requestId!==kitchTrialRequestId)return;
   console.warn('KITCH trial status unavailable',err);
-  target.textContent='Subscription status is temporarily unavailable. This message does not change your access.';
+  target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
 function openPage(name){void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
@@ -2802,9 +2802,9 @@ function compatibleUnits(a,b){return canonicalUnit(a)===canonicalUnit(b)}
 function displayStock(x){return fromCanonical(contextStockCanonical(x),x.base_unit)}
 function inventoryPage(){
  const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager'&&!hasCentralStore(),storeMaster=hasCentralStore()&&session==='store';
- const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${displayStock(x).toFixed(3)}</td><td>${Number(x.par||0).toFixed(2)}</td><td>AED ${Number(x.reference_cost!=null?x.reference_cost:x.cost||0).toFixed(2)}</td><td>AED ${Number(x.latest_cost!=null?x.latest_cost:x.cost||0).toFixed(2)}</td><td>${displayStock(x)<=Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
+ const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${displayStock(x).toFixed(3)}</td><td>${Number(x.par||0).toFixed(2)}</td><td>${Number(x.reference_cost||0)>0.1?'AED '+Number(x.reference_cost).toFixed(2):'<span class="warn" title="Verify supplier price and cost unit">Review cost</span>'}</td><td>${Number(x.latest_cost||0)>0.1?'AED '+Number(x.latest_cost).toFixed(2):'<span class="warn">Review cost</span>'}</td><td>${displayStock(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':displayStock(x)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
  return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>displayStock(x)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+displayStock(x)*Number(x.cost||0),0).toFixed(0)}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
- <div class="panel"><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
+ <div class="panel"><div class="note" style="margin-bottom:14px">Inventory values use recorded stock only. Zero means no available stock is recorded for this location; confirm opening stock before relying on LOW/OUT counts. Costs marked Review cost must be checked against supplier prices and units.</div><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
  <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster||session==='manager')?'<button class="btn" onclick="openImport()">Upload / Import Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
  <table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>REFERENCE COST</th><th>LATEST COST</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="11" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div>`;
@@ -2887,23 +2887,66 @@ async function readExcel(file){
   preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Duplicate names will update the existing ingredient instead of creating another one.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${x.par}</td><td>${x.minimum}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Ingredients</button>`;
  }catch(e){preview.innerHTML='<div class="note bad">Could not read this Excel file.</div>'}
 }
+let ingredientImportBusy=false;
 async function confirmImport(){
- let a=ingredients(),added=0,updated=0;
+ if(ingredientImportBusy)return;
+ if(!importRows.length)return alert('Choose an Excel file first.');
+ ingredientImportBusy=true;
+ const button=document.querySelector('#preview button.primary');
+ const total=importRows.length;
+ let added=0,updated=0,completed=0;
+ const a=ingredients();
+ const status=document.createElement('div');
+ status.id='ingredientImportStatus';
+ status.setAttribute('role','status');
+ status.setAttribute('aria-live','polite');
+ status.style.cssText='margin:14px 0;padding:14px;background:#f5f5f2;border-radius:14px;font-size:13px';
+ status.innerHTML='<b>Preparing secure import…</b><div style="height:8px;background:#ddd;border-radius:9px;overflow:hidden;margin-top:10px"><div id="ingredientImportBar" style="height:100%;width:0%;background:#111;transition:width .18s ease"></div></div><div id="ingredientImportCount" style="margin-top:8px;color:#666">0 / '+total+' ingredients</div>';
+ if(button){button.disabled=true;button.style.opacity='.65';button.textContent='Importing…';button.before(status)}
+ const updateProgress=()=>{
+  const bar=document.getElementById('ingredientImportBar');
+  const count=document.getElementById('ingredientImportCount');
+  if(bar)bar.style.width=Math.round(completed/total*100)+'%';
+  if(count)count.textContent=completed+' / '+total+' ingredients saved';
+  if(button)button.textContent='Importing '+completed+' / '+total+'…';
+ };
  try{
-  // Team imports use the secure RPC and do not require a Management auth session.
-  // Management imports use normal authenticated RLS.
   if(!teamCloudAuth?.pin){
    const ok=await ensureCloudWorkspace();
    if(!ok||!cloud.restaurant_id)throw new Error('Management workspace is not loaded. Sign in again.');
   }
   for(const x0 of importRows){
-   let e=a.find(z=>z.name.toLowerCase()===x0.name.toLowerCase());
-   if(e){Object.assign(e,x0,{stock:Number(x0.opening_stock||0),stock_canonical:toCanonical(Number(x0.opening_stock||0),x0.base_unit),stock_location:assignedLocationName()});await cloudUpsertIngredient(e);updated++}
-   else{let x={...x0,sku:'ING-'+String(a.length+1).padStart(3,'0'),stock:Number(x0.opening_stock||0),stock_canonical:toCanonical(Number(x0.opening_stock||0),x0.base_unit),stock_location:assignedLocationName()};await cloudUpsertIngredient(x);a.push(x);added++}
+   const e=a.find(z=>z.name.toLowerCase()===x0.name.toLowerCase());
+   if(e){
+    const candidate={...e,...x0,stock:e.stock,stock_canonical:e.stock_canonical,branch_stock_canonical:e.branch_stock_canonical,restaurant_stock_canonical:e.restaurant_stock_canonical,opening_stock:e.opening_stock,opening_unit_cost:e.opening_unit_cost,stock_location:e.stock_location||assignedLocationName()};
+    await cloudUpsertIngredient(candidate);
+    Object.assign(e,candidate);updated++;
+   }else{
+    const x={...x0,sku:'ING-'+String(a.length+1).padStart(3,'0'),stock:Number(x0.opening_stock||0),stock_canonical:toCanonical(Number(x0.opening_stock||0),x0.base_unit),stock_location:assignedLocationName()};
+    await cloudUpsertIngredient(x);
+    a.push(x);added++;
+   }
+   completed++;
+   saveIngredients(a);
+   updateProgress();
+   // Yield to the browser periodically so progress and controls stay responsive.
+   if(completed%5===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
-  saveIngredients(a);importRows=[];closeModal();openPage('Inventory');
- }catch(e){alert('KITCH Cloud import stopped: '+e.message)}
+  importRows=[];
+  if(status)status.innerHTML='<b style="color:#26733a">✓ Import complete</b><div style="margin-top:6px">'+added+' added · '+updated+' updated</div>';
+  if(button){button.textContent='Import complete';button.style.opacity='1'}
+  await new Promise(resolve=>setTimeout(resolve,650));
+  closeModal();openPage('Inventory');
+ }catch(e){
+  saveIngredients(a);
+  if(status)status.innerHTML='<b style="color:#b42318">Import stopped after '+completed+' of '+total+' ingredients.</b><div style="margin-top:6px">'+esc(String(e.message||e))+'</div><div style="margin-top:6px">Saved items are kept. Check the connection and retry; matching ingredient names will be updated.</div>';
+  if(button){button.textContent='Retry import';button.style.opacity='1'}
+ }finally{
+  ingredientImportBusy=false;
+  if(button)button.disabled=false;
+ }
 }
+
 function downloadMaster(){
  const a=ingredients();if(!a.length)return alert('Ingredient Master is empty.');
  if(typeof XLSX==='undefined')return alert('Excel export needs an internet connection.');
