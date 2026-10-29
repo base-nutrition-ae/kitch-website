@@ -2087,9 +2087,23 @@ async function cloudLoadIngredients(){
    });
    a.forEach(x=>{
      const b=live.get(String(x.cloud_id));
-     x.stock_canonical=b?b.qty:0;
-     x.stock=fromCanonical(x.stock_canonical,x.base_unit);
-     x.restaurant_stock_canonical=0; // Avoid counting the same stock twice in Starter mode.
+     // The Business UI reads branch_stock_canonical, not stock_canonical.
+     // Store live stock under BOTH the cloud branch id and local UI branch id.
+     const branchQty=b?b.qty:0;
+     if(hasCentralStore()){
+       x.stock_canonical=0; // Central Store remains independent.
+       x.stock=0;
+       x.branch_stock_canonical={};
+       const localBranch=currentBranchId();
+       if(cloud.branch_id)x.branch_stock_canonical[String(cloud.branch_id)]=branchQty;
+       if(localBranch)x.branch_stock_canonical[String(localBranch)]=branchQty;
+       x.restaurant_stock_canonical=branchQty; // Aggregate ONCE, not per alias.
+     }else{
+       x.stock_canonical=branchQty;
+       x.stock=fromCanonical(branchQty,x.base_unit);
+       x.branch_stock_canonical={};
+       x.restaurant_stock_canonical=0;
+     }
      if(b&&b.qty>0){
        const unitQty=fromCanonical(b.qty,x.base_unit);
        const liveUnitCost=unitQty>0?b.value/unitQty:0;
@@ -2189,7 +2203,9 @@ function currentBranchName(){return currentBranch().name}
 function centralStockCanonical(ing){return ing.stock_canonical!=null?Number(ing.stock_canonical):toCanonical(ing.stock,ing.base_unit)}
 function branchStockCanonical(ing,branchId=currentBranchId()){
  const map=(ing.branch_stock_canonical&&typeof ing.branch_stock_canonical==='object')?ing.branch_stock_canonical:{};
- return Number(map[branchId]||0);
+ if(Object.prototype.hasOwnProperty.call(map,String(branchId)))return Number(map[String(branchId)]||0);
+ if(cloud?.branch_id&&Object.prototype.hasOwnProperty.call(map,String(cloud.branch_id)))return Number(map[String(cloud.branch_id)]||0);
+ return 0;
 }
 function setBranchStockCanonical(ing,branchId,value){
  ing.branch_stock_canonical=(ing.branch_stock_canonical&&typeof ing.branch_stock_canonical==='object')?ing.branch_stock_canonical:{};
@@ -2879,9 +2895,10 @@ function kitchStockValue(x){
  return (u==='g'||u==='ml'?q/1000:q)*price;
 }
 function inventoryPage(){
+ if(window.__kitchInventoryLoadError)return `<div class="note"><b>Live inventory unavailable:</b> ${esc(window.__kitchInventoryLoadError)}. No stock has been changed. Please check the browser console or access policy.</div>`;
  const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager'&&!hasCentralStore(),storeMaster=hasCentralStore()&&session==='store';
- const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(unit(x.base_unit)==='ltr'||unit(x.base_unit)==='ml'?'L':unit(x.base_unit)==='kg'||unit(x.base_unit)==='g'?'kg':x.base_unit)}</td><td><b>${kitchQuantityLabel(contextStockCanonical(x),x.base_unit)}</b></td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(x.latest_cost,x.base_unit)}</td><td><b>AED ${kitchStockValue(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></td><td>${displayStock(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':displayStock(x)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
- return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>displayStock(x)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
+ const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(unit(x.base_unit)==='ltr'||unit(x.base_unit)==='ml'?'L':unit(x.base_unit)==='kg'||unit(x.base_unit)==='g'?'kg':x.base_unit)}</td><td><b>${kitchQuantityLabel(contextStockCanonical(x),x.base_unit)}</b></td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(x.latest_cost,x.base_unit)}</td><td><b>AED ${kitchStockValue(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></td><td>${contextStockCanonical(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':fromCanonical(contextStockCanonical(x),x.base_unit)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
+ return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>fromCanonical(contextStockCanonical(x),x.base_unit)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
  <div class="panel"><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
  <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster||session==='manager')?'<button class="btn" onclick="openImport()">Upload / Import Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
