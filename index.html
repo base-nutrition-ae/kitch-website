@@ -2348,7 +2348,7 @@ async function refreshKitchTrialStatus(){
   const now=Date.now();
   const plan=String(data.plan||'').toLowerCase()==='business'?'Business':'Starter';
   const status=String(data.status||'').toLowerCase();
-  if(status==='active' && Number.isFinite(end) && end>now){
+  if(status==='trialing' && Number.isFinite(end) && end>now){
     const days=Math.ceil((end-now)/86400000);
     target.textContent=`${plan} free trial · ${days} day${days===1?'':'s'} remaining · Ends ${new Date(end).toLocaleDateString('en-AE',{day:'numeric',month:'short',year:'numeric'})}. No payment card required for your trial.`;
   }else if(Number.isFinite(end)&&end<=now){
