@@ -2401,7 +2401,7 @@ function page(n){
 
 
 
-function publicModal(html){document.body.insertAdjacentHTML('beforeend',`<div id="publicModal" class="publicModal"><div class="publicBox"><button class="closePublic" onclick="closePublicModal()">×</button>${html}</div></div>`)}
+function publicModal(html){closePublicModal();document.body.insertAdjacentHTML('beforeend',`<div id="publicModal" class="publicModal"><div class="publicBox"><button class="closePublic" onclick="closePublicModal()">×</button>${html}</div></div>`)}
 function closePublicModal(){document.getElementById('publicModal')?.remove()}
 function toggleMobileMenu(open){
  const m=document.getElementById('mobilePublicMenu');
@@ -4261,18 +4261,7 @@ async function completeStripeReturn(){
   // management session and remove every old KITCH browser record so testing
   // starts exactly like a brand-new customer. Cloud data is never borrowed
   // from a previous account.
-  const FRESH_CLIENT_BUILD='kitch_fresh_client_build_2026_10_02_v3_final_zero';
-  if(!localStorage.getItem(FRESH_CLIENT_BUILD)){
-    try{await sb.auth.signOut({scope:'local'});}catch(e){}
-    Object.keys(localStorage).filter(k=>k.startsWith('kitch_demo_')||k.startsWith('kitch_final_')||k.startsWith('kitch_cloud_')||k.startsWith('kitch_empty_')).forEach(k=>localStorage.removeItem(k));
-    sessionStorage.removeItem('kitch_pending_subscription');
-    localStorage.setItem(PACKAGE_KEY,'restaurant');
-    localStorage.setItem(FRESH_CLIENT_BUILD,'1');
-    session=null;currentStaff=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
-    app.classList.add('hidden');
-    login.classList.remove('hidden');
-    return;
-  }
+  // Preserve existing sessions and workspace data on every deployment.
 
   // Preserve this browser's scoped workspace data across refreshes. The signed-in
   // restaurant is resolved below before any operational screen is shown.
