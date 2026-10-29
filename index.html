@@ -2914,7 +2914,38 @@ async function readExcel(file){
  try{
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
   const pick=(o,names)=>{for(const n of names)if(Object.prototype.hasOwnProperty.call(o,n))return o[n];return''};
-  importRows=rows.map(r=>{const ref=Number(pick(r,['Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED'])||0),open=Number(pick(r,['Opening Stock','Opening Quantity'])||0),openCost=Number(pick(r,['Opening Unit Cost AED','Opening Cost AED'])||ref||0);return {name:String(pick(r,['Ingredient Name','Ingredient'])).trim(),category:String(pick(r,['Category'])).trim(),supplier:String(pick(r,['Supplier','Supplier Name','Default Supplier'])).trim(),base_unit:unit(pick(r,['Base Unit'])),cost:openCost||ref,reference_cost:ref,opening_stock:open,opening_unit_cost:openCost,par:Number(pick(r,['PAR Target Stock','PAR Level','PAR'])||0),minimum:Number(pick(r,['Minimum Stock','Min Stock'])||0),receiving_type:correctedReceivingType(String(pick(r,['Ingredient Name','Ingredient','Name'])||'').trim(),String(pick(r,['Receiving Type','Storage Type'])||'Room Temperature').trim()||'Room Temperature')}}).filter(x=>x.name);
+  // Accept both the simplified KITCH export and older ingredient-master templates.
+  const normalized=(r)=>Object.fromEntries(Object.entries(r).map(([k,v])=>[String(k).trim().toLowerCase(),v]));
+  const get=(r,names)=>{const o=normalized(r);for(const n of names){const v=o[n.toLowerCase()];if(v!==undefined&&v!==null&&String(v).trim()!=='')return v;}return '';};
+  const numeric=(value,label,ingredient)=>{
+   if(value===undefined||value===null||String(value).trim()==='')return 0;
+   const raw=String(value).trim().replace(/,/g,'').replace(/^AED\s*/i,'');
+   const match=raw.match(/^([+-]?(?:\d+\.?\d*|\.\d+))(?:\s*(kg|g|l|ltr|litre|liter|ml|pcs?|pieces?))?$/i);
+   if(!match)throw new Error(ingredient+': invalid '+label+' ('+String(value)+').');
+   const n=Number(match[1]);if(!Number.isFinite(n)||n<0)throw new Error(ingredient+': invalid '+label+'.');
+   return {n,u:(match[2]||'').toLowerCase()};
+  };
+  const asBase=(value,base,label,name)=>{
+   const {n,u}=numeric(value,label,name);if(!u)return n;
+   const b=unit(base);
+   if((b==='kg'||b==='g')&&(u==='kg'||u==='g'))return n*(u==='kg'?1000:1)/(b==='kg'?1000:1);
+   if((b==='ltr'||b==='ml')&&['l','ltr','litre','liter','ml'].includes(u))return n*(u==='ml'?1:1000)/(b==='ml'?1:1000);
+   if(b==='pcs'&&['pc','pcs','piece','pieces'].includes(u))return n;
+   throw new Error(name+': '+label+' unit '+u+' does not match '+b+'.');
+  };
+  importRows=rows.map(r=>{
+   const name=String(get(r,['Ingredient Name','Ingredient','Name'])).trim();if(!name)return null;
+   const base=unit(get(r,['Base Unit','Unit'])||'kg');
+   const priceKey=Object.keys(r).find(k=>/^Supplier Price \(AED\//i.test(k));
+   const priceRaw=get(r,['Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED','Reference Cost','Latest Cost'])||(priceKey?r[priceKey]:'');
+   const ref=numeric(priceRaw,'supplier price',name).n;
+   const opening=asBase(get(r,['Opening Stock','Opening Quantity']),base,'opening stock',name);
+   const par=asBase(get(r,['PAR Target Stock','PAR Level','PAR']),base,'PAR',name);
+   const minimum=asBase(get(r,['Minimum Stock','Min Stock','MIN']),base,'minimum stock',name);
+   const openingCostRaw=get(r,['Opening Unit Cost AED','Opening Cost AED']);
+   const openCost=openingCostRaw===''?ref:numeric(openingCostRaw,'opening cost',name).n;
+   return {name,category:String(get(r,['Category'])).trim(),supplier:String(get(r,['Supplier','Supplier Name','Default Supplier'])).trim(),base_unit:base,cost:ref,reference_cost:ref,opening_stock:opening,opening_unit_cost:openCost,par,minimum,receiving_type:correctedReceivingType(name,String(get(r,['Receiving Type','Storage Type'])||'Room Temperature').trim())};
+  }).filter(Boolean);
   const existing=ingredients();
   preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Duplicate names will update the existing ingredient instead of creating another one.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${x.par}</td><td>${x.minimum}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Ingredients</button>`;
  }catch(e){preview.innerHTML='<div class="note bad">Could not read this Excel file.</div>'}
@@ -2948,6 +2979,7 @@ async function confirmImport(){
    if(!ok||!cloud.restaurant_id)throw new Error('Management workspace is not loaded. Sign in again.');
   }
   for(const x0 of importRows){
+   if(teamCloudAuth?.pin && Number(x0.opening_stock||0)===0)throw new Error('This staff import has zero opening stock. The server stock-movement function must allow zero opening stock without creating a movement. Use a management login or update the server function before retrying.');
    const e=a.find(z=>z.name.toLowerCase()===x0.name.toLowerCase());
    if(e){
     const candidate={...e,...x0,stock:e.stock,stock_canonical:e.stock_canonical,branch_stock_canonical:e.branch_stock_canonical,restaurant_stock_canonical:e.restaurant_stock_canonical,opening_stock:e.opening_stock,opening_unit_cost:e.opening_unit_cost,stock_location:e.stock_location||assignedLocationName()};
