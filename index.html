@@ -2977,6 +2977,7 @@ async function readExcel(file){
    if(b==='pcs'&&['pc','pcs','piece','pieces'].includes(u))return n;
    throw new Error(name+': '+label+' unit '+u+' does not match '+b+'.');
   };
+  ingredientImportCursor=0;
   importRows=rows.map(r=>{
    const name=String(get(r,['Ingredient Name','Ingredient','Name'])).trim();if(!name)return null;
    const base=unit(get(r,['Base Unit','Unit','Price Unit','Receiving Type'])||'kg');
@@ -2995,14 +2996,44 @@ async function readExcel(file){
   }catch(e){console.error('Ingredient import preview:',e);preview.innerHTML='<div class="note bad">Could not read this file: '+esc(e.message||'Unknown error')+'</div>'}
 }
 let ingredientImportBusy=false;
+let ingredientImportCursor=0;
+let ingredientImportFileSignature='';
+const kitchImportPause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function kitchTransientImportError(error){
+ const message=String(error?.message||error||'').toLowerCase();
+ return /load failed|failed to fetch|network|timeout|timed out|connection|502|503|504|429|rate limit|abort/.test(message);
+}
+async function kitchImportCloudWrite(x, isNew){
+ // An interrupted request may have reached the database. Check before repeating
+ // a new insert, so a lost response cannot create a duplicate ingredient.
+ let lastError;
+ for(let attempt=0;attempt<4;attempt++){
+  if(attempt){
+   await kitchImportPause(Math.min(700*2**(attempt-1),4000));
+   if(isNew&&!teamCloudAuth?.pin&&cloud.restaurant_id){
+    const {data,error}=await sb.from('ingredients').select('id').eq('restaurant_id',cloud.restaurant_id).ilike('name',x.name).limit(1);
+    if(!error&&data?.length){x.cloud_id=data[0].id;isNew=false;}
+   }
+  }
+  try{return await cloudUpsertIngredient(x)}catch(error){
+   lastError=error;
+   if(!kitchTransientImportError(error)||attempt===3)break;
+   // Team RPC can commit even when the response is lost. Never blindly
+   // repeat an ambiguous create against that endpoint.
+   if(isNew&&teamCloudAuth?.pin)break;
+  }
+ }
+ throw lastError;
+}
 async function confirmImport(){
  if(ingredientImportBusy)return;
  if(!importRows.length)return alert('Choose an Excel file first.');
  ingredientImportBusy=true;
  const button=document.querySelector('#preview button.primary');
  const total=importRows.length;
- let added=0,updated=0,completed=0;
+ let added=0,updated=0,completed=ingredientImportCursor;
  const a=ingredients();
+ document.getElementById('ingredientImportStatus')?.remove();
  const status=document.createElement('div');
  status.id='ingredientImportStatus';
  status.setAttribute('role','status');
@@ -3022,24 +3053,27 @@ async function confirmImport(){
    const ok=await ensureCloudWorkspace();
    if(!ok||!cloud.restaurant_id)throw new Error('Management workspace is not loaded. Sign in again.');
   }
-  for(const x0 of importRows){
+  for(let rowIndex=ingredientImportCursor;rowIndex<importRows.length;rowIndex++){
+   const x0=importRows[rowIndex];
    const e=a.find(z=>z.name.toLowerCase()===x0.name.toLowerCase());
    if(e){
     const candidate={...e,...x0,stock:e.stock,stock_canonical:e.stock_canonical,branch_stock_canonical:e.branch_stock_canonical,restaurant_stock_canonical:e.restaurant_stock_canonical,opening_stock:e.opening_stock,opening_unit_cost:e.opening_unit_cost,stock_location:e.stock_location||assignedLocationName()};
-    await cloudUpsertIngredient(candidate);
+    await kitchImportCloudWrite(candidate,false);
     Object.assign(e,candidate);updated++;
    }else{
     const x={...x0,sku:'ING-'+String(a.length+1).padStart(3,'0'),stock:Number(x0.opening_stock||0),stock_canonical:toCanonical(Number(x0.opening_stock||0),x0.base_unit),stock_location:assignedLocationName()};
-    await cloudUpsertIngredient(x);
+    await kitchImportCloudWrite(x,true);
     a.push(x);added++;
    }
    completed++;
+   ingredientImportCursor=rowIndex+1;
    saveIngredients(a);
    updateProgress();
    // Yield to the browser periodically so progress and controls stay responsive.
    if(completed%5===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
   importRows=[];
+  ingredientImportCursor=0;
   if(status)status.innerHTML='<b style="color:#26733a">✓ Import complete</b><div style="margin-top:6px">'+added+' added · '+updated+' updated</div>';
   if(button){button.textContent='Import complete';button.style.opacity='1'}
   await new Promise(resolve=>setTimeout(resolve,650));
@@ -3047,7 +3081,7 @@ async function confirmImport(){
  }catch(e){
   saveIngredients(a);
   if(status)status.innerHTML='<b style="color:#b42318">Import stopped after '+completed+' of '+total+' ingredients.</b><div style="margin-top:6px">'+esc(String(e.message||e))+'</div><div style="margin-top:6px">Saved items are kept. Check the connection and retry; matching ingredient names will be updated.</div>';
-  if(button){button.textContent='Retry import';button.style.opacity='1'}
+  if(button){button.textContent='Resume import ('+completed+' / '+total+')';button.style.opacity='1'}
  }finally{
   ingredientImportBusy=false;
   if(button)button.disabled=false;
