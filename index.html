@@ -1923,7 +1923,7 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-se
    <button onclick="logout()"><span>Log out</span></button>
   </div>
  </aside>
- <main class="main"><div class="top"><div><div class="sub">RESTAURANT WORKSPACE</div><h1 id="pageTitle">Dashboard</h1></div><button class="logout" onclick="logout()">Log out</button></div><div id="content"></div></main>
+ <main class="main"><div class="top"><div><div class="sub">RESTAURANT WORKSPACE</div><h1 id="pageTitle">Dashboard</h1></div><button class="logout" onclick="logout()">Log out</button></div><div id="kitchTrialStatus" role="status" aria-live="polite" style="display:none;margin:0 0 16px;padding:14px 18px;border:1px solid #e9d7b5;background:#fff8e8;border-radius:14px;font-size:13px;line-height:1.5"></div><div id="content"></div></main>
 </section>
 
 <script>
@@ -2325,7 +2325,44 @@ function toggleAppMobileMenu(open){
  document.body.style.overflow=open?'hidden':'';
 }
 
-function openPage(name){pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+// Subscription status is displayed from Supabase, never inferred from local storage.
+// IMPORTANT: this is informational UI only. Paid-feature authorization must be
+// enforced independently by server-side policies / RPCs / Edge Functions.
+let kitchTrialRequestId=0;
+async function refreshKitchTrialStatus(){
+ const target=document.getElementById('kitchTrialStatus');
+ if(!target)return;
+ const requestId=++kitchTrialRequestId;
+ const restaurantId=cloud?.restaurant_id;
+ if(!restaurantId){target.style.display='none';return;}
+ target.style.display='block';
+ target.textContent='Checking your subscription status…';
+ try{
+  const {data,error}=await sb.from('kitch_restaurant_trials')
+    .select('plan,status,trial_started_at,trial_ends_at')
+    .eq('restaurant_id',restaurantId).limit(1).maybeSingle();
+  if(requestId!==kitchTrialRequestId)return;
+  if(error)throw error;
+  if(!data){target.textContent='No trial is registered for this restaurant. Contact KITCH support to activate your subscription.';return;}
+  const end=Date.parse(data.trial_ends_at||'');
+  const now=Date.now();
+  const plan=String(data.plan||'').toLowerCase()==='business'?'Business':'Starter';
+  const status=String(data.status||'').toLowerCase();
+  if(status==='active' && Number.isFinite(end) && end>now){
+    const days=Math.ceil((end-now)/86400000);
+    target.textContent=`${plan} free trial · ${days} day${days===1?'':'s'} remaining · Ends ${new Date(end).toLocaleDateString('en-AE',{day:'numeric',month:'short',year:'numeric'})}. No payment card required for your trial.`;
+  }else if(Number.isFinite(end)&&end<=now){
+    target.textContent=`Your ${plan} trial has ended. Your restaurant data is preserved. Choose a paid plan to continue using subscription features.`;
+  }else{
+    target.textContent=`${plan} subscription · Status: ${status||'pending'}. Contact KITCH support if this is unexpected.`;
+  }
+ }catch(err){
+  if(requestId!==kitchTrialRequestId)return;
+  console.warn('KITCH trial status unavailable',err);
+  target.textContent='Subscription status is temporarily unavailable. This message does not change your access.';
+ }
+}
+function openPage(name){void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
