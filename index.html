@@ -2065,6 +2065,33 @@ async function cloudLoadIngredients(){
   const prev=byCloud.get(String(x.id))||byName.get(String(x.name||'').trim().toLowerCase())||{};
   return {cloud_id:x.id,sku:x.sku||prev.sku||'',name:x.name,category:x.category||prev.category||'',supplier:prev.supplier||'',receiving_type:receivingTypeLabel(x.receiving_type||prev.receiving_type||'Room Temperature'),base_unit:x.base_unit,cost:Number(x.last_unit_cost||0),reference_cost:Number(x.reference_cost!=null?x.reference_cost:(x.last_unit_cost||0)),latest_cost:Number(x.last_unit_cost||0),par:Number(x.par_target||0),minimum:Number(x.minimum_stock||0),opening_stock:Number(prev.opening_stock||0),opening_unit_cost:Number(prev.opening_unit_cost||0),stock:Number(prev.stock||0),stock_canonical:Number(prev.stock_canonical||0),branch_stock_canonical:prev.branch_stock_canonical||{},restaurant_stock_canonical:Number(prev.restaurant_stock_canonical||0),stock_location:prev.stock_location||localStorage.getItem('kitch_cloud_branch_name')||'Main Branch'};
  });
+ // KITCH live stock is held in Supabase inventory_balances, not in the
+ // browser's demo cache. Never overwrite a live balance with an empty cache.
+ const {data:balances,error:balanceError}=await sb.from('inventory_balances')
+   .select('ingredient_id,branch_id,unit,quantity_on_hand,indicative_unit_cost')
+   .eq('restaurant_id',cloud.restaurant_id);
+ if(balanceError){
+   console.error('Live inventory balances could not load',balanceError);
+   window.__kitchInventoryLoadError=balanceError.message||'Inventory access denied';
+ }else{
+   window.__kitchInventoryLoadError='';
+   const live=new Map();
+   (balances||[]).filter(b=>!cloud.branch_id||String(b.branch_id)===String(cloud.branch_id)).forEach(b=>{
+     const key=String(b.ingredient_id);
+     const prev=live.get(key)||{qty:0,value:0};
+     const qty=Number(b.quantity_on_hand||0);
+     prev.qty+=toCanonical(qty,b.unit);
+     prev.value+=qty*Number(b.indicative_unit_cost||0);
+     live.set(key,prev);
+   });
+   a.forEach(x=>{
+     const b=live.get(String(x.cloud_id));
+     x.stock_canonical=b?b.qty:0;
+     x.stock=fromCanonical(x.stock_canonical,x.base_unit);
+     x.restaurant_stock_canonical=x.stock_canonical;
+     x.latest_cost=b&&b.qty>0?b.value/(b.qty/((canonicalUnit(x.base_unit)==='pcs')?1:1000)):x.latest_cost;
+   });
+ }
  localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
 }
 async function ensureSupabaseAuth(){
