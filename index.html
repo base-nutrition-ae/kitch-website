@@ -2935,9 +2935,9 @@ async function readExcel(file){
   };
   importRows=rows.map(r=>{
    const name=String(get(r,['Ingredient Name','Ingredient','Name'])).trim();if(!name)return null;
-   const base=unit(get(r,['Base Unit','Unit'])||'kg');
+   const base=unit(get(r,['Base Unit','Unit','Price Unit','Receiving Type'])||'kg');
    const priceKey=Object.keys(r).find(k=>/^Supplier Price \(AED\//i.test(k));
-   const priceRaw=get(r,['Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED','Reference Cost','Latest Cost'])||(priceKey?r[priceKey]:'');
+   const priceRaw=get(r,['Supplier Price (AED)','Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED','Reference Cost','Latest Cost'])||(priceKey?r[priceKey]:'');
    const ref=numeric(priceRaw,'supplier price',name).n;
    const opening=asBase(get(r,['Opening Stock','Opening Quantity']),base,'opening stock',name);
    const par=asBase(get(r,['PAR Target Stock','PAR Level','PAR']),base,'PAR',name);
@@ -2948,7 +2948,7 @@ async function readExcel(file){
   }).filter(Boolean);
   const existing=ingredients();
   preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Duplicate names will update the existing ingredient instead of creating another one.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${Number.isFinite(Number(x.par))?Number(x.par):0}</td><td>${Number.isFinite(Number(x.minimum))?Number(x.minimum):0}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Ingredients</button>`;
- }catch(e){preview.innerHTML='<div class="note bad">Could not read this Excel file.</div>'}
+  }catch(e){console.error('Ingredient import preview:',e);preview.innerHTML='<div class="note bad">Could not read this file: '+esc(e.message||'Unknown error')+'</div>'}
 }
 let ingredientImportBusy=false;
 async function confirmImport(){
