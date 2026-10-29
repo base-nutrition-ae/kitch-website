@@ -2411,7 +2411,7 @@ async function createWorkspace(){
  await loadCloudWorkspace();await cloudLoadIngredients();currentStaff=null;enter('owner');
 }
 function socialContact(type){
- if(type==='instagram') return publicModal(`<h2>Instagram</h2><div class="policyText"><p>KITCH social profile is being prepared for launch.</p><p>For now, contact us at <b>hello@kitch.ae</b>.</p></div><a class="primary" style="display:grid;place-items:center;text-decoration:none;margin-top:18px" href="mailto:hello@kitch.ae">Contact KITCH</a>`);
+ if(type==='instagram') return window.open('https://www.instagram.com/kitch.ae/','_blank','noopener,noreferrer');
  return publicModal(`<h2>WhatsApp</h2><div class="policyText"><p>KITCH WhatsApp support is being prepared for launch.</p><p>For now, contact us at <b>hello@kitch.ae</b>.</p></div><a class="primary" style="display:grid;place-items:center;text-decoration:none;margin-top:18px" href="mailto:hello@kitch.ae">Contact KITCH</a>`);
 }
 function publicInfo(type){
