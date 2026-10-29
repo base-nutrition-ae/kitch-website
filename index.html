@@ -2834,12 +2834,12 @@ function kitchStockValue(x){
 }
 function inventoryPage(){
  const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager'&&!hasCentralStore(),storeMaster=hasCentralStore()&&session==='store';
- const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(unit(x.base_unit)==='ltr'||unit(x.base_unit)==='ml'?'L':unit(x.base_unit)==='kg'||unit(x.base_unit)==='g'?'kg':x.base_unit)}</td><td><b>${kitchQuantityLabel(contextStockCanonical(x),x.base_unit)}</b></td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(x.latest_cost,x.base_unit)}</td><td><b>AED ${kitchStockValue(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></td><td>${displayStock(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':displayStock(x)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
+ const rows=a.map(x=>`<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b><br><small>${esc(x.category||'')}</small></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(unit(x.base_unit)==='ltr'||unit(x.base_unit)==='ml'?'L':unit(x.base_unit)==='kg'||unit(x.base_unit)==='g'?'kg':x.base_unit)}</td><td><b>${kitchQuantityLabel(contextStockCanonical(x),x.base_unit)}</b></td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost'),x.base_unit)}</td><td><b>AED ${kitchStockValue(x).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></td><td>${displayStock(x)<=0?'<span class="warn">OUT / NOT ENTERED</span>':displayStock(x)<Number(x.minimum||0)?'<span class="warn">LOW</span>':'<span class="ok">OK</span>'}</td><td>${(manage||storeMaster)?`<button class="btn" onclick="openEditIngredient('${esc(x.sku)}')">Edit</button>`:'—'}</td></tr>`).join('');
  return `<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>displayStock(x)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
  <div class="panel"><div class="note" style="margin-bottom:14px">Inventory values use recorded stock only. Zero means no available stock is recorded for this location; confirm opening stock before relying on LOW/OUT counts. Supplier prices are shown as currently recorded; verify imported costs against invoices before using inventory valuation.</div><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
  <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster||session==='manager')?'<button class="btn" onclick="openImport()">Upload / Import Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
- <table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>REFERENCE COST</th><th>LATEST COST</th><th>STOCK VALUE</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="12" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div>`;
+ <table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>SUPPLIER PRICE</th><th>STOCK VALUE</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="11" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div>`;
 }
 
 function openBranchOpeningStock(){
@@ -2982,8 +2982,23 @@ async function confirmImport(){
 function downloadMaster(){
  const a=ingredients();if(!a.length)return alert('Ingredient Master is empty.');
  if(typeof XLSX==='undefined')return alert('Excel export needs an internet connection.');
- const data=a.map(x=>({'SKU':x.sku,'Ingredient Name':x.name,'Category':x.category,'Supplier':x.supplier||'','Receiving Type':receivingTypeLabel(x.receiving_type),'Base Unit':x.base_unit,'Reference Cost AED':Number(x.reference_cost||x.cost||0),'Opening Stock':Number(x.opening_stock||x.stock||0),'Opening Unit Cost AED':Number(x.opening_unit_cost||x.cost||0),'PAR Target Stock':x.par,'Minimum Stock':x.minimum,'Current Stock':x.stock}));
- const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,'Ingredient Master');XLSX.writeFile(wb,'KITCH_INGREDIENT_MASTER.xlsx');
+ // Export human-readable quantities; never change the underlying inventory records.
+ const data=a.map(x=>{
+  const base=unit(x.base_unit),suffix=base==='kg'||base==='g'?'kg':base==='ltr'||base==='ml'?'L':'pc';
+  const price=kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost');
+  const qty=Number(contextStockCanonical(x)||0);
+  const stockValue=kitchStockValue(x);
+  return {'SKU':x.sku,'Ingredient':x.name,'Category':x.category||'','Supplier':x.supplier||'',
+   'Unit':suffix,'Opening Stock':kitchQuantityLabel(toCanonical(Number(x.opening_stock||0),x.base_unit),x.base_unit),
+   'PAR':kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit),
+   'MIN':kitchQuantityLabel(toCanonical(Number(x.minimum||0),x.base_unit),x.base_unit),
+   ['Supplier Price (AED/'+suffix+')']:price||'',
+   'Current Stock':kitchQuantityLabel(qty,x.base_unit),
+   'Stock Value (AED)':Number(stockValue.toFixed(2))};
+ });
+ const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(data);
+ ws['!cols']=[{wch:14},{wch:30},{wch:20},{wch:24},{wch:10},{wch:18},{wch:14},{wch:14},{wch:25},{wch:18},{wch:20}];
+ XLSX.utils.book_append_sheet(wb,ws,'Ingredient Master');XLSX.writeFile(wb,'KITCH_INGREDIENT_MASTER_SIMPLE.xlsx');
 }
 
 
