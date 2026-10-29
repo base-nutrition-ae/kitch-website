@@ -2073,6 +2073,7 @@ async function cloudLoadIngredients(){
  if(balanceError){
    console.error('Live inventory balances could not load',balanceError);
    window.__kitchInventoryLoadError=balanceError.message||'Inventory access denied';
+   alert('KITCH could not read live stock: '+window.__kitchInventoryLoadError+'\nExisting stock was not changed.');
  }else{
    window.__kitchInventoryLoadError='';
    const live=new Map();
@@ -2088,8 +2089,13 @@ async function cloudLoadIngredients(){
      const b=live.get(String(x.cloud_id));
      x.stock_canonical=b?b.qty:0;
      x.stock=fromCanonical(x.stock_canonical,x.base_unit);
-     x.restaurant_stock_canonical=x.stock_canonical;
-     x.latest_cost=b&&b.qty>0?b.value/(b.qty/((canonicalUnit(x.base_unit)==='pcs')?1:1000)):x.latest_cost;
+     x.restaurant_stock_canonical=0; // Avoid counting the same stock twice in Starter mode.
+     if(b&&b.qty>0){
+       const unitQty=fromCanonical(b.qty,x.base_unit);
+       const liveUnitCost=unitQty>0?b.value/unitQty:0;
+       x.cost=liveUnitCost;
+       x.latest_cost=liveUnitCost;
+     }
    });
  }
  localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
