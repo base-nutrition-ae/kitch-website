@@ -2065,6 +2065,42 @@ async function cloudLoadIngredients(){
   const prev=byCloud.get(String(x.id))||byName.get(String(x.name||'').trim().toLowerCase())||{};
   return {cloud_id:x.id,sku:x.sku||prev.sku||'',name:x.name,category:x.category||prev.category||'',supplier:prev.supplier||'',receiving_type:receivingTypeLabel(x.receiving_type||prev.receiving_type||'Room Temperature'),base_unit:x.base_unit,cost:Number(x.last_unit_cost||0),reference_cost:Number(x.reference_cost!=null?x.reference_cost:(x.last_unit_cost||0)),latest_cost:Number(x.last_unit_cost||0),par:Number(x.par_target||0),minimum:Number(x.minimum_stock||0),opening_stock:Number(prev.opening_stock||0),opening_unit_cost:Number(prev.opening_unit_cost||0),stock:Number(prev.stock||0),stock_canonical:Number(prev.stock_canonical||0),branch_stock_canonical:prev.branch_stock_canonical||{},restaurant_stock_canonical:Number(prev.restaurant_stock_canonical||0),stock_location:prev.stock_location||localStorage.getItem('kitch_cloud_branch_name')||'Main Branch'};
  });
+ // Restore actual quantities from saved cloud stock movements, not stale browser cache.
+ // Read-only: no stock movements are created or changed here.
+ try{
+  const {data:movements,error:movementError}=await sb.from('inventory_movements')
+   .select('ingredient_id,branch_id,quantity_delta,unit')
+   .eq('restaurant_id',cloud.restaurant_id).order('occurred_at',{ascending:true}).limit(10000);
+  if(movementError)throw movementError;
+  const {data:cloudBranches,error:branchError}=await sb.from('branches')
+   .select('id,name,branch_type').eq('restaurant_id',cloud.restaurant_id);
+  if(branchError)throw branchError;
+  const branchNames=new Map((cloudBranches||[]).map(b=>[String(b.id),String(b.name||'').trim().toLowerCase()]));
+  const centralIds=new Set((cloudBranches||[]).filter(b=>b.branch_type==='central_store').map(b=>String(b.id)));
+  const localBranches=(typeof branches==='function'?branches():[]);
+  const totals=new Map();
+  for(const m of (movements||[])){
+   const key=String(m.ingredient_id)+'|'+String(m.branch_id);
+   totals.set(key,(totals.get(key)||0)+Number(m.quantity_delta||0));
+  }
+  for(const x of a){
+   const localByBranch={};let mainTotal=0,centralTotal=0;
+   for(const b of (cloudBranches||[])){
+    const qty=Math.max(0,totals.get(String(x.cloud_id)+'|'+String(b.id))||0);
+    if(centralIds.has(String(b.id))){centralTotal+=qty;continue;}
+    mainTotal+=qty;
+    // Branches stored in the UI may have local IDs rather than cloud UUIDs.
+    localByBranch[String(b.id)]=qty;
+    for(const local of localBranches){
+     if(String(local.name||'').trim().toLowerCase()===branchNames.get(String(b.id)))localByBranch[String(local.id)]=qty;
+    }
+   }
+   x.branch_stock_canonical=localByBranch;
+   x.restaurant_stock_canonical=mainTotal;
+   x.stock_canonical=centralTotal;
+   x.stock=fromCanonical(centralTotal,x.base_unit);
+  }
+ }catch(stockError){console.warn('Could not restore KITCH cloud stock:',stockError);}
  localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
 }
 async function ensureSupabaseAuth(){
