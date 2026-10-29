@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>KITCH</title>
-<link rel="icon" type="image/png" sizes="32x32" href="./kitch-logo.png?v=20261005">
-<link rel="shortcut icon" type="image/png" href="./kitch-logo.png?v=20261005">
-<link rel="apple-touch-icon" href="./kitch-logo.png?v=20261005">
+<title>KITCH | Restaurant Operating System</title>
+<link rel="icon" type="image/png" sizes="32x32" href="./kitch-logo.png?v=20261029">
+<link rel="shortcut icon" type="image/png" href="./kitch-logo.png?v=20261029">
+<link rel="apple-touch-icon" href="./kitch-logo.png?v=20261029">
 
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f5f5f2;color:#111}
@@ -2385,7 +2385,7 @@ function publicInfo(type){
  };const x=data[type];publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:38px">${x[0]}</h2><div class="policyText">${x[1]}</div>`)
 }
 function openSubscribe(){
- publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>SUBSCRIPTION</span></div><h2 style="font-size:38px;margin-bottom:8px">Choose your KITCH</h2><p class="muted">Start with the operating structure that matches your business.</p><div class="planGrid" style="grid-template-columns:repeat(2,1fr)"><div class="plan"><b>Starter</b><strong>AED 149 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>1 restaurant location</li><li>Main Office control</li><li>Kitchen Manager + Production Staff</li><li>Receiving, inventory, recipes & production</li><li>Waste, stock count & variance</li><li>Import / download Ingredient Master List (Excel)</li><li>Daily, weekly, monthly & custom recaps</li><li>Excel / CSV reports, printable PDF reports & staff access</li></ul><button class="primary" onclick="startSubscription('starter')">Choose Starter</button></div><div class="plan"><b>Business</b><strong>AED 299 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>Central Store</li><li>Multiple restaurant branches</li><li>Branch-level inventory & managers</li><li>Stock requests & transfers</li><li>Everything in Starter, including exports & recaps</li><li>Company-wide + location reporting</li><li>Main Office control</li></ul><button class="primary" onclick="startSubscription('business')">Choose Business</button></div></div><div class="note"><b>Stripe sandbox connected:</b> use Stripe test cards only. No real card will be charged.</div>`)
+ publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>SUBSCRIPTION</span></div><h2 style="font-size:38px;margin-bottom:8px">Choose your KITCH</h2><p class="muted">Start with the operating structure that matches your business.</p><div class="note" style="border:1px solid #f1d7c4;background:#fff8f3;margin-top:14px"><b>30-day free trial planned.</b> Trial activation is not yet available on this website. Current account setup uses the existing Stripe test checkout; no live subscription will be charged through this test flow.</div><div class="planGrid" style="grid-template-columns:repeat(2,1fr)"><div class="plan"><b>Starter</b><strong>AED 149 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>1 restaurant location</li><li>Main Office control</li><li>Kitchen Manager + Production Staff</li><li>Receiving, inventory, recipes & production</li><li>Waste, stock count & variance</li><li>Import / download Ingredient Master List (Excel)</li><li>Daily, weekly, monthly & custom recaps</li><li>Excel / CSV reports, printable PDF reports & staff access</li></ul><button class="primary" onclick="startSubscription('starter')">Choose Starter</button></div><div class="plan"><b>Business</b><strong>AED 299 <small style="font-size:12px;color:#777">/ month</small></strong><ul><li>Central Store</li><li>Multiple restaurant branches</li><li>Branch-level inventory & managers</li><li>Stock requests & transfers</li><li>Everything in Starter, including exports & recaps</li><li>Company-wide + location reporting</li><li>Main Office control</li></ul><button class="primary" onclick="startSubscription('business')">Choose Business</button></div></div><div class="note"><b>Stripe sandbox connected:</b> use Stripe test cards only. No real card will be charged.</div>`)
 }
 function startSubscription(plan){
  const label=plan==='business'?'Business · AED 299/month':'Starter · AED 149/month';
