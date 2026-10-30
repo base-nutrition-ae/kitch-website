@@ -2291,13 +2291,17 @@ async function cloudLoadIngredients(){
    console.error('Live inventory balances could not load',balanceError);
    window.__kitchInventoryLoadError=balanceError.message||'Inventory access denied';
    alert('KITCH could not read live stock: '+window.__kitchInventoryLoadError+'\nExisting stock was not changed.');
+   return;
  }else{
    window.__kitchInventoryLoadError='';
    const live=new Map();
-   const matchingBalances=(balances||[]).filter(b=>!cloud.branch_id||String(b.branch_id)===String(cloud.branch_id));
+   // Resolve the selected location by its real cloud ID, not a stale browser branch ID.
+   const activeLocation=currentBranch();
+   const selectedCloudBranch=activeLocation?.cloud_id||cloud.branch_id;
+   const matchingBalances=(balances||[]).filter(b=>!selectedCloudBranch||String(b.branch_id)===String(selectedCloudBranch));
    if((balances||[]).length && !matchingBalances.length){
-     console.warn('KITCH: selected branch has no inventory balances',cloud.branch_id);
-     window.__kitchInventoryLoadError='Selected branch has no inventory balances. Verify the workspace branch assignment.';
+     console.warn('KITCH: selected branch has no inventory balances',selectedCloudBranch);
+     window.__kitchInventoryLoadError='This location has no live inventory balances. Select the correct location or check its cloud assignment. Existing stock was not changed.';
    }
    matchingBalances.forEach(b=>{
      const key=String(b.ingredient_id);
@@ -2307,6 +2311,10 @@ async function cloudLoadIngredients(){
      prev.value+=qty*Number(b.indicative_unit_cost||0);
      live.set(key,prev);
    });
+   if(window.__kitchInventoryLoadError){
+     // Never persist a misleading zero-stock snapshot when the selected branch is unresolved.
+     return;
+   }
    a.forEach(x=>{
      const b=live.get(String(x.cloud_id));
      // The Business UI reads branch_stock_canonical, not stock_canonical.
@@ -2317,10 +2325,10 @@ async function cloudLoadIngredients(){
        x.stock=0;
        x.branch_stock_canonical={};
        const localBranch=currentBranchId();
-       if(cloud.branch_id)x.branch_stock_canonical[String(cloud.branch_id)]=branchQty;
+       if(selectedCloudBranch)x.branch_stock_canonical[String(selectedCloudBranch)]=branchQty;
        if(localBranch)x.branch_stock_canonical[String(localBranch)]=branchQty;
        // Local location IDs are UI aliases; do not double-count aliases.
-       const matchedLocation=locations().find(l=>String(l.cloud_id||'')===String(cloud.branch_id||''));
+       const matchedLocation=locations().find(l=>String(l.cloud_id||'')===String(selectedCloudBranch||''));
        if(matchedLocation)x.branch_stock_canonical[String(matchedLocation.id)]=branchQty;
        x.restaurant_stock_canonical=branchQty; // Aggregate ONCE, not per alias.
      }else{
