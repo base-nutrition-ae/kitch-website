@@ -2067,9 +2067,24 @@ async function cloudLoadIngredients(){
  });
  // KITCH live stock is held in Supabase inventory_balances, not in the
  // browser's demo cache. Never overwrite a live balance with an empty cache.
- const {data:balances,error:balanceError}=await sb.from('inventory_balances')
-   .select('ingredient_id,branch_id,unit,quantity_on_hand,indicative_unit_cost')
-   .eq('restaurant_id',cloud.restaurant_id);
+ let balances=null, balanceError=null;
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+   const response=await sb.rpc('kitch_team_inventory_read',{
+     p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin
+   });
+   balanceError=response.error;
+   if(!balanceError){
+     const payload=response.data||{};
+     if(String(payload.restaurant_id)!==String(cloud.restaurant_id)||String(payload.branch_id)!==String(cloud.branch_id)){
+       balanceError={message:'Team inventory restaurant or branch does not match your session.'};
+     }else balances=payload.balances||[];
+   }
+ }else{
+   const response=await sb.from('inventory_balances')
+     .select('ingredient_id,branch_id,unit,quantity_on_hand,indicative_unit_cost')
+     .eq('restaurant_id',cloud.restaurant_id);
+   balances=response.data;balanceError=response.error;
+ }
  if(balanceError){
    console.error('Live inventory balances could not load',balanceError);
    window.__kitchInventoryLoadError=balanceError.message||'Inventory access denied';
@@ -2340,6 +2355,8 @@ async function teamLogin(){
   catch(syncError){console.warn('Team workspace sync:',syncError);}
   const r=(role==='kitchen_manager'||role==='executive_chef')?'manager':((role==='store_manager'||role==='receiving_staff')?'store':'production');
   enter(r);
+  await cloudLoadIngredients();
+  openPage(roles[r].nav[0]);
  }catch(e){console.error('KITCH team login error',e);say('Unable to sign in: '+(e?.message||String(e)));}
  finally{if(button){button.disabled=false;button.textContent='Team sign in';}}
 }
