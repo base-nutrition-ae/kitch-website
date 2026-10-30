@@ -2077,7 +2077,12 @@ async function cloudLoadIngredients(){
  }else{
    window.__kitchInventoryLoadError='';
    const live=new Map();
-   (balances||[]).filter(b=>!cloud.branch_id||String(b.branch_id)===String(cloud.branch_id)).forEach(b=>{
+   const matchingBalances=(balances||[]).filter(b=>!cloud.branch_id||String(b.branch_id)===String(cloud.branch_id));
+   if((balances||[]).length && !matchingBalances.length){
+     console.warn('KITCH: selected branch has no inventory balances',cloud.branch_id);
+     window.__kitchInventoryLoadError='Selected branch has no inventory balances. Verify the workspace branch assignment.';
+   }
+   matchingBalances.forEach(b=>{
      const key=String(b.ingredient_id);
      const prev=live.get(key)||{qty:0,value:0};
      const qty=Number(b.quantity_on_hand||0);
@@ -2097,6 +2102,9 @@ async function cloudLoadIngredients(){
        const localBranch=currentBranchId();
        if(cloud.branch_id)x.branch_stock_canonical[String(cloud.branch_id)]=branchQty;
        if(localBranch)x.branch_stock_canonical[String(localBranch)]=branchQty;
+       // Local location IDs are UI aliases; do not double-count aliases.
+       const matchedLocation=locations().find(l=>String(l.cloud_id||'')===String(cloud.branch_id||''));
+       if(matchedLocation)x.branch_stock_canonical[String(matchedLocation.id)]=branchQty;
        x.restaurant_stock_canonical=branchQty; // Aggregate ONCE, not per alias.
      }else{
        x.stock_canonical=branchQty;
@@ -2393,6 +2401,9 @@ async function refreshKitchTrialStatus(){
  if(!target)return;
  const requestId=++kitchTrialRequestId;
  const restaurantId=cloud?.restaurant_id;
+ // Team PIN sign-in is not a Supabase Auth session. Do not issue a protected
+ // subscription query from a PIN-only session or show a false missing-trial alert.
+ if(session && session!=='owner'){target.style.display='none';return;}
  if(!restaurantId){target.style.display='none';return;}
  target.style.display='block';
  target.textContent='Checking your subscription status…';
@@ -2402,7 +2413,7 @@ async function refreshKitchTrialStatus(){
     .eq('restaurant_id',restaurantId).limit(1).maybeSingle();
   if(requestId!==kitchTrialRequestId)return;
   if(error)throw error;
-  if(!data){target.textContent='No trial is registered for this restaurant. Contact KITCH support to activate your subscription.';return;}
+  if(!data){target.textContent='Subscription details are not visible to this login. Ask the restaurant owner to check account access.';return;}
   const end=Date.parse(data.trial_ends_at||'');
   const now=Date.now();
   const plan=String(data.plan||'').toLowerCase()==='business'?'Business':'Starter';
