@@ -4353,6 +4353,8 @@ async function completeStripeReturn(){
 
   await syncPackageFromCloud();
   ensureStructure();
+  await cloudLoadIngredients();
+  if(session && !app.classList.contains('hidden')) openPage(document.getElementById('pageTitle')?.textContent?.trim()||'Dashboard');
  }catch(e){
   console.warn('KITCH workspace restore:',e?.message||e);
   session=null;currentStaff=null;
@@ -4365,7 +4367,7 @@ sb.auth.onAuthStateChange((event,authSession)=>{
    cloud.user=authSession.user;
    setTimeout(async()=>{
      const ok=await loadCloudWorkspace().catch(()=>false);
-     if(ok){await syncPackageFromCloud();ensureStructure();}
+     if(ok){await syncPackageFromCloud();ensureStructure();await cloudLoadIngredients();if(session && !app.classList.contains('hidden')) openPage(document.getElementById('pageTitle')?.textContent?.trim()||'Dashboard');}
    },0);
  }else if(event==='SIGNED_OUT'){
    cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
