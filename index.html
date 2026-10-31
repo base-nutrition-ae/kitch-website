@@ -3843,19 +3843,31 @@ function linkRecipeIngredients(){
  a.forEach(r=>(r.items||[]).forEach(it=>{const x=ingredientForRecipeItem(it,m);if(x&&it.sku!==x.sku){it.sku=x.sku;changed=true}}));
  if(changed)setArr(RECIPE_KEY,a);return changed
 }
-function recipeCost(r){
- const master=ingredients();
- return r.items.reduce((t,it)=>{
+function recipeCostDetails(r){
+ const master=ingredients(),missingPrices=[],missingIngredients=[];
+ const total=(r.items||[]).reduce((t,it)=>{
    const ing=ingredientForRecipeItem(it,master);
-   if(!ing)return t;
-   let q=Number(it.qty||0), iu=unit(it.unit), bu=unit(ing.base_unit);
+   if(!ing){missingIngredients.push(it.ingredient);return t}
+   let q=Number(it.qty||0),iu=unit(it.unit),bu=unit(ing.base_unit);
    if(iu==='g'&&bu==='kg')q/=1000;
    else if(iu==='kg'&&bu==='g')q*=1000;
    else if(iu==='ml'&&bu==='ltr')q/=1000;
    else if(iu==='ltr'&&bu==='ml')q*=1000;
-   return t+q*Number(ing.cost||ing.latest_cost||ing.reference_cost||0);
- },0)
+   const price=kitchSupplierPrice(ing,'latest_cost')||kitchSupplierPrice(ing,'reference_cost');
+   if(!(price>0)){missingPrices.push(ing.name);return t}
+   // Supplier prices are normalized per kg/L/pc; recipe quantities use matching units.
+   if(iu==='g'&&bu==='g')q/=1000;
+   else if(iu==='ml'&&bu==='ml')q/=1000;
+   else if(iu==='kg'&&bu==='g')q/=1000;
+   else if(iu==='ltr'&&bu==='ml')q/=1000;
+   return t+q*price;
+ },0);
+ return {total,missingPrices,missingIngredients,complete:!missingPrices.length&&!missingIngredients.length};
 }
+function recipeCost(r){return recipeCostDetails(r).total}
+function recipeCostLabel(r){const d=recipeCostDetails(r);return d.complete?'AED '+d.total.toFixed(2):'Price missing'}
+function recipeNeedsReview(r){const d=recipeCostDetails(r);return !d.complete}
+
 function recipeMissing(r){
  const m=ingredients();return r.items.filter(it=>!ingredientForRecipeItem(it,m)).map(x=>x.ingredient)
 }
@@ -3882,17 +3894,17 @@ function recipesPage(){
  const a=recipes().slice().sort((x,y)=>x.name.localeCompare(y.name));
  const manage=session==='manager',chef=session==='production';
  if(chef){
-  const approved=a.filter(r=>!recipeMissing(r).length);
+  const approved=a.filter(r=>!recipeNeedsReview(r));
   return `<div class="grid"><div class="card"><span>MY RECIPES</span><b>${approved.length}</b></div><div class="card"><span>ROLE</span><b style="font-size:18px">Chef Production</b></div><div class="card"><span>PRODUCTION</span><b style="font-size:18px">Ready</b></div><div class="card"><span>LABEL</span><b style="font-size:18px">Ready</b></div></div>
   <div class="panel"><h2>Approved Recipes</h2><p class="muted">View the recipes assigned for production. Costs and purchasing prices are hidden.</p>
   <table><tr><th>RECIPE</th><th>CATEGORY</th><th>INGREDIENTS</th><th>INPUT QTY</th><th>PORTIONS</th><th>STATUS</th></tr>
   ${approved.map(r=>`<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${Number(r.portions||0)||'—'}</td><td><span class="ok"><b>APPROVED</b></span></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No approved recipes assigned yet.</td></tr>'}</table></div>`;
  }
- return `<div class="grid"><div class="card"><span>RECIPES</span><b>${a.length}</b></div><div class="card"><span>APPROVED</span><b>${a.filter(x=>!recipeMissing(x).length).length}</b></div><div class="card"><span>NEEDS REVIEW</span><b>${a.filter(x=>recipeMissing(x).length).length}</b></div><div class="card"><span>1 BATCH RULE</span><b>ON</b></div></div>
+ return `<div class="grid"><div class="card"><span>RECIPES</span><b>${a.length}</b></div><div class="card"><span>APPROVED</span><b>${a.filter(x=>!recipeNeedsReview(x)).length}</b></div><div class="card"><span>NEEDS REVIEW</span><b>${a.filter(x=>recipeNeedsReview(x)).length}</b></div><div class="card"><span>1 BATCH RULE</span><b>ON</b></div></div>
  <div class="panel"><h2>Recipe Master</h2><p class="muted">Chef defines ingredient quantities in kg/g/ltr/ml/pcs for exactly 1 Batch. KITCH converts units automatically and Production will deduct from the production location stock.</p>
  <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button>':''}</div>
  <table><tr><th>RECIPE</th><th>CATEGORY</th><th>INGREDIENTS</th><th>INPUT QTY</th><th>PORTIONS</th><th>1 BATCH COST</th><th>STATUS</th></tr>
- ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${Number(r.portions||0)||'—'}</td><td>AED ${cost.toFixed(2)}</td><td>${miss.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length} missing · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
+ ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r),costInfo=recipeCostDetails(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${Number(r.portions||0)||'—'}</td><td>${recipeCostLabel(r)}</td><td>${miss.length||costInfo.missingPrices.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length?miss.length+" unmatched":costInfo.missingPrices.length+" missing prices"} · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
 }
 function openRecipe(){
  if(session!=='manager')return;
@@ -3955,16 +3967,16 @@ function viewRecipe(id){
  const chef=session==='production';
  if(chef){
   modal(`<div class="modalHead"><div><h2>${esc(r.name)}</h2><div class="muted">Approved Recipe · Exactly 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
-  <div class="grid" style="margin-top:18px"><div class="card"><span>INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${miss.length?'Not Ready':'Approved'}</b></div></div>
+  <div class="grid" style="margin-top:18px"><div class="card"><span>INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${recipeNeedsReview(r)?'Not Ready':'Approved'}</b></div></div>
   <table><tr><th>INGREDIENT</th><th>QTY / 1 BATCH</th><th>UNIT</th></tr>${r.items.map(it=>{let x=ingredientForRecipeItem(it,m);return `<tr><td><b>${esc(it.ingredient)}</b></td><td>${it.qty} ${esc(it.unit)}</td><td>${x?esc(x.base_unit):'<span class="bad">Missing</span>'}</td></tr>`}).join('')}</table>
   ${r.instructions?`<div class="note"><b>Instructions:</b> ${esc(r.instructions)}</div>`:''}
   <div class="note"><b>Chef Production access:</b> Recipe execution, Production and Label only. Cost and purchasing information are hidden.</div>`);
   return;
  }
  modal(`<div class="modalHead"><div><h2>${esc(r.name)}</h2><div class="muted">Locked Master · Exactly 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
- <div class="grid" style="margin-top:18px"><div class="card"><span>1 BATCH COST</span><b>AED ${recipeCost(r).toFixed(2)}</b></div><div class="card"><span>AUTO INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${miss.length?'Needs Review':'Approved'}</b></div></div>
- ${miss.length?`<div class="note bad"><b>Missing from Ingredient Master (${miss.length})</b><br>${miss.map(x=>esc(x)).join(' · ')}<br><small>KITCH links recipe ingredients to the Ingredient Master by SKU/ID. Only truly unmatched ingredients need review.</small></div>`:`<div class="note ok"><b>All ingredients matched.</b> This recipe is approved for Production.</div>`}
- <table><tr><th>INGREDIENT</th><th>QTY / 1 BATCH</th><th>MASTER UNIT</th><th>UNIT COST</th></tr>${r.items.map(it=>{let x=ingredientForRecipeItem(it,m);return `<tr><td><b>${esc(it.ingredient)}</b>${x&&normIngName(x.name)!==normIngName(it.ingredient)?`<br><small>Linked to ${esc(x.name)} · ${esc(x.sku)}</small>`:''}</td><td>${it.qty} ${esc(it.unit)}</td><td>${x?esc(x.base_unit):'<span class="bad">Missing</span>'}</td><td>${x?'AED '+Number(x.cost||0).toFixed(2):'—'}</td></tr>`}).join('')}</table>
+ <div class="grid" style="margin-top:18px"><div class="card"><span>1 BATCH COST</span><b>${recipeCostLabel(r)}</b></div><div class="card"><span>AUTO INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${recipeNeedsReview(r)?'Needs Review':'Approved'}</b></div></div>
+ ${miss.length?`<div class="note bad"><b>Missing from Ingredient Master (${miss.length})</b><br>${miss.map(x=>esc(x)).join(' · ')}<br><small>KITCH links recipe ingredients to the Ingredient Master by SKU/ID. Only truly unmatched ingredients need review.</small></div>`:`<div class="note ok"><b>All ingredients matched.</b> Ingredient links are valid. Check that all ingredient prices are entered before Production.</div>`}
+ <table><tr><th>INGREDIENT</th><th>QTY / 1 BATCH</th><th>MASTER UNIT</th><th>UNIT COST</th></tr>${r.items.map(it=>{let x=ingredientForRecipeItem(it,m);return `<tr><td><b>${esc(it.ingredient)}</b>${x&&normIngName(x.name)!==normIngName(it.ingredient)?`<br><small>Linked to ${esc(x.name)} · ${esc(x.sku)}</small>`:''}</td><td>${it.qty} ${esc(it.unit)}</td><td>${x?esc(x.base_unit):'<span class="bad">Missing</span>'}</td><td>${x?(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost')?'AED '+(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost')).toFixed(2):'<span class="bad">Price missing</span>'):'—'}</td></tr>`}).join('')}</table>
  ${r.instructions?`<div class="note"><b>Instructions:</b> ${esc(r.instructions)}</div>`:''}</div>`)
 }
 
@@ -3983,7 +3995,7 @@ function cleanQty(v){
 function prettyCanonical(q,u){return cleanQty(fromCanonical(Number(q||0),u))+' '+unit(u)}
 function productionPage(){
  linkRecipeIngredients();
- const approved=recipes().filter(r=>!recipeMissing(r).length), runs=scopedRows(getArr(PROD_KEY)).slice().reverse();
+ const approved=recipes().filter(r=>!recipeNeedsReview(r)), runs=scopedRows(getArr(PROD_KEY)).slice().reverse();
  return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${runs.filter(x=>x.status==='Completed'||x.status==='Label Pending').length}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
  <div class="panel"><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
  <div class="actions"><button class="btn black" onclick="openProduction()">+ Start Production</button></div>
