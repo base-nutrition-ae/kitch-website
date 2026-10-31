@@ -3634,6 +3634,30 @@ const TRANSFER_KEY='kitch_demo_transfers_v1';
 let transferReceiptPhotoData='';
 let transferDispatchPhotoData='';
 
+// Stock units: never silently treat a box as a kilogram or litre.
+function stockTransferUnits(x){
+ const base=unit(x.base_unit);
+ const choices=base==='kg'||base==='g'?['kg']:base==='ltr'||base==='ml'?['ltr']:base==='pcs'?['pcs']:base==='box'?['box']:[];
+ const pack=Number(x.units_per_box||x.pieces_per_box||x.box_size||0);
+ if(base==='pcs'&&pack>0)choices.push('box');
+ return choices;
+}
+function stockTransferCanonical(q,u,x){
+ u=unit(u);const base=unit(x.base_unit);q=Number(q);
+ if(!Number.isFinite(q)||q<=0)return null;
+ if(u==='box'&&base==='pcs'){
+   const pack=Number(x.units_per_box||x.pieces_per_box||x.box_size||0);
+   return pack>0?q*pack:null;
+ }
+ if(!stockTransferUnits(x).includes(u))return null;
+ return toCanonical(q,u);
+}
+function stockTransferUnitOptions(x,selected){return stockTransferUnits(x).map(u=>`<option value="${u}" ${u===selected?'selected':''}>${u}</option>`).join('')}
+function centralStockReady(){
+ if(window.__kitchInventoryLoadError){alert('Live inventory is unavailable: '+window.__kitchInventoryLoadError+'\nStock transfers are blocked until Central Store balances are verified.');return false;}
+ if(teamCloudAuth?.staff_name&&!window.__kitchTeamLiveStock){alert('Live inventory has not loaded. No stock will be transferred.');return false;}
+ return true;
+}
 function requestStatusLabel(x){
  const st=x.status||'Requested';
  return st==='Requested'?'Pending Store':st==='Accepted'?'Store Accepted':st==='In Transfer'?'In Transfer':st==='Received'?'Completed':st;
@@ -3663,17 +3687,17 @@ function stockRequestsPage(){
 function openStockRequest(){
  if(session!=='manager'||!hasCentralStore())return;
  const a=sortedIngredients(),branch=currentBranch();if(!a.length)return alert('Ingredient Master is empty.');if(!branch)return alert('No branch is assigned.');
- modal(`<div class="modalHead"><h2>Request Stock</h2><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>From:</b> Central Store<br><b>To:</b> ${esc(branch.name)}</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="srIng" class="ingredientSelect" onchange="stockRequestIngredientChanged()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="srQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><input id="srUnit" disabled></div></div><button class="primary" onclick="saveStockRequest()">Send Stock Request</button>`);stockRequestIngredientChanged();
+ modal(`<div class="modalHead"><h2>Request Stock</h2><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>From:</b> Central Store<br><b>To:</b> ${esc(branch.name)}</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="srIng" class="ingredientSelect" onchange="stockRequestIngredientChanged()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="srQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><select id="srUnit"></select></div></div><button class="primary" onclick="saveStockRequest()">Send Stock Request</button>`);stockRequestIngredientChanged();
 }
-function stockRequestIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('srIng')?.value),e=document.getElementById('srUnit');if(x&&e)e.value=x.base_unit}
+function stockRequestIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('srIng')?.value),e=document.getElementById('srUnit');if(x&&e)e.innerHTML=stockTransferUnitOptions(x,stockTransferUnits(x)[0]);}
 function saveStockRequest(){
- const sku=document.getElementById('srIng')?.value,x=ingredients().find(i=>i.sku===sku),q=Number(document.getElementById('srQty')?.value||0),branch=currentBranch();if(!x||q<=0)return alert('Enter a valid quantity.');if(!branch)return alert('Branch not found.');
- let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:x.base_unit,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests');
+ const sku=document.getElementById('srIng')?.value,x=ingredients().find(i=>i.sku===sku),q=Number(document.getElementById('srQty')?.value||0),u=document.getElementById('srUnit')?.value,branch=currentBranch();if(!x||stockTransferCanonical(q,u,x)===null)return alert('Enter a valid quantity and compatible unit.');if(!branch)return alert('Branch not found.');
+ let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests');
 }
 function acceptStockRequest(id){
- if(session!=='store')return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Requested')return;
+ if(session!=='store'||!centralStockReady())return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Requested')return;
  const x=ingredients().find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
- const have=fromCanonical(centralStockCanonical(x),x.base_unit);if(r.qty>have)return alert(`Not enough Central Store stock. Available: ${cleanQty(have)} ${x.base_unit}`);
+ const need=stockTransferCanonical(r.qty,r.unit,x),have=centralStockCanonical(x);if(need===null)return alert('This unit requires a valid Master List pack conversion.');if(need>have+1e-9)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,x.base_unit))} ${x.base_unit}`);
  r.status='Accepted';r.accepted_by=currentActor();r.accepted_at=new Date().toISOString();setArr(STOCK_REQUEST_KEY,req);openPage('Stock Requests');
 }
 function previewTransferDispatchPhoto(file){
@@ -3681,7 +3705,7 @@ function previewTransferDispatchPhoto(file){
  if(!file)return;const rd=new FileReader();rd.onload=e=>{transferDispatchPhotoData=e.target.result;if(p)p.innerHTML=`<img src="${transferDispatchPhotoData}" style="display:block;max-width:180px;max-height:130px;margin-top:10px;border-radius:10px;object-fit:cover">`};rd.readAsDataURL(file);
 }
 function sendStockRequest(id){
- if(session!=='store')return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Accepted')return;
+ if(session!=='store'||!centralStockReady())return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Accepted')return;
  let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
  const have=fromCanonical(centralStockCanonical(x),x.base_unit);
  transferDispatchPhotoData='';
@@ -3699,7 +3723,8 @@ function sendStockRequest(id){
  <button class="primary" onclick="confirmStockRequestDispatch(${r.id})">Send to Restaurant</button>`);
 }
 function confirmStockRequestDispatch(id){
- if(session!=='store')return;
+ if(session!=='store'||!centralStockReady())return;
+ if(teamCloudAuth?.staff_name)return alert('Live stock dispatch is not yet connected to a secure Supabase transfer transaction. No inventory was changed.');
  let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Accepted')return;
  let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
  const q=Number(document.getElementById('tsQty')?.value||0),batch=(document.getElementById('tsBatch')?.value||'').trim(),
@@ -3709,7 +3734,7 @@ function confirmStockRequestDispatch(id){
  if(!batch)return alert('Batch / lot number is required.');
  if(!expiry)return alert('Expiry date is required.');
  if(!transferDispatchPhotoData)return alert('Dispatch photo proof is required.');
- const need=toCanonical(q,r.unit),have=centralStockCanonical(x);
+ const need=stockTransferCanonical(q,r.unit,x),have=centralStockCanonical(x);if(need===null)return alert('Missing or incompatible Master List unit conversion.');
  if(need>have+1e-9)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,x.base_unit))} ${x.base_unit}`);
  x.stock_canonical=have-need;x.stock=fromCanonical(x.stock_canonical,x.base_unit);x.stock_location='Central Store';saveIngredients(a);
  const now=new Date().toISOString();
@@ -3744,6 +3769,7 @@ function openTransferReceiving(id){
  <button class="primary" onclick="confirmTransferReceipt(${r.id})">Confirm Restaurant Receipt</button>`);
 }
 function confirmTransferReceipt(id){
+ if(teamCloudAuth?.staff_name)return alert('Live stock receipt is not yet connected to a secure Supabase transaction. No inventory was changed.');
  let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='In Transfer'||session!=='manager'||r.branch!==currentBranchName())return;
  const delivered=Number(document.getElementById('trDelivered')?.value||0),rejected=Number(document.getElementById('trRejected')?.value||0),sent=Number(r.sent_qty||r.qty),accepted=delivered-rejected;
  const temp=(document.getElementById('trTemp')?.value||'').trim(),tempCheck=document.getElementById('trTempCheck')?.value||'Not Checked',pack=document.getElementById('trPackaging')?.value||'Pass',quality=document.getElementById('trQuality')?.value||'Pass',note=(document.getElementById('trNote')?.value||'').trim();
@@ -3773,15 +3799,16 @@ function transferPage(){
  const a=ingredients(),tr=getArr(TRANSFER_KEY).slice().reverse().slice(0,30);
  return `<div class="panel"><h2>Stock Transfer</h2><p class="muted">Central Store stock leaves when sent. Restaurant stock increases only after the receiving Kitchen Manager confirms the accepted quantity.</p><div class="actions"><button class="btn black" onclick="openTransfer()">+ Direct Transfer</button></div><table><tr><th>INGREDIENT</th><th>CENTRAL STORE</th><th>BASE UNIT</th></tr>${a.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${fromCanonical(centralStockCanonical(x),x.base_unit).toFixed(3)}</td><td>${esc(x.base_unit)}</td></tr>`).join('')}</table></div>${tr.length?`<div class="panel"><h2>Transfer History</h2><table><tr><th>DATE</th><th>REQUEST</th><th>INGREDIENT</th><th>TO</th><th>SENT QTY</th><th>STATUS</th></tr>${tr.map(t=>`<tr><td>${esc(new Date(t.sent_at||t.id).toLocaleString())}</td><td>${esc(t.ref||'Direct')}</td><td><b>${esc(t.ingredient)}</b></td><td>${esc(t.to||'')}</td><td>${cleanQty(t.qty||0)} ${esc(t.unit||'')}</td><td><b>${esc(t.status||'')}</b></td></tr>`).join('')}</table></div>`:''}`;
 }
-function transferSelectedIngredient(){const a=ingredients(),x=a.find(i=>i.sku===document.getElementById('tIng')?.value);if(!x)return;const unitEl=document.getElementById('tUnit'),avail=document.getElementById('tAvailable');if(unitEl)unitEl.value=x.base_unit;if(avail)avail.value=fromCanonical(centralStockCanonical(x),x.base_unit).toFixed(3)+' '+x.base_unit}
+function transferSelectedIngredient(){const a=ingredients(),x=a.find(i=>i.sku===document.getElementById('tIng')?.value);if(!x)return;const unitEl=document.getElementById('tUnit'),avail=document.getElementById('tAvailable');if(unitEl)unitEl.innerHTML=stockTransferUnitOptions(x,stockTransferUnits(x)[0]);if(avail)avail.value=fromCanonical(centralStockCanonical(x),x.base_unit).toFixed(3)+' '+x.base_unit}
 function openTransfer(){
  const a=ingredients(),dest=locations().filter(x=>x.type==='Branch'&&x.status==='Active');if(!dest.length)return alert('No active restaurant / brand location.');
- modal(`<div class="modalHead"><h2>Direct Transfer</h2><button class="close" onclick="closeModal()">×</button></div><div class="note">For normal branch replenishment, use Stock Requests. Direct transfers also require restaurant receiving confirmation.</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="tIng" class="ingredientSelect" onchange="transferSelectedIngredient()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>AVAILABLE · CENTRAL STORE</label><input id="tAvailable" disabled></div><div class="field"><label>TRANSFER TO</label><select id="tDestination">${dest.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="tQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><input id="tUnit" disabled></div></div><button class="primary" onclick="confirmTransfer()">Send Direct Transfer</button>`);transferSelectedIngredient();
+ modal(`<div class="modalHead"><h2>Direct Transfer</h2><button class="close" onclick="closeModal()">×</button></div><div class="note">For normal branch replenishment, use Stock Requests. Direct transfers also require restaurant receiving confirmation.</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="tIng" class="ingredientSelect" onchange="transferSelectedIngredient()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>AVAILABLE · CENTRAL STORE</label><input id="tAvailable" disabled></div><div class="field"><label>TRANSFER TO</label><select id="tDestination">${dest.map(x=>`<option value="${esc(x.id)}">${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="tQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><select id="tUnit"></select></div></div><button class="primary" onclick="confirmTransfer()">Send Direct Transfer</button>`);transferSelectedIngredient();
 }
 function confirmTransfer(){
+ if(teamCloudAuth?.staff_name)return alert('Live stock transfer is not yet connected to a secure Supabase transaction. No inventory was changed.');
  let a=ingredients(),sku=document.getElementById('tIng')?.value,x=a.find(i=>i.sku===sku),q=Number(document.getElementById('tQty')?.value||0),destId=document.getElementById('tDestination')?.value,dest=locations().find(l=>String(l.id)===String(destId)&&l.type==='Branch'&&l.status==='Active');
- if(!dest||!x||q<=0)return alert('Choose a valid destination and quantity.');
- const u=x.base_unit,need=toCanonical(q,u),have=centralStockCanonical(x);if(need>have)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,u))} ${u}`);
+ if(!centralStockReady())return;if(!dest||!x||q<=0)return alert('Choose a valid destination and quantity.');
+ const u=document.getElementById('tUnit')?.value,need=stockTransferCanonical(q,u,x),have=centralStockCanonical(x);if(need===null)return alert('Missing or incompatible Master List unit conversion.');if(need>have)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,u))} ${u}`);
  x.stock_canonical=have-need;x.stock=fromCanonical(x.stock_canonical,u);saveIngredients(a);
  let req=getArr(STOCK_REQUEST_KEY),id=Date.now(),ref='TR-'+String(id).slice(-6),now=new Date().toISOString();req.push({id,ref,branch_id:dest.id,branch:dest.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:'Central Store · Direct Transfer',requested_at:now,accepted_by:currentActor(),accepted_at:now,sent_by:currentActor(),sent_at:now,sent_qty:q,status:'In Transfer'});setArr(STOCK_REQUEST_KEY,req);
  let tr=getArr(TRANSFER_KEY);tr.push({id:Date.now()+1,request_id:id,ref,sku:x.sku,ingredient:x.name,qty:q,unit:u,canonical:need,from:'Central Store',to:dest.name,to_location_id:dest.id,staff:currentActor(),sent_by:currentActor(),sent_at:now,status:'In Transfer'});setArr(TRANSFER_KEY,tr);
