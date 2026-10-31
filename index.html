@@ -2475,9 +2475,9 @@ function contextStockCanonical(ing){
 }
 const roles={
  owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
- manager:{name:'Kitchen Manager',label:'Kitchen Manager / Executive Chef',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
+ manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
  store:{name:'Central Store Manager',label:'Central Store Manager',nav:['Inventory','Receiving','Expiry & Batches','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
- production:{name:'Chef Production',label:'Chef Production',nav:['Recipes','Production','Label','Notifications']}
+ production:{name:'Production Staff',label:'Production Staff',nav:['Production','Recipes','Suppliers & Purchasing','Label','Notifications']}
 };
 let session=null;
 let dashboardPeriod='30d',dashboardCustomStart='',dashboardCustomEnd='';
@@ -2694,7 +2694,7 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+function openPage(name){if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -3024,7 +3024,7 @@ function staffAccessPage(){
 }
 
 function staffRoleLabel(role){
- const m={kitchen_manager:'Kitchen Manager',executive_chef:'Executive Chef',store_manager:'Store Manager',receiving_staff:'Receiving Staff',production_staff:'Chef Production',viewer:'Viewer / Auditor',owner:'Owner',main_office:'Main Office',operations_manager:'Operations Manager',purchasing:'Purchasing'};return m[String(role||'').toLowerCase()]||String(role||'').replaceAll('_',' ');
+ const m={kitchen_manager:'Kitchen Manager',executive_chef:'Head Chef',store_manager:'Store Manager',receiving_staff:'Receiving Staff',production_staff:'Production Staff',viewer:'Viewer / Auditor',owner:'Owner',main_office:'Main Office',operations_manager:'Operations Manager',purchasing:'Purchasing'};return m[String(role||'').toLowerCase()]||String(role||'').replaceAll('_',' ');
 }
 async function refreshStaffAccessFromCloud(showMessage=false){
  if(!cloud.restaurant_id)return;
@@ -3073,11 +3073,11 @@ function openStaffAccess(){
  const loc=locations().filter(x=>x.status==='Active');
  modal(`<div class="modalHead"><div><div class="sub">MAIN OFFICE</div><h2>Create Staff Access</h2></div><button class="close" onclick="closeModal()">×</button></div>
  <div class="formGrid"><div class="field"><label>STAFF NAME</label><input id="stName"></div>
- <div class="field"><label>ROLE</label><select id="stRole" onchange="syncStaffRoleLocation()">${hasCentralStore()?'<option>Kitchen Manager</option><option>Executive Chef</option><option>Store Manager</option><option>Receiving Staff</option><option>Chef Production</option><option>Viewer / Auditor</option>':'<option>Kitchen Manager</option><option>Executive Chef</option><option>Chef Production</option><option>Viewer / Auditor</option>'}</select></div>
+ <div class="field"><label>ROLE</label><select id="stRole" onchange="syncStaffRoleLocation()">${hasCentralStore()?'<option>Kitchen Manager</option><option>Head Chef</option><option>Store Manager</option><option>Receiving Staff</option><option>Production Staff</option><option>Kitchen Staff</option><option>Viewer / Auditor</option>':'<option>Kitchen Manager</option><option>Head Chef</option><option>Production Staff</option><option>Kitchen Staff</option><option>Viewer / Auditor</option>'}</select></div>
  <div class="field"><label>LOCATION</label><select id="stLocation" onchange="refreshStaffDepartments()">${loc.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div>
  <div class="field"><label>DEPARTMENT</label><select id="stDepartment"></select></div>
  <div class="field"><label>4-DIGIT PIN</label><input id="stPin" inputmode="numeric" maxlength="4" placeholder="e.g. 4821"></div></div>
- <div class="note">The assigned location controls the workspace the staff member sees after sign in.</div><button class="primary" onclick="saveStaffAccess()">Create Access</button>`);
+ <div class="note">Assign one role per person. Kitchen Manager and Head Chef have identical access. Production Staff and Kitchen Staff can request supplies; only managers approve and send. The Owner monitors activity from Main Office. The assigned location controls staff access.</div><button class="primary" onclick="saveStaffAccess()">Create Access</button>`);
  syncStaffRoleLocation();
 }
 function syncStaffRoleLocation(){
@@ -3094,7 +3094,7 @@ async function saveStaffAccess(){
  const name=stName.value.trim(),pin=stPin.value.trim();if(!name)return alert('Enter staff name.');if(!/^\d{4}$/.test(pin))return alert('Enter a 4-digit PIN.');
  let a=staffMembers();if(a.some(x=>x.pin===pin))return alert('This PIN is already in use.');
  if(!(await ensureCloudWorkspace()))return alert('Management cloud session is required to create staff access.');
- const roleMap={'Kitchen Manager':'kitchen_manager','Executive Chef':'executive_chef','Store Manager':'store_manager','Receiving Staff':'receiving_staff','Chef Production':'production_staff','Viewer / Auditor':'viewer'};
+ const roleMap={'Kitchen Manager':'kitchen_manager','Head Chef':'executive_chef','Store Manager':'store_manager','Receiving Staff':'receiving_staff','Production Staff':'production_staff','Kitchen Staff':'production_staff','Viewer / Auditor':'viewer'};
  const selectedLocation=locations().find(x=>String(x.id)===String(stLocation.value));
  const storeRole=stRole.value==='Store Manager'||stRole.value==='Receiving Staff';
  // Store staff belongs to the Central Store scope. Restaurant staff belongs to the selected branch.
@@ -3365,7 +3365,7 @@ function purchaseStatus(x){return x.status||'Pending Approval'}
 function purchaseOrderRows(po){
  if(!po.length)return '<tr><td colspan="9" class="empty">No purchase requests or orders yet.</td></tr>';
  const groups=[];po.forEach(x=>{let g=groups.find(v=>v.po===x.po);if(!g){g={po:x.po,rows:[]};groups.push(g)}g.rows.push(x)});
- return groups.map(g=>{const first=g.rows[0],status=purchaseStatus(first),total=g.rows.reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0),items=g.rows.map(x=>`<div><b>${esc(x.ingredient)}</b> <span class="muted">${cleanQty(x.qty)} ${esc(x.unit)} × ${money(x.price)}</span></div>`).join(''),action=status==='Pending Approval'&&['owner','manager'].includes(session)?`<button class="btn black" onclick="approvePurchase(${first.id})">Approve</button> <button class="btn" onclick="rejectPurchase(${first.id})">Reject</button>`:status==='Approved'?`<button class="btn" onclick="markPOSent(${first.id})">Mark Sent</button>`:'—';return `<tr><td><b>${esc(g.po)}</b><br><small>${g.rows.length} item${g.rows.length===1?'':'s'}</small></td><td>${esc(first.supplier)}</td><td>${items}</td><td>${g.rows.length} line${g.rows.length===1?'':'s'}</td><td>—</td><td><b>${money(total)}</b></td><td>${esc(first.delivery_date||'—')}</td><td><span class="alertBadge ${status==='Pending Approval'?'alertWarning':status==='Rejected'?'alertCritical':'alertInfo'}">${esc(status)}</span></td><td>${action}</td></tr>`}).join('')
+ return groups.map(g=>{const first=g.rows[0],status=purchaseStatus(first),total=g.rows.reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0),items=g.rows.map(x=>`<div><b>${esc(x.ingredient)}</b> <span class="muted">${cleanQty(x.qty)} ${esc(x.unit)} × ${money(x.price)}</span></div>`).join(''),action=status==='Pending Approval'&&session==='manager'?`<button class="btn black" onclick="approvePurchase(${first.id})">Approve</button> <button class="btn" onclick="rejectPurchase(${first.id})">Reject</button>`:status==='Approved'&&session==='manager'?`<button class="btn" onclick="markPOSent(${first.id})">Mark Sent</button>`:'—';return `<tr><td><b>${esc(g.po)}</b><br><small>${g.rows.length} item${g.rows.length===1?'':'s'}</small></td><td>${esc(first.supplier)}</td><td>${items}</td><td>${g.rows.length} line${g.rows.length===1?'':'s'}</td><td>—</td><td><b>${money(total)}</b></td><td>${esc(first.delivery_date||'—')}</td><td><span class="alertBadge ${status==='Pending Approval'?'alertWarning':status==='Rejected'?'alertCritical':'alertInfo'}">${esc(status)}</span></td><td>${action}</td></tr>`}).join('')
 }
 function syncSupplierMasterFromIngredients(){
  const items=ingredients().filter(x=>x&&x.name&&String(x.supplier||x.supplier_name||'').trim());
@@ -3460,9 +3460,9 @@ function savePurchaseRequest(){
  lines.forEach((l,i)=>existing.push({id:groupId+i,request_id:groupId,po:pr,supplier,ingredient:l.p.name,sku:l.p.sku||'',unit:l.p.unit,qty:l.qty,price:l.p.price,delivery_date:delivery,notes,status:'Pending Approval',accepted:0,rejected:0,created_at:new Date().toISOString()}));
  setArr(PO_KEY,existing);closeModal();openPage('Suppliers & Purchasing')
 }
-function approvePurchase(id){let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const old=seed.po,newPo=old.replace(/^PR-/,'PO-'),now=new Date().toISOString();a.forEach(x=>{if(x.po===old){x.status='Approved';x.po=newPo;x.approved_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
-function rejectPurchase(id){let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po;a.forEach(x=>{if(x.po===key)x.status='Rejected'});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
-function markPOSent(id){let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po,now=new Date().toISOString();a.forEach(x=>{if(x.po===key){x.status='Open';x.sent_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
+function approvePurchase(id){if(session!=='manager'){alert('Only the Kitchen Manager or Head Chef can manage purchase orders.');return;}let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const old=seed.po,newPo=old.replace(/^PR-/,'PO-'),now=new Date().toISOString();a.forEach(x=>{if(x.po===old){x.status='Approved';x.po=newPo;x.approved_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
+function rejectPurchase(id){if(session!=='manager'){alert('Only the Kitchen Manager or Head Chef can manage purchase orders.');return;}let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po;a.forEach(x=>{if(x.po===key)x.status='Rejected'});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
+function markPOSent(id){if(session!=='manager'){alert('Only the Kitchen Manager or Head Chef can manage purchase orders.');return;}let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po,now=new Date().toISOString();a.forEach(x=>{if(x.po===key){x.status='Open';x.sent_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
 function openPO(){openPurchaseRequest()}
 function poIngredientChanged(){}
 function savePO(){}
