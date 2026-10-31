@@ -3422,14 +3422,54 @@ function openPO(){openPurchaseRequest()}
 function poIngredientChanged(){}
 function savePO(){}
 function receivingPage(){
- const po=getArr(PO_KEY);
- const starter=!hasCentralStore();
- const direct=starter||session==='store';
- const title='Receiving';
- const intro=starter?'Receive supplier deliveries directly into the restaurant with invoice proof. No Purchase Order is required in Starter. Only accepted quantity enters Inventory.':'Central Store receives supplier deliveries directly with invoice proof. Branches request stock from Central Store; Central Store does not create Purchase Orders.';
- const add=direct?'<div class="actions"><button class="btn black" onclick="openDirectReceive()">+ Receive Supplier Stock</button></div>':'';
- return `<div class="panel"><h2>${title}</h2><p class="muted">${intro}</p>${add}<table><tr><th>${direct?'RECEIPT':'PO'}</th><th>SUPPLIER</th><th>INGREDIENT</th><th>${direct?'DELIVERED':'ORDERED'}</th><th>STATUS</th><th>ACTION</th></tr>${po.map(x=>`<tr><td>${esc(x.po)}</td><td>${esc(x.supplier)}</td><td><b>${esc(x.ingredient)}</b></td><td>${cleanQty(x.direct_receive?(x.delivered||x.qty):x.qty)} ${esc(x.unit)}</td><td>${x.status}</td><td>${x.status==='Open'?`<button class="btn black" onclick="openReceive(${x.id})">Receive</button>`:`Accepted ${cleanQty(x.accepted)} · Rejected ${cleanQty(x.rejected)}${x.invoice_price!=null?`<br><small class="${x.price_variance_alert?'warn':'ok'}">Price: ${money(x.reference_price)} → ${money(x.invoice_price)} · ${Number(x.price_variance_pct||0)>=0?'+':''}${Number(x.price_variance_pct||0).toFixed(2)}%</small>`:''}${x.receiving_condition_status?`<br><small class="${x.receiving_condition_status==='Passed'?'ok':'bad'}">Condition: ${esc(x.receiving_condition_status)}${x.receiving_temperature!==''&&x.receiving_temperature!=null?` · ${esc(x.receiving_temperature)}°C`:''}</small>`:''}${Number(x.rejected)>0&&x.reject_reason?`<br><small class="warn">Reason: ${esc(x.reject_reason)}${x.reject_note?` · ${esc(x.reject_note)}`:''}</small>`:''}`}</td></tr>`).join('')||`<tr><td colspan="6" class="empty">${direct?'No receiving records yet. Click + Receive Supplier Stock to start.':'No receiving records.'}</td></tr>`}</table></div>`;
+ const records=getArr('kitch_receiving_local_history_v2').filter(x=>String(x.branch_id)===String(cloud.branch_id||''));
+ return `<div class="panel"><h2>Receiving</h2><p class="muted">Receive supplier deliveries directly into your assigned location. Accepted quantities are saved to live KITCH inventory.</p>
+ <div class="actions"><button class="btn black" onclick="openKitchNewReceiving()">+ New Receiving</button></div>
+ <table><tr><th>DATE</th><th>INVOICE</th><th>SUPPLIER</th><th>INGREDIENT</th><th>ACCEPTED</th><th>STATUS</th></tr>${records.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.invoice)}</td><td>${esc(x.supplier)}</td><td>${esc(x.ingredient)}</td><td>${esc(x.accepted)} ${esc(x.unit)}</td><td class="ok">Saved to cloud</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No receiving records in this browser yet. Click + New Receiving.</td></tr>'}</table>
+ <p class="muted" style="font-size:12px;margin-top:12px">The list above shows receipts saved from this browser. Inventory quantities are read from Supabase.</p></div>`;
 }
+function openKitchNewReceiving(){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud.branch_id)return alert('Please sign in with your Team account to receive stock for your assigned location.');
+ const ing=sortedIngredients().filter(x=>x.cloud_id);
+ if(!ing.length)return alert('Cloud Ingredient Master has not loaded. Refresh and sign in again.');
+ modal(`<div class="modalHead"><h2>New Receiving</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note">Location: <b>${esc(currentBranchName())}</b>. Only confirmed accepted quantities will be added to inventory.</div>
+ <div class="formGrid">
+ <div class="field"><label>SUPPLIER *</label><input id="knrSupplier" required placeholder="Supplier name"></div>
+ <div class="field"><label>INGREDIENT *</label><select id="knrIng" onchange="kitchReceiveIngredientChanged()">${ing.map(x=>`<option value="${esc(x.cloud_id)}">${esc(x.name)} (${esc(x.base_unit)})</option>`).join('')}</select></div>
+ <div class="field"><label>DELIVERED QUANTITY *</label><input id="knrQty" type="number" min="0.001" step="any" placeholder="Quantity in ingredient base unit"></div>
+ <div class="field"><label>REJECTED QUANTITY</label><input id="knrRejected" type="number" min="0" step="any" value="0"></div>
+ <div class="field"><label>UNIT PRICE (AED) *</label><input id="knrPrice" type="number" min="0" step="any"></div>
+ <div class="field"><label>INVOICE NUMBER *</label><input id="knrInvoice" placeholder="Supplier invoice number"></div>
+ <div class="field"><label>EXPIRY DATE</label><input id="knrExpiry" type="date"></div>
+ <div class="field"><label>RECEIVING TEMPERATURE (°C)</label><input id="knrTemp" type="number" step="any" placeholder="If applicable"></div>
+ <div class="field"><label>INVOICE / DELIVERY NOTE</label><input id="knrFile" type="file" accept="image/*,.pdf"><small class="muted">Filename recorded; file is not uploaded to cloud storage yet.</small></div>
+ </div><p id="knrStatus" class="muted" aria-live="polite"></p><button id="knrSubmit" class="primary" onclick="kitchSaveNewReceiving()">Confirm Receiving</button>`);
+ kitchReceiveIngredientChanged();
+}
+function kitchReceiveIngredientChanged(){
+ const ing=ingredients().find(x=>String(x.cloud_id)===String(document.getElementById('knrIng')?.value));
+ if(!ing)return;
+ const sup=document.getElementById('knrSupplier'),price=document.getElementById('knrPrice');
+ if(sup)sup.value=ing.supplier||'';
+ if(price)price.value=Number(ing.reference_cost??ing.cost??0).toFixed(2);
+}
+async function kitchSaveNewReceiving(){
+ const el=id=>document.getElementById(id), ingredient=ingredients().find(x=>String(x.cloud_id)===String(el('knrIng')?.value));
+ const supplier=el('knrSupplier').value.trim(),invoice=el('knrInvoice').value.trim(),qty=Number(el('knrQty').value),rejected=Number(el('knrRejected').value),price=Number(el('knrPrice').value);
+ const status=el('knrStatus'),btn=el('knrSubmit');
+ if(!ingredient||!supplier||!invoice||!Number.isFinite(qty)||qty<=0||!Number.isFinite(rejected)||rejected<0||rejected>qty||!Number.isFinite(price)||price<0){status.textContent='Complete supplier, ingredient, invoice, quantities and price correctly.';return;}
+ const expiry=el('knrExpiry').value||null,temp=el('knrTemp').value===''?null:Number(el('knrTemp').value);
+ if(temp!==null&&!Number.isFinite(temp)){status.textContent='Invalid receiving temperature.';return;}
+ btn.disabled=true;status.textContent='Saving receiving to KITCH Cloud…';
+ try{
+ const {data,error}=await sb.rpc('kitch_team_receive_stock',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ingredient.cloud_id,p_supplier:supplier,p_invoice_number:invoice,p_invoice_filename:el('knrFile').files?.[0]?.name||null,p_delivered_qty:qty,p_rejected_qty:rejected,p_unit:ingredient.base_unit,p_unit_price:price,p_expiry_date:expiry,p_temperature:temp});
+ if(error)throw error;
+ const arr=getArr('kitch_receiving_local_history_v2');arr.unshift({id:data.id,branch_id:cloud.branch_id,date:new Date().toLocaleDateString(),invoice,supplier,ingredient:ingredient.name,accepted:data.accepted_qty,unit:ingredient.base_unit});setArr('kitch_receiving_local_history_v2',arr.slice(0,150));
+ closeModal();await cloudLoadIngredients();openPage('Receiving');alert('Receiving saved to cloud. Accepted: '+data.accepted_qty+' '+ingredient.base_unit+'. Inventory has been refreshed.');
+ }catch(e){status.textContent='Not saved: '+(e.message||'Cloud error')+'. No stock was changed by this screen.';btn.disabled=false;}
+}
+
 function openDirectReceive(){
  const ing=sortedIngredients(); if(!ing.length)return alert('Ingredient Master is empty. Add or import ingredients first.');
  modal(`<div class="modalHead"><h2>Receive Stock</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid">
