@@ -3435,24 +3435,32 @@ function openKitchNewReceiving(){
  modal(`<div class="modalHead"><h2>New Receiving</h2><button class="close" onclick="closeModal()">×</button></div>
  <div class="note">Location: <b>${esc(currentBranchName())}</b>. Only confirmed accepted quantities will be added to inventory.</div>
  <div class="formGrid">
- <div class="field"><label>SUPPLIER *</label><input id="knrSupplier" required placeholder="Supplier name"></div>
+ <div class="field"><label>SUPPLIER *</label><input id="knrSupplier" required placeholder="Auto-filled from Master List"><small class="muted">Auto-selected; editable to match the invoice.</small></div>
  <div class="field"><label>INGREDIENT *</label><select id="knrIng" onchange="kitchReceiveIngredientChanged()">${ing.map(x=>`<option value="${esc(x.cloud_id)}">${esc(x.name)} (${esc(x.base_unit)})</option>`).join('')}</select></div>
- <div class="field"><label>DELIVERED QUANTITY *</label><input id="knrQty" type="number" min="0.001" step="any" placeholder="Quantity in ingredient base unit"></div>
+ <div class="field"><label id="knrQtyLabel">DELIVERED QUANTITY *</label><input id="knrQty" type="number" min="0.001" step="any" placeholder="Quantity"><small class="muted" id="knrUnitHelp">Unit selected from Ingredient Master.</small></div>
  <div class="field"><label>REJECTED QUANTITY</label><input id="knrRejected" type="number" min="0" step="any" value="0"></div>
- <div class="field"><label>UNIT PRICE (AED) *</label><input id="knrPrice" type="number" min="0" step="any"></div>
+ <div class="field"><label id="knrPriceLabel">UNIT PRICE (AED) *</label><input id="knrPrice" type="number" min="0" step="any"><small class="muted">Master List price; editable to match the invoice.</small></div>
  <div class="field"><label>INVOICE NUMBER *</label><input id="knrInvoice" placeholder="Supplier invoice number"></div>
- <div class="field"><label>EXPIRY DATE</label><input id="knrExpiry" type="date"></div>
+ <div class="field"><label>EXPIRY DATE (BATCH)</label><input id="knrExpiry" type="date"><small class="muted">Enter the expiry printed on this delivery.</small></div>
+ <div class="field"><label>RECEIVING DATE</label><input id="knrDate" type="date" readonly><small class="muted">Automatically set to today.</small></div>
  <div class="field"><label>RECEIVING TEMPERATURE (°C)</label><input id="knrTemp" type="number" step="any" placeholder="If applicable"></div>
  <div class="field"><label>INVOICE / DELIVERY NOTE</label><input id="knrFile" type="file" accept="image/*,.pdf"><small class="muted">Filename recorded; file is not uploaded to cloud storage yet.</small></div>
  </div><p id="knrStatus" class="muted" aria-live="polite"></p><button id="knrSubmit" class="primary" onclick="kitchSaveNewReceiving()">Confirm Receiving</button>`);
+ const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);document.getElementById('knrDate').value=localDate;
  kitchReceiveIngredientChanged();
 }
 function kitchReceiveIngredientChanged(){
  const ing=ingredients().find(x=>String(x.cloud_id)===String(document.getElementById('knrIng')?.value));
  if(!ing)return;
  const sup=document.getElementById('knrSupplier'),price=document.getElementById('knrPrice');
- if(sup)sup.value=ing.supplier||'';
- if(price)price.value=Number(ing.reference_cost??ing.cost??0).toFixed(2);
+ const linked=supplierProducts().find(p=>String(p.sku||'')===String(ing.sku||'') || String(p.ingredient_id||'')===String(ing.cloud_id||'') || String(p.name||'').toLowerCase()===String(ing.name||'').toLowerCase());
+ if(sup)sup.value=ing.supplier||linked?.supplier||linked?.supplier_name||'';
+ if(price)price.value=Number(ing.reference_cost??ing.cost??linked?.price??0).toFixed(2);
+ const unit=String(ing.base_unit||'unit');
+ const qtyLabel=document.getElementById('knrQtyLabel'),priceLabel=document.getElementById('knrPriceLabel'),unitHelp=document.getElementById('knrUnitHelp');
+ if(qtyLabel)qtyLabel.textContent='DELIVERED QUANTITY ('+unit+') *';
+ if(priceLabel)priceLabel.textContent='UNIT PRICE (AED / '+unit+') *';
+ if(unitHelp)unitHelp.textContent='Stock unit: '+unit+' · automatically selected from Ingredient Master.';
 }
 async function kitchSaveNewReceiving(){
  const el=id=>document.getElementById(id), ingredient=ingredients().find(x=>String(x.cloud_id)===String(el('knrIng')?.value));
