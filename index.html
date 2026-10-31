@@ -4045,7 +4045,7 @@ function previewProduction(){
    }
    const need=toCanonical(Number(it.qty)*mult,it.unit),
          have=productionStockCanonical(ing),
-         good=have+1e-9>=need;
+         good=have+1e-9>=r.items.filter(x=>ingredientForRecipeItem(x,m)?.sku===ing.sku).reduce((sum,x)=>sum+toCanonical(Number(x.qty)*mult,x.unit),0);
    ok=ok&&good;
    const required=cleanQty(Number(it.qty)*mult)+' '+unit(it.unit);
    return `<tr><td><b>${esc(ing.name)}</b></td><td>${required}</td><td>${prettyCanonical(have,ing.base_unit)}</td><td><span class="${good?'ok':'bad'}"><b>${good?'READY':'SHORT '+prettyCanonical(need-have,ing.base_unit)}</b></span></td></tr>`;
@@ -4090,12 +4090,23 @@ function deductFEFO(sku,need){
  }
  setArr(BATCH_KEY,batches);return {cost,used};
 }
+let kitchProductionSubmitting=false;
 function confirmProduction(){
- const r=recipes().find(x=>String(x.id)===String(prRecipe.value)),mult=Number(prBatches.value||0);if(!r||mult<=0)return;
+ if(kitchProductionSubmitting)return;
+ const r=recipes().find(x=>String(x.id)===String(prRecipe.value)),mult=Number(prBatches.value||0);
+ if(!r||!Number.isFinite(mult)||mult<=0)return alert('Enter a valid number of batches.');
+ if(recipeMissing(r).length)return alert('This recipe needs review. Link all ingredients before production.');
  let a=ingredients(),requirements=[];
  for(const it of r.items){const ing=ingredientForRecipeItem(it,a);if(!ing)return alert('Recipe ingredient is not linked.');const need=toCanonical(Number(it.qty)*mult,it.unit),have=productionStockCanonical(ing);if(have+1e-9<need)return alert('Not enough Restaurant stock for '+ing.name+'.');requirements.push({sku:ing.sku,ingredient:ing.name,qty:Number(it.qty)*mult,unit:it.unit,canonical:need,unit_cost:Number(ing.cost||0),cost:(()=>{let q=Number(it.qty)*mult,iu=unit(it.unit),bu=unit(ing.base_unit);if(iu==='g'&&bu==='kg')q/=1000;else if(iu==='kg'&&bu==='g')q*=1000;else if(iu==='ml'&&bu==='ltr')q/=1000;else if(iu==='ltr'&&bu==='ml')q*=1000;return q*Number(ing.cost||0)})()})}
+ // Confirm inventory again immediately before making any changes.
+ const totals=new Map();
+ for(const req of requirements)totals.set(req.sku,(totals.get(req.sku)||0)+req.canonical);
+ for(const [sku,required] of totals){const ing=a.find(x=>x.sku===sku);if(!ing||productionStockCanonical(ing)+1e-9<required)return alert('Stock changed or insufficient for '+(ing?.name||sku)+'. Refresh and try again.');}
+ kitchProductionSubmitting=true;
+ try{
  for(const req of requirements){const ing=a.find(x=>x.sku===req.sku);if(hasCentralStore()){setBranchStockCanonical(ing,currentBranchId(),branchStockCanonical(ing)-req.canonical)}else{let have=productionStockCanonical(ing);ing.stock_canonical=have-req.canonical;ing.stock=fromCanonical(ing.stock_canonical,ing.base_unit);const fefo=deductFEFO(ing.sku,req.canonical);if(fefo&&fefo.used&&fefo.used.length){req.cost=fefo.cost;req.fefo_batches=fefo.used}}}saveIngredients(a);
  let runs=getArr(PROD_KEY),code='PRD-'+String(runs.length+1).padStart(5,'0'),productionCost=requirements.reduce((t,x)=>t+Number(x.cost||0),0);runs.push({id:Date.now(),code,recipe_id:r.id,recipe:r.name,batches:mult,requirements,production_cost:productionCost,location:hasCentralStore()?currentBranchName():primaryRestaurantName(),status:'In Production',created_by:currentActor(),staff_name:currentActor(),created_at:new Date().toISOString(),actual_yield:'',yield_unit:r.yield_unit||'kg'});setArr(PROD_KEY,runs);closeModal();openActualYield(runs[runs.length-1].id)
+ }finally{kitchProductionSubmitting=false;}
 }
 function openActualYield(id){
  const x=getArr(PROD_KEY).find(p=>p.id===id);if(!x)return;
