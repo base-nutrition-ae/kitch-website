@@ -2258,6 +2258,7 @@ async function syncPackageFromCloud(){
 
 async function cloudLoadIngredients(){
  if(!cloud.restaurant_id)return;
+ window.__kitchTeamLiveStock=null;
  const {data,error}=await sb.from('ingredients').select('id,sku,name,base_unit,category,last_unit_cost,receiving_type,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('name');
  if(error){console.error(error);return alert('Could not load Ingredient Master from KITCH Cloud.')}
  const existing=ingredients();
@@ -2307,6 +2308,12 @@ async function cloudLoadIngredients(){
    if((balances||[]).length && !matchingBalances.length){
      console.warn('KITCH: selected branch has no inventory balances',selectedCloudBranch);
      window.__kitchInventoryLoadError='This location has no live inventory balances. Select the correct location or check its cloud assignment. Existing stock was not changed.';
+   }
+   // Authoritative live snapshot for the signed-in staff branch.
+   // Render stock from this snapshot directly rather than depending on legacy
+   // Starter/Business browser package flags or branch aliases.
+   if(teamCloudAuth?.staff_name){
+     window.__kitchTeamLiveStock=new Map(matchingBalances.map(b=>[String(b.ingredient_id),{qty:toCanonical(Number(b.quantity_on_hand||0),b.unit),value:Number(b.quantity_on_hand||0)*Number(b.indicative_unit_cost||0)}]));
    }
    matchingBalances.forEach(b=>{
      const key=String(b.ingredient_id);
@@ -2455,6 +2462,10 @@ function setBranchStockCanonical(ing,branchId,value){
  ing.restaurant_stock_canonical=Object.values(ing.branch_stock_canonical).reduce((sum,v)=>sum+Number(v||0),0);
 }
 function contextStockCanonical(ing){
+ if(teamCloudAuth?.staff_name && window.__kitchTeamLiveStock instanceof Map && ing.cloud_id){
+   const live=window.__kitchTeamLiveStock.get(String(ing.cloud_id));
+   return live?Number(live.qty||0):0;
+ }
  if(!hasCentralStore())return centralStockCanonical(ing);
  return session==='store'?centralStockCanonical(ing):branchStockCanonical(ing);
 }
@@ -2584,7 +2595,7 @@ async function teamLogin(){
  finally{if(button){button.disabled=false;button.textContent='Team sign in';}}
 }
 function enter(r){closePublicModal();session=r;login.classList.add('hidden');document.getElementById('publicLanding')?.classList.add('hidden');app.classList.remove('hidden');userName.textContent=currentStaff?.name||roles[r].name;userRole.textContent=(currentStaff?`${currentStaff.role} · ${currentStaff.location_name||locationName(currentStaff.location_id)}`:roles[r].label);userScope.textContent=currentStaff?.workspace_name||cloud.workspace_code||primaryRestaurantName();renderNav();openPage(roles[r].nav[0])}
-async function logout(){toggleAppMobileMenu(false);session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
+async function logout(){toggleAppMobileMenu(false);window.__kitchTeamLiveStock=null;session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
 function renderNav(){
  let items=[...roles[session].nav];
  if(!hasCentralStore()){
@@ -3150,6 +3161,9 @@ function kitchCostLabel(price,base){
  return n>0?'AED '+amount.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})+'/'+suffix:'—';
 }
 function kitchStockValue(x){
+ if(teamCloudAuth?.staff_name && window.__kitchTeamLiveStock instanceof Map && x.cloud_id){
+   return Number(window.__kitchTeamLiveStock.get(String(x.cloud_id))?.value||0);
+ }
  const q=Number(contextStockCanonical(x)||0),u=canonicalUnit(x.base_unit);
  const price=kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost');
  return (u==='g'||u==='ml'?q/1000:q)*price;
