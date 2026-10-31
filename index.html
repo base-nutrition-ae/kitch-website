@@ -2263,6 +2263,7 @@ async function syncPackageFromCloud(){
 async function cloudLoadIngredients(){
  if(!cloud.restaurant_id)return;
  window.__kitchTeamLiveStock=null;
+ window.__kitchInventoryLoadError=''; // clear stale errors before each fresh live read
  const {data,error}=await sb.from('ingredients').select('id,sku,name,base_unit,category,last_unit_cost,receiving_type,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('name');
  if(error){console.error(error);return alert('Could not load Ingredient Master from KITCH Cloud.')}
  const existing=ingredients();
@@ -2453,7 +2454,12 @@ function currentBranch(){
 }
 function currentBranchId(){return currentBranch().id}
 function currentBranchName(){return currentBranch().name}
-function centralStockCanonical(ing){return ing.stock_canonical!=null?Number(ing.stock_canonical):toCanonical(ing.stock,ing.base_unit)}
+function centralStockCanonical(ing){
+ if(session==='store' && teamCloudAuth?.staff_name && window.__kitchTeamLiveStock instanceof Map){
+  return Number(window.__kitchTeamLiveStock.get(String(ing.cloud_id))?.qty||0);
+ }
+ return ing.stock_canonical!=null?Number(ing.stock_canonical):toCanonical(ing.stock,ing.base_unit);
+}
 function branchStockCanonical(ing,branchId=currentBranchId()){
  const map=(ing.branch_stock_canonical&&typeof ing.branch_stock_canonical==='object')?ing.branch_stock_canonical:{};
  if(Object.prototype.hasOwnProperty.call(map,String(branchId)))return Number(map[String(branchId)]||0);
@@ -3483,7 +3489,7 @@ function openKitchNewReceiving(){
  const ing=sortedIngredients().filter(x=>x.cloud_id);
  if(!ing.length)return alert('Cloud Ingredient Master has not loaded. Refresh and sign in again.');
  modal(`<div class="modalHead"><h2>New Receiving</h2><button class="close" onclick="closeModal()">×</button></div>
- <div class="note">Location: <b>${esc(currentBranchName())}</b>. Only confirmed accepted quantities will be added to inventory.</div>
+ <div class="note">Location: <b>${esc(assignedLocationName())}</b>. Only confirmed accepted quantities will be added to inventory.</div>
  <div class="formGrid">
  <div class="field"><label>SUPPLIER *</label><input id="knrSupplier" required placeholder="Auto-filled from Master List"><small class="muted">Auto-selected; editable to match the invoice.</small></div>
  <div class="field"><label>INGREDIENT *</label><select id="knrIng" onchange="kitchReceiveIngredientChanged()">${ing.map(x=>`<option value="${esc(x.cloud_id)}">${esc(x.name)} (${esc(x.base_unit)})</option>`).join('')}</select></div>
@@ -3656,7 +3662,7 @@ function stockTransferCanonical(q,u,x){
 function stockTransferUnitOptions(x,selected){return stockTransferUnits(x).map(u=>`<option value="${u}" ${u===selected?'selected':''}>${u}</option>`).join('')}
 function centralStockReady(){
  if(window.__kitchInventoryLoadError){alert('Live inventory is unavailable: '+window.__kitchInventoryLoadError+'\nStock transfers are blocked until Central Store balances are verified.');return false;}
- if(teamCloudAuth?.staff_name&&!window.__kitchTeamLiveStock){alert('Live inventory has not loaded. No stock will be transferred.');return false;}
+ if(teamCloudAuth?.staff_name && !(window.__kitchTeamLiveStock instanceof Map)){alert('Live inventory has not loaded. No stock will be transferred.');return false;}
  return true;
 }
 function requestStatusLabel(x){
