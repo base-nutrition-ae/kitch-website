@@ -2612,7 +2612,7 @@ function renderNav(){
  const preferred=session==='store'?['Dashboard','Receiving','Inventory','Stock Requests']:session==='production'?['Dashboard','Recipes','Production','QC Labels']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
  const mainItems=preferred.filter(x=>items.includes(x)).slice(0,4);
  for(const x of items){if(mainItems.length>=4)break;if(!mainItems.includes(x))mainItems.push(x)}
- const extra=items.filter(x=>!mainItems.includes(x));
+ const extra=items.filter(x=>!mainItems.includes(x) && !(items.includes('Suppliers & Purchasing') && x==='Receiving'));
  const makeButton=x=>{const b=document.createElement('button');b.type='button';b.textContent=x;b.addEventListener('click',()=>{document.getElementById('kitchMoreMenu')?.remove();openPage(x)});return b};
  nav.replaceChildren(...mainItems.map(makeButton));
  if(extra.length){const more=document.createElement('button');more.type='button';more.textContent='More ▾';more.className='kitchMoreTrigger';more.setAttribute('aria-haspopup','true');more.addEventListener('click',e=>{e.stopPropagation();let menu=document.getElementById('kitchMoreMenu');if(menu){menu.remove();return}menu=document.createElement('div');menu.id='kitchMoreMenu';menu.className='kitchMoreMenu';extra.forEach(x=>menu.appendChild(makeButton(x)));document.body.appendChild(menu);const r=more.getBoundingClientRect();menu.style.top=(r.bottom+8)+'px';menu.style.left=Math.max(12,Math.min(r.left,innerWidth-270))+'px';});nav.appendChild(more)}
@@ -2701,7 +2701,7 @@ function page(n){
  if(n==='Invoice Matching')return invoiceMatchingPage();
  if(n==='Supplier Performance')return supplierPerformancePage();
  if(n==='Price Alerts')return priceAlertsPage();
- if(n==='Receiving')return receivingPage();
+ if(n==='Receiving')return (roles[session]?.nav.includes('Suppliers & Purchasing')?`<div style="margin:0 0 14px"><button class="btn" onclick="openPage('Suppliers & Purchasing')">← Suppliers & Purchasing</button></div>`:'')+receivingPage();
  if(n==='Expiry & Batches')return batchesPage();
  if(n==='Stock Requests')return stockRequestsPage();
  if(n==='Stock Transfer')return transferPage();
@@ -3348,7 +3348,7 @@ function purchasingPage(){
  const pending=po.filter(x=>purchaseStatus(x)==='Pending Approval').length,open=po.filter(x=>['Approved','Open'].includes(purchaseStatus(x))).length;
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
- <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn" onclick="openSupplierExcel()">Import Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button></div>
+ <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn" onclick="openSupplierExcel()">Import Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
  <h3>Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
  <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
 }
