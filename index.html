@@ -2264,7 +2264,18 @@ async function cloudLoadIngredients(){
  if(!cloud.restaurant_id)return;
  window.__kitchTeamLiveStock=null;
  window.__kitchInventoryLoadError=''; // clear stale errors before each fresh live read
- const {data,error}=await sb.from('ingredients').select('id,sku,name,base_unit,category,supplier_name,last_unit_cost,receiving_type,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('name');
+ let data,error,teamSnapshot=null;
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+  const response=await sb.rpc('kitch_team_inventory_read',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  error=response.error;teamSnapshot=response.data;
+  if(!error&&(String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id)||String(teamSnapshot?.branch_id)!==String(cloud.branch_id)))error={message:'Inventory location does not match login'};
+  if(!error&&!Array.isArray(teamSnapshot?.ingredients))error={message:'Staff catalog response is unavailable'};
+  data=teamSnapshot?.ingredients;
+ }else{
+ const response=await sb.from('ingredients').select('id,sku,name,base_unit,category,supplier_name,last_unit_cost,receiving_type,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('name');
+ data=response.data;error=response.error;
+ }
+
  if(error){console.error('Ingredient catalog read failed',error);window.__kitchInventoryLoadError='Ingredient catalog access denied: '+(error.message||'unknown error');alert('KITCH cannot load the live Ingredient Master for this staff account. This is a permissions problem, not zero inventory. '+window.__kitchInventoryLoadError);return;}
  const existing=ingredients();
  const byCloud=new Map(existing.filter(x=>x.cloud_id).map(x=>[String(x.cloud_id),x]));
@@ -2277,9 +2288,7 @@ async function cloudLoadIngredients(){
  // browser's demo cache. Never overwrite a live balance with an empty cache.
  let balances=null, balanceError=null;
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
-   const response=await sb.rpc('kitch_team_inventory_read',{
-     p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin
-   });
+   const response={data:teamSnapshot,error:null};
    balanceError=response.error;
    if(!balanceError){
      const payload=response.data||{};
@@ -3404,7 +3413,6 @@ async function confirmImport(){
   await new Promise(resolve=>setTimeout(resolve,650));
   closeModal();openPage('Inventory');
  }catch(e){
-  saveIngredients(a);
   if(status)status.innerHTML='<b style="color:#b42318">Import stopped after '+completed+' of '+total+' ingredients.</b><div style="margin-top:6px">'+esc(String(e.message||e))+'</div><div style="margin-top:6px">Saved items are kept. Check the connection and retry; matching ingredient names will be updated.</div>';
   if(button){button.textContent='Retry import';button.style.opacity='1'}
  }finally{
