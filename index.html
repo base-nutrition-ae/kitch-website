@@ -35,6 +35,27 @@ body.modal-open{position:fixed;width:100%;left:0;right:0}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:20px;z-index:50;overflow:hidden;overscroll-behavior:contain}
 .modalBox{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .modalBox{width:min(850px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:22px;padding:24px}
+
+.kitchCostingModal{padding:10px}
+.kitchCostingModal .modalBox{width:min(1530px,99vw)!important;max-height:95vh!important;overflow:auto}
+.kitchRecipeSheet .sheetHead{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+.kitchRecipeSheet .sheetField{border:1px solid #dce2eb;background:#f6f8fb;border-radius:10px;padding:10px}
+.kitchRecipeSheet .sheetField label{font-size:11px;font-weight:800;color:#6e7583;letter-spacing:.04em;margin-bottom:5px;display:block}
+.kitchRecipeSheet .sheetField input{border:1px solid #d4d8e0;background:#fff;border-radius:8px;padding:9px;width:100%;min-width:0;box-sizing:border-box}
+.kitchRecipeSheet .sheetTotals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.kitchRecipeSheet .sheetTotal{background:#f6f8fb;border:1px solid #dce2eb;border-radius:10px;padding:14px}
+.kitchRecipeSheet .sheetTotal small{font-size:10px;letter-spacing:.05em;color:#687281;font-weight:800;display:block}
+.kitchRecipeSheet .sheetTotal b{font-size:21px;display:block;margin-top:6px}
+.kitchRecipeSheet .sheetGrid{width:100%;overflow:auto;border:1px solid #bdc6d5;border-radius:10px;margin:15px 0}
+.kitchRecipeSheet table{border-collapse:collapse;min-width:1270px;width:100%;font-size:12px}
+.kitchRecipeSheet table th{background:#dfe5f1;border:1px solid #bac4d3;padding:9px 7px;text-align:center;color:#202c3a}
+.kitchRecipeSheet table td{border:1px solid #d4dae5;padding:9px 7px;vertical-align:middle}
+.kitchRecipeSheet table tr:nth-child(even) td{background:#fafbfc}
+.kitchRecipeSheet table td input{width:84px;max-width:100%;height:36px;border:1px solid #c9d1dc;border-radius:7px;padding:6px;font:inherit}
+.kitchRecipeSheet .sheetFooter{display:flex;gap:12px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.kitchRecipeSheet .sheetFooter .primary{width:auto;min-width:230px;padding:13px 20px}
+@media(max-width:700px){.kitchRecipeSheet .sheetHead,.kitchRecipeSheet .sheetTotals{grid-template-columns:repeat(2,minmax(0,1fr))}.kitchCostingModal .modalBox{padding:14px}}
+
 .modalHead{display:flex;justify-content:space-between;align-items:center;gap:15px}.modalHead h2{margin:0}
 .close{border:0;background:#eee;width:36px;height:36px;border-radius:50%;font-size:20px}
 .formGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.formGrid .field{margin:0}
@@ -4190,58 +4211,93 @@ function confirmRecipeImport(){
  setArr(RECIPE_KEY,a);recipeImport=[];closeModal();openPage('Recipes');alert(`Recipe import complete: ${added} new · ${updated} updated`);
 }
 
+
 function openRecipeYieldEditor(id){
- if(session!=='manager')return alert('Only Kitchen Manager / Executive Chef can update recipe yield settings.');
+ if(session!=='manager')return alert('Kitchen Manager permission required.');
  const r=recipes().find(x=>String(x.id)===String(id));if(!r)return alert('Recipe not found.');
- modal(`<div class="modalHead"><div><h2>AP / EP Recipe Yield</h2><div class="muted">${esc(r.name)} · 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
- <div class="note"><b>Enter AP raw quantities and expected cooking yield %.</b> Example: chicken 1 kg × 80% = 0.800 kg cooked. AP batch cost does not change when yield changes. 100% is the default for ingredients without a measured yield.</div>
- <div class="formGrid" style="margin:14px 0">
- <div class="field"><label>PORTIONS PER BATCH</label><input id="eyPortions" type="number" min="1" step="1" value="${Number(r.portions||1)}" oninput="updateRecipeYieldPreview()"></div>
- <div class="field"><label>SELLING PRICE / PORTION AED (OPTIONAL)</label><input id="eySellPrice" type="number" min="0" step="0.01" value="${Number(r.selling_price_per_portion||0)||''}" placeholder="Leave blank if unknown" oninput="updateRecipeYieldPreview()"></div>
+ const recipeNo=String(r.recipe_no||('REC-'+String(r.id).slice(-6)));
+ const date=r.recipe_date||new Date().toISOString().slice(0,10);
+ const prepared=String(r.prepared_by||currentActor()||'');
+ modal(`<div class="kitchRecipeSheet">
+ <div class="modalHead"><div><div class="sub">KITCH · RECIPE COSTING SHEET</div><h2>${esc(r.name)}</h2><p class="muted">AP purchased / raw ingredients · EP usable yield after preparation</p></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="sheetHead">
+  <div class="sheetField"><label>RECIPE NO.</label><input id="eyRecipeNo" value="${esc(recipeNo)}" readonly></div>
+  <div class="sheetField"><label>DATE</label><input type="date" id="eyRecipeDate" value="${esc(date)}"></div>
+  <div class="sheetField"><label>PREPARED BY</label><input id="eyPreparedBy" value="${esc(prepared)}" maxlength="100"></div>
+  <div class="sheetField"><label>PORTIONS</label><input id="eyPortions" type="number" min="1" step="1" value="${Number(r.portions||1)}" oninput="updateRecipeYieldPreview()"></div>
+  <div class="sheetField"><label>SELLING PRICE / PORTION (AED)</label><input id="eySellPrice" type="number" min="0" step=".01" value="${Number(r.selling_price_per_portion||0)||''}" placeholder="Optional" oninput="updateRecipeYieldPreview()"></div>
+  <div class="sheetField"><label>RECIPE CATEGORY</label><input value="${esc(r.category||'—')}" readonly></div>
+  <div class="sheetField"><label>AP QUANTITY</label><input value="Purchased/raw quantity" readonly></div>
+  <div class="sheetField"><label>EP YIELD</label><input value="Cooked/usable quantity" readonly></div>
  </div>
- <div class="inventoryTableWrap"><table>
- <thead><tr><th>INGREDIENT</th><th>AP QTY</th><th>UNIT</th><th>EXPECTED YIELD %</th><th>EXPECTED EP QTY</th><th>AP COST AED</th></tr></thead>
- <tbody>${r.items.map((it,i)=>`<tr class="epRecipeLine">
- <td><b>${esc(it.ingredient)}</b></td>
- <td><input class="eyRaw" aria-label="Raw quantity for ${esc(it.ingredient)}" type="number" min="0.001" step="any" value="${Number(it.qty)}" oninput="updateRecipeYieldPreview()" style="width:95px;padding:9px;border:1px solid #ddd;border-radius:8px"></td>
- <td>${esc(unit(it.unit))}</td>
- <td><input class="eyPercent" aria-label="Yield percent for ${esc(it.ingredient)}" type="number" min="0.01" max="500" step="0.1" value="${recipeYieldPercent(it)}" oninput="updateRecipeYieldPreview()" style="width:95px;padding:9px;border:1px solid #ddd;border-radius:8px"></td>
- <td class="eyEp">—</td><td class="eyCost">—</td></tr>`).join('')}</tbody>
+ <div class="sheetTotals">
+  <div class="sheetTotal"><small>COST PER RECIPE</small><b id="eyBatchCost">—</b></div>
+  <div class="sheetTotal"><small>COST PER PORTION</small><b id="eyPortionCost">—</b></div>
+  <div class="sheetTotal"><small>FOOD COST %</small><b id="eyFoodCost">—</b></div>
+  <div class="sheetTotal"><small>GROSS MARGIN %</small><b id="eyMargin">—</b></div>
+ </div>
+ <div class="sheetGrid"><table>
+ <thead><tr><th rowspan="2">ITEM CODE</th><th rowspan="2">INGREDIENT</th><th colspan="4">AP PURCHASED / SUPPLIER</th><th colspan="4">EP YIELD / USABLE</th><th rowspan="2">CONVERSION FACTOR</th><th rowspan="2">COST PER EP UNIT</th></tr>
+ <tr><th>UNIT</th><th>QTY USED</th><th>UNIT COST</th><th>TOTAL COST</th><th>UNIT</th><th>YIELD %</th><th>EP QTY</th><th>TOTAL EDIBLE COST</th></tr></thead>
+ <tbody>${r.items.map(it=>{const x=ingredientForRecipeItem(it);return `<tr class="epRecipeLine">
+  <td>${esc(x?.sku||'—')}</td><td><b>${esc(it.ingredient)}</b></td><td>${esc(unit(x?.base_unit||it.unit))}</td>
+  <td><input class="eyRaw" type="number" min=".001" step="any" value="${Number(it.qty)}" oninput="updateRecipeYieldPreview()" aria-label="AP raw qty ${esc(it.ingredient)}"></td>
+  <td>${esc(kitchCostLabel(x?kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost'):0,x?.base_unit||it.unit))}</td>
+  <td class="eyCost">—</td><td>${esc(unit(it.unit))}</td>
+  <td><input class="eyPercent" type="number" min=".01" max="500" step=".1" value="${recipeYieldPercent(it)}" oninput="updateRecipeYieldPreview()" aria-label="Yield percent ${esc(it.ingredient)}"></td>
+  <td class="eyEp">—</td><td class="eyEdibleCost">—</td><td class="eyFactor">—</td><td class="eyEffectiveCost">—</td>
+ </tr>`}).join('')}
+ </tbody><tfoot><tr><td colspan="5"><b>TOTAL COST · 1 BATCH</b></td><td><b id="eyTableTotal">—</b></td><td colspan="3">TOTAL EDIBLE INGREDIENT COST</td><td id="eyTableEdibleTotal">—</td><td colspan="2"></td></tr></tfoot>
  </table></div>
- <div id="eySummary" class="note"></div>
- <button class="primary" onclick="saveRecipeYieldEditor(${r.id})">Save AP / EP Yield Settings</button>`);
+ <div class="note"><b>Example:</b> Chicken AP 1 kg × 80% yield = EP 0.800 kg. AP cost AED 27.00; edible cost per kg AED 33.75. Production deducts 1 kg raw stock.</div>
+ <div id="eySummary" class="note" role="status" aria-live="polite"></div>
+ <div class="sheetFooter"><small class="muted">Supplier prices come from Ingredient Master. This recipe sheet currently saves to this browser, not to shared cloud recipe storage.</small>
+ <button class="primary" onclick="saveRecipeYieldEditor(${r.id})">Save Recipe Costing Sheet</button></div>
+ </div>`);
+ document.getElementById('modal')?.classList.add('kitchCostingModal');
  window.__recipeYieldEditingId=id;
  updateRecipeYieldPreview();
 }
 function draftRecipeYieldEditor(){
- const r=recipes().find(x=>String(x.id)===String(window.__recipeYieldEditingId));
- if(!r)return null;
- const lines=[...document.querySelectorAll('.epRecipeLine')];
- if(lines.length!==r.items.length)return null;
- const items=r.items.map((it,i)=>({...it,
-  qty:Number(lines[i].querySelector('.eyRaw')?.value),
-  yield_pct:Number(lines[i].querySelector('.eyPercent')?.value)
- }));
- const portions=Number(document.getElementById('eyPortions')?.value);
- const sell=Number(document.getElementById('eySellPrice')?.value||0);
- return {...r,items,portions,selling_price_per_portion:sell};
+ const r=recipes().find(x=>String(x.id)===String(window.__recipeYieldEditingId));if(!r)return null;
+ const lines=[...document.querySelectorAll('.epRecipeLine')];if(lines.length!==r.items.length)return null;
+ const items=r.items.map((it,i)=>({...it,qty:Number(lines[i].querySelector('.eyRaw')?.value),
+  yield_pct:Number(lines[i].querySelector('.eyPercent')?.value)}));
+ return {...r,items,portions:Number(document.getElementById('eyPortions')?.value),
+  selling_price_per_portion:Number(document.getElementById('eySellPrice')?.value||0),
+  recipe_no:document.getElementById('eyRecipeNo')?.value||'',recipe_date:document.getElementById('eyRecipeDate')?.value||'',
+  prepared_by:document.getElementById('eyPreparedBy')?.value?.trim()||''};
 }
 function updateRecipeYieldPreview(){
  const r=draftRecipeYieldEditor();if(!r)return;
  const valid=r.items.every(it=>Number.isFinite(it.qty)&&it.qty>0&&Number.isFinite(it.yield_pct)&&it.yield_pct>0&&it.yield_pct<=500)
-   &&Number.isInteger(r.portions)&&r.portions>0&&Number.isFinite(r.selling_price_per_portion)&&r.selling_price_per_portion>=0;
+  &&Number.isInteger(r.portions)&&r.portions>0&&Number.isFinite(r.selling_price_per_portion)&&r.selling_price_per_portion>=0;
+ let total=0,missing=false;
  [...document.querySelectorAll('.epRecipeLine')].forEach((tr,i)=>{
   const d=recipeAPBreakdown(r.items[i]);
-  tr.querySelector('.eyEp').textContent=valid?recipeQtyLabel(d.epQty,d.u):'Check entry';
+  if(!d.valid)missing=true;else total+=d.apCost;
+  tr.querySelector('.eyEp').textContent=valid?recipeQtyLabel(d.epQty,d.u):'Check quantity';
   tr.querySelector('.eyCost').textContent=d.valid?'AED '+d.apCost.toFixed(2):'Price missing';
+  tr.querySelector('.eyEdibleCost').textContent=d.valid?'AED '+d.apCost.toFixed(2):'—';
+  tr.querySelector('.eyFactor').textContent=valid?(100/d.percent).toFixed(3)+'×':'—';
+  const epUnit=canonicalUnit(d.u)==='g'?'kg':canonicalUnit(d.u)==='ml'?'L':'pc';
+  tr.querySelector('.eyEffectiveCost').textContent=d.valid?'AED '+d.epUnitCost.toFixed(2)+'/'+epUnit:'—';
  });
+ const good=valid&&!missing;
+ const portionCost=good?total/r.portions:0;
+ const foodCost=good&&r.selling_price_per_portion>0?portionCost/r.selling_price_per_portion*100:null;
+ const margin=foodCost===null?null:100-foodCost;
+ const money=v=>'AED '+v.toFixed(2);
+ for(const [id,val] of [
+  ['eyBatchCost',good?money(total):'—'],['eyPortionCost',good?money(portionCost):'—'],
+  ['eyFoodCost',foodCost===null?'—':foodCost.toFixed(1)+'%'],
+  ['eyMargin',margin===null?'—':margin.toFixed(1)+'%'],
+  ['eyTableTotal',good?money(total):'—'],['eyTableEdibleTotal',good?money(total):'—']
+ ]){const el=document.getElementById(id);if(el)el.textContent=val}
  const summary=document.getElementById('eySummary');if(!summary)return;
- if(!valid){summary.textContent='Enter positive AP quantities, yield from 0.01 to 500%, whole-number portions, and a nonnegative selling price.';return}
- const cost=recipeCost(r),per=cost/r.portions,food=recipeFoodCostPercent(r);
- summary.innerHTML='<b>1 batch raw/AP cost:</b> AED '+cost.toFixed(2)
-  +' · <b>Cost / portion:</b> AED '+per.toFixed(2)
-  +(food!==null?' · <b>Food cost %:</b> '+food.toFixed(1)+'%':'')
-  +'<br><small>Edible quantities are estimated. Raw AP quantities are the planned stock deduction.</small>';
+ summary.textContent=!valid?'Check raw quantities, yield %, portions and selling price.'
+   :missing?'Missing Ingredient Master price or mismatched ingredient unit. Review the affected rows.'
+   :'AP quantities will be deducted as raw stock; EP is expected cooked/usable quantity and never deducted as extra stock.';
 }
 function saveRecipeYieldEditor(id){
  if(session!=='manager')return;
@@ -4278,7 +4334,7 @@ function viewRecipe(id){
  modal(`<div class="modalHead"><div><h2>${esc(r.name)}</h2><div class="muted">Locked Master · Exactly 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
  <div class="grid" style="margin-top:18px"><div class="card"><span>1 BATCH AP COST</span><b>${recipeCostLabel(r)}</b></div><div class="card"><span>COST / PORTION</span><b>${Number(r.portions)>0?'AED '+recipeCostPerPortion(r).toFixed(2):'Set portions'}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>FOOD COST %</span><b>${recipeFoodCostPercent(r)===null?'Set selling price':recipeFoodCostPercent(r).toFixed(1)+'%'}</b></div></div>
  <div class="note"><b>AP = raw/purchased quantity</b> · <b>EP = cooked or usable quantity</b>. EP = AP × yield %. Ingredient and batch cost use AP; cost per cooked kg reflects loss. Actual production yield is recorded separately.</div>
- ${session==='manager'?`<button class="btn black" onclick="closeModal();openRecipeYieldEditor(${r.id})">Edit AP Quantity / EP Yield</button>`:''}
+ ${session==='manager'?`<button class="btn black" onclick="closeModal();openRecipeYieldEditor(${r.id})">Open Full Recipe Costing Sheet</button>`:''}
  ${miss.length?`<div class="note bad"><b>Missing from Ingredient Master (${miss.length})</b><br>${miss.map(x=>esc(x)).join(' · ')}<br><small>KITCH links recipe ingredients to the Ingredient Master by SKU/ID. Only truly unmatched ingredients need review.</small></div>`:`<div class="note ok"><b>All ingredients matched.</b> Ingredient links are valid. Check that all ingredient prices are entered before Production.</div>`}
  ${costInfo.missingPrices.length?`<div class="note bad"><b>Missing ingredient prices (${costInfo.missingPrices.length})</b><br>${[...new Set(costInfo.missingPrices)].map(esc).join(' · ')}<p>Enter actual purchase prices in Inventory → Edit. KITCH will calculate the recipe automatically.</p><button class="btn" onclick="closeModal();openPage('Inventory')">Open Ingredient Master</button></div>`:''}
  <div class="inventoryTableWrap"><table><tr><th>INGREDIENT</th><th>AP RAW QTY</th><th>SUPPLIER PRICE</th><th>AP COST</th><th>YIELD %</th><th>EP USABLE QTY</th><th>COST / EP UNIT</th></tr>
