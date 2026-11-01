@@ -3190,28 +3190,66 @@ function inventoryPage(){
  <div class="inventoryTableWrap"><table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>REFERENCE COST</th><th>LATEST COST</th><th>STOCK VALUE</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="12" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div></div></div>`;
 }
 
+let kitchOpeningRows=[];
 function openBranchOpeningStock(){
- if(!hasCentralStore()||session!=='manager')return;
- const a=sortedIngredients(),branch=currentBranch();if(!a.length)return alert('Ingredient Master is empty.');
- modal(`<div class="modalHead"><div><div class="sub">BUSINESS · BRANCH STOCK</div><h2>Restaurant Opening Stock</h2></div><button class="close" onclick="closeModal()">×</button></div>
- <div class="note"><b>${esc(branch.name)}</b><br>Enter stock this restaurant already has before using KITCH. This stock belongs only to this branch and is not deducted from Central Store.</div>
- <div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="boIng" class="ingredientSelect" onchange="branchOpeningChanged()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div>
- <div class="field"><label>OPENING QTY</label><input id="boQty" type="number" min="0" step=".001" value="0"></div>
- <div class="field"><label>UNIT</label><input id="boUnit" disabled></div>
- <div class="field"><label>OPENING UNIT COST AED</label><input id="boCost" type="number" min="0" step=".01"></div></div>
- <div id="boCurrent" class="note"></div><button class="primary" onclick="saveBranchOpeningStock()">Save Branch Opening Stock</button>`);branchOpeningChanged();
+ if(session!=='manager')return;
+ const a=sortedIngredients();if(!a.length)return alert('Import Ingredient Master first.');
+ kitchOpeningRows=a.map(x=>({x,qty:fromCanonical(contextStockCanonical(x),x.base_unit),cost:Number(x.latest_cost||x.reference_cost||x.cost||0)}));
+ modal(`<div class="modalHead"><div><div class="sub">BRANCH STOCK · CLOUD SAVE</div><h2>Restaurant Opening Stock</h2></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note"><b>${esc(currentBranchName())}</b> · Enter the existing stock for each ingredient, or upload an Excel file. Quantities are absolute opening balances (not added to existing stock). Saving writes to Supabase.</div>
+ <label class="filePick"><b>Import Opening Stock Excel</b><div class="muted">Ingredient Name + Opening Stock + Opening Unit Cost AED (optional)</div><input type="file" accept=".xlsx,.xls,.csv" onchange="kitchOpeningExcel(this.files[0])" style="margin-top:12px;max-width:100%"></label>
+ <div style="max-height:46vh;overflow:auto"><table><thead><tr><th>INGREDIENT</th><th>UNIT</th><th>OPENING QTY</th><th>UNIT COST AED</th></tr></thead><tbody id="kitchOpeningTable"></tbody></table></div>
+ <div id="kitchOpeningStatus" class="note">Review quantities before saving.</div><button id="kitchOpeningSave" class="primary" onclick="saveBranchOpeningStock()">Save All Opening Stock to Cloud</button>`);
+ kitchRenderOpeningRows();
 }
-function branchOpeningChanged(){
- const x=ingredients().find(i=>i.sku===document.getElementById('boIng')?.value);if(!x)return;
- boUnit.value=x.base_unit;boCost.value=Number(x.cost||0).toFixed(2);
- boCurrent.innerHTML=`Current ${esc(currentBranchName())} stock: <b>${prettyCanonical(branchStockCanonical(x),x.base_unit)}</b>`;
+function kitchRenderOpeningRows(){
+ const body=document.getElementById('kitchOpeningTable');if(!body)return;
+ body.innerHTML=kitchOpeningRows.map((r,i)=>`<tr><td><b>${esc(r.x.name)}</b></td><td>${esc(r.x.base_unit)}</td><td><input aria-label="Opening quantity ${esc(r.x.name)}" type="number" min="0" step="any" value="${r.qty}" oninput="kitchOpeningRows[${i}].qty=Number(this.value)" style="width:115px;padding:9px;border:1px solid #ddd;border-radius:9px"></td><td><input aria-label="Opening cost ${esc(r.x.name)}" type="number" min="0" step="any" value="${r.cost}" oninput="kitchOpeningRows[${i}].cost=Number(this.value)" style="width:115px;padding:9px;border:1px solid #ddd;border-radius:9px"></td></tr>`).join('');
 }
-function saveBranchOpeningStock(){
- const x=ingredients().find(i=>i.sku===boIng.value),q=Number(boQty.value||0),cost=Number(boCost.value||0);if(!x||q<0||cost<0)return alert('Enter valid opening stock and cost.');
- setBranchStockCanonical(x,currentBranchId(),toCanonical(q,x.base_unit));if(q>0&&cost>0){x.cost=cost;x.latest_cost=cost}
- saveIngredients(ingredients());
- let mv=getArr('kitch_demo_inventory_movements_v1');mv.push({id:Date.now(),type:'Branch Opening Balance',sku:x.sku,ingredient:x.name,qty:q,unit:x.base_unit,unit_cost:cost,value:q*cost,location:currentBranchName(),staff:currentActor(),created_at:new Date().toISOString()});setArr('kitch_demo_inventory_movements_v1',mv);
- closeModal();openPage('Inventory');
+async function kitchOpeningExcel(file){
+ if(!file)return;
+ if(typeof XLSX==='undefined')return alert('Excel reader unavailable. Check internet connection.');
+ try{
+  const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),ws=wb.Sheets[wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{defval:''});let matched=0;
+  for(const row of rows){
+   const pick=(keys)=>{for(const key of keys){const found=Object.keys(row).find(k=>k.trim().toLowerCase()===key.toLowerCase());if(found&&row[found]!==''&&row[found]!=null)return row[found]}return null};
+   const name=String(pick(['Ingredient Name','Ingredient','Name'])||'').trim().toLowerCase();
+   const r=kitchOpeningRows.find(v=>v.x.name.trim().toLowerCase()===name);if(!r)continue;
+   const q=pick(['Opening Stock','Opening Quantity','Opening Qty','Quantity']);
+   const c=pick(['Opening Unit Cost AED','Opening Cost AED','Unit Cost AED']);
+   if(q!==null){if(!Number.isFinite(Number(q))||Number(q)<0)throw Error('Invalid quantity for '+r.x.name);r.qty=Number(q);matched++}
+   if(c!==null){if(!Number.isFinite(Number(c))||Number(c)<0)throw Error('Invalid cost for '+r.x.name);r.cost=Number(c)}
+  }
+  kitchRenderOpeningRows();document.getElementById('kitchOpeningStatus').textContent=matched+' ingredients matched from Excel. Review and click Save All.';
+ }catch(e){alert('Excel import failed: '+e.message)}
+}
+async function saveBranchOpeningStock(){
+ const btn=document.getElementById('kitchOpeningSave'),status=document.getElementById('kitchOpeningStatus');
+ if(!btn||btn.disabled)return;
+ if(kitchOpeningRows.some(r=>!Number.isFinite(r.qty)||r.qty<0||!Number.isFinite(r.cost)||r.cost<0))return alert('Opening quantities and costs must be valid nonnegative numbers.');
+ if(!confirm('Save '+kitchOpeningRows.length+' ingredient opening balances to Supabase for '+currentBranchName()+'? This replaces the current balances for this branch.'))return;
+ btn.disabled=true;btn.textContent='Saving…';let done=0;
+ try{
+  if(teamCloudAuth?.pin)throw Error('This PIN session needs a secure opening-stock database function. No changes were made. Sign in as the authenticated owner or install the required database RPC.');
+  if(!cloud.restaurant_id||!cloud.branch_id){const ok=await ensureCloudWorkspace();if(!ok)throw Error('Cloud workspace unavailable. Sign in again.')}
+  const branch=currentBranch(),branchId=branch.cloud_id||cloud.branch_id;
+  if(!branchId)throw Error('No cloud branch ID.');
+  for(const r of kitchOpeningRows){
+   const x=r.x;if(!x.cloud_id)throw Error('Missing cloud ingredient ID for '+x.name);
+   const match={restaurant_id:cloud.restaurant_id,branch_id:branchId,ingredient_id:x.cloud_id};
+   const {data:existing,error:readErr}=await sb.from('inventory_balances').select('ingredient_id').match(match).limit(1);
+   if(readErr)throw Error(x.name+': '+readErr.message);
+   const payload={...match,unit:x.base_unit,quantity_on_hand:r.qty,indicative_unit_cost:r.cost};
+   const result=existing?.length?await sb.from('inventory_balances').update({unit:x.base_unit,quantity_on_hand:r.qty,indicative_unit_cost:r.cost}).match(match):await sb.from('inventory_balances').insert(payload);
+   if(result.error)throw Error(x.name+': '+result.error.message);
+   done++;status.textContent='Saved '+done+' / '+kitchOpeningRows.length+' to Supabase…';
+  }
+  await cloudLoadIngredients();
+  if(window.__kitchInventoryLoadError)throw Error(window.__kitchInventoryLoadError);
+  closeModal();openPage('Inventory');alert('Opening stock saved and verified from Supabase for '+done+' ingredients.');
+ }catch(e){status.textContent='Stopped after '+done+' of '+kitchOpeningRows.length+' ingredients. '+e.message+' Existing successful saves remain in cloud. Retry to finish.';console.error(e)}
+ finally{btn.disabled=false;btn.textContent='Save All Opening Stock to Cloud'}
 }
 
 let __kitchModalScrollY=0;
