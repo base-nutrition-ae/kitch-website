@@ -1860,6 +1860,11 @@ function recipeIngredientCost(it,master=ingredients()){
  if(u==='g'||u==='ml')q/=1000;
  return q*price;
 }
+function recipeYieldValueDetails(r){
+ let raw=0,usable=0,loss=0;
+ (r.items||[]).forEach(it=>{const c=recipeIngredientCost(it);if(c===null)return;const yieldRate=recipeYieldPercent(it)/100;raw+=c;usable+=c*yieldRate;loss+=c*(1-yieldRate)});
+ return {raw,usable,loss};
+}
 function recipeCostDetails(r){
  const master=ingredients(),missingPrices=[],missingIngredients=[];
  const total=(r.items||[]).reduce((t,it)=>{
@@ -1873,10 +1878,10 @@ function recipeCostDetails(r){
 }
 function recipeYieldRows(r,showCost){
  const master=ingredients();
- return `<table><tr><th>INGREDIENT</th><th>RAW (AP)</th><th>YIELD %</th><th>USABLE / COOKED (EP)</th><th>AP / EP FACTOR</th>${showCost?'<th>SUPPLIER PRICE</th><th>ING. COST</th>':''}</tr>${(r.items||[]).map(it=>{
+ return `<table><tr><th>INGREDIENT</th><th>RAW (AP)</th><th>YIELD %</th><th>USABLE / COOKED (EP)</th><th>AP / EP FACTOR</th>${showCost?'<th>SUPPLIER PRICE</th><th>RAW COST</th><th>NET VALUE</th><th>PREP LOSS</th>':''}</tr>${(r.items||[]).map(it=>{
   const x=ingredientForRecipeItem(it,master),pct=recipeYieldPercent(it),cost=recipeIngredientCost(it,master);
   const price=x?(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost')):0;
-  return `<tr><td><b>${esc(it.ingredient)}</b>${!x?'<small class="bad"> · Unmatched</small>':''}</td><td>${cleanQty(it.qty)} ${esc(it.unit)}</td><td>${pct}%</td><td><b>${cleanQty(recipeUsableQty(it))} ${esc(it.unit)}</b></td><td>${(100/pct).toFixed(3)}×</td>${showCost?`<td>${price>0?'AED '+price.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+cost.toFixed(2):'<span class="bad">Missing</span>'}</td>`:''}</tr>`
+  return `<tr><td><b>${esc(it.ingredient)}</b>${!x?'<small class="bad"> · Unmatched</small>':''}</td><td>${cleanQty(it.qty)} ${esc(it.unit)}</td><td>${pct}%</td><td><b>${cleanQty(recipeUsableQty(it))} ${esc(it.unit)}</b></td><td>${(100/pct).toFixed(3)}×</td>${showCost?`<td>${price>0?'AED '+price.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+cost.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+(cost*pct/100).toFixed(2):'—'}</td><td>${cost!==null?'AED '+(cost*(100-pct)/100).toFixed(2):'—'}</td>`:''}</tr>`
  }).join('')}</table>`;
 }
 function recipeCost(r){return recipeCostDetails(r).total}
@@ -1995,13 +2000,56 @@ function viewRecipe(id){
   return;
  }
  modal(`<div class="modalHead"><div><h2>${esc(r.name)}</h2><div class="muted">Locked Master · Exactly 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
- <div class="grid" style="margin-top:18px"><div class="card"><span>1 BATCH COST</span><b>${recipeCostLabel(r)}</b></div><div class="card"><span>AUTO INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${recipeNeedsReview(r)?'Needs Review':'Approved'}</b></div></div>
+ <div class="grid" style="margin-top:18px"><div class="card"><span>1 BATCH RAW COST</span><b>${recipeCostLabel(r)}</b></div><div class="card"><span>AUTO INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${recipeNeedsReview(r)?'Needs Review':'Approved'}</b></div></div>
  ${miss.length?`<div class="note bad"><b>Missing from Ingredient Master (${miss.length})</b><br>${miss.map(x=>esc(x)).join(' · ')}<br><small>KITCH links recipe ingredients to the Ingredient Master by SKU/ID. Only truly unmatched ingredients need review.</small></div>`:`<div class="note ok"><b>All ingredients matched.</b> Ingredient links are valid. Check that all ingredient prices are entered before Production.</div>`}
  ${recipeYieldRows(r,true)}
+ <div class="note"><b>Net usable value:</b> AED ${recipeYieldValueDetails(r).usable.toFixed(2)} · <b>Preparation loss value:</b> AED ${recipeYieldValueDetails(r).loss.toFixed(2)} · <b>Raw food cost:</b> AED ${recipeYieldValueDetails(r).raw.toFixed(2)}. Preparation loss is already included in raw cost.</div>
+ ${session==='manager'||session==='owner'?`<div class="actions"><button class="btn black" onclick="openRecipeYieldEdit(${r.id})">Edit Recipe &amp; Yield</button></div>`:''}
  <div class="note"><b>Ingredient costs use raw (AP), not cooked (EP).</b> Cost / portion: ${r.portions>0&&recipeCostDetails(r).complete?'AED '+(recipeCost(r)/r.portions).toFixed(2):'Enter portions and all ingredient prices'}. Actual production yield is recorded separately during Production.</div>
  ${r.instructions?`<div class="note"><b>Instructions:</b> ${esc(r.instructions)}</div>`:''}</div>`)
 }
 
+
+
+function openRecipeYieldEdit(id){
+ if(session!=='manager'&&session!=='owner')return;
+ const recipe=recipes().find(r=>String(r.id)===String(id));if(!recipe)return;
+ closeModal();
+ const rows=recipe.items.map((it,i)=>'<tr class="yieldEditRow"><td>'+esc(it.ingredient)+'</td><td><input class="yieldQty" type="number" min="0.001" step="0.001" value="'+Number(it.qty)+'" oninput="previewYieldEdit()"></td><td>'+esc(it.unit)+'</td><td><input class="yieldPct" type="number" min="0.01" max="100" step="0.01" value="'+recipeYieldPercent(it)+'" oninput="previewYieldEdit()"></td><td class="yieldCooked"></td><td class="yieldRaw"></td><td class="yieldNet"></td><td class="yieldLoss"></td></tr>').join('');
+ modal('<div class="modalHead"><h2>Edit '+esc(recipe.name)+' · Yield</h2><button class="close" onclick="closeModal()">×</button></div><div class="note">Raw cost remains the actual food cost; net usable value and preparation loss are shown separately. Preparation loss does not deduct inventory twice.</div><label>Portions</label><input id="yieldPortions" type="number" min="1" step="1" value="'+(Number(recipe.portions)||1)+'" oninput="previewYieldEdit()"><table><tr><th>INGREDIENT</th><th>RAW AP</th><th>UNIT</th><th>YIELD %</th><th>COOKED EP</th><th>RAW COST</th><th>NET VALUE</th><th>PREP LOSS</th></tr>'+rows+'</table><div id="yieldTotals" class="note"></div><div class="actions"><button class="btn black" onclick="saveYieldEdit()">Save Changes</button></div>');
+ window._editingYieldRecipeId=id;previewYieldEdit();
+}
+function previewYieldEdit(){
+ const recipe=recipes().find(r=>String(r.id)===String(window._editingYieldRecipeId));if(!recipe)return;
+ let raw=0,net=0,loss=0;
+ document.querySelectorAll('.yieldEditRow').forEach((row,i)=>{
+  const qty=Number(row.querySelector('.yieldQty').value),pct=Number(row.querySelector('.yieldPct').value);
+  const it={...recipe.items[i],qty,yield_pct:pct};const cost=recipeIngredientCost(it);
+  const netCost=cost===null?0:cost*pct/100,lossCost=cost===null?0:cost-netCost;
+  row.querySelector('.yieldCooked').textContent=cleanQty(qty*pct/100)+' '+it.unit;
+  row.querySelector('.yieldRaw').textContent=cost===null?'Missing':'AED '+cost.toFixed(2);
+  row.querySelector('.yieldNet').textContent=cost===null?'Missing':'AED '+netCost.toFixed(2);
+  row.querySelector('.yieldLoss').textContent=cost===null?'Missing':'AED '+lossCost.toFixed(2);
+  raw+=cost||0;net+=netCost;loss+=lossCost;
+ });
+ const portions=Math.max(1,Number(document.getElementById('yieldPortions').value)||1);
+ document.getElementById('yieldTotals').textContent='Raw food cost: AED '+raw.toFixed(2)+' | Net usable value: AED '+net.toFixed(2)+' | Preparation loss: AED '+loss.toFixed(2)+' | Raw cost/portion: AED '+(raw/portions).toFixed(2);
+}
+function saveYieldEdit(){
+ if(session!=='manager'&&session!=='owner')return;
+ const all=recipes(),id=window._editingYieldRecipeId,recipe=all.find(r=>String(r.id)===String(id));if(!recipe)return;
+ const rows=[...document.querySelectorAll('.yieldEditRow')];if(rows.length!==recipe.items.length)return alert('Reopen editor.');
+ const edits=rows.map(row=>({qty:Number(row.querySelector('.yieldQty').value),pct:Number(row.querySelector('.yieldPct').value)}));
+ if(edits.some(e=>!(e.qty>0)||!(e.pct>0&&e.pct<=100)))return alert('Quantity must be positive and yield 0–100%.');
+ const portions=Number(document.getElementById('yieldPortions').value);if(!Number.isInteger(portions)||portions<1)return alert('Portions must be a positive whole number.');
+ recipe.items.forEach((it,i)=>{it.qty=edits[i].qty;it.yield_pct=edits[i].pct});recipe.portions=portions;recipe.updated_at=new Date().toISOString();
+ setArr(RECIPE_KEY,all);
+ const records=wasteRecords().filter(w=>!(w.type==='Preparation Yield Loss'&&String(w.recipe_id)===String(id)));
+ recipe.items.forEach((it,i)=>{const cost=recipeIngredientCost(it),fraction=1-recipeYieldPercent(it)/100;if(cost===null||fraction<=0)return;
+ records.push({id:Date.now()+i,code:'YLD-'+id+'-'+i,type:'Preparation Yield Loss',recipe_id:id,ingredient:it.ingredient,sku:it.sku,qty:Number(it.qty)*fraction,unit:it.unit,location:currentBranchName(),reason:'Expected preparation loss',note:'Informational only; included in raw cost. No extra inventory deduction.',cost:0,value_impact:cost*fraction,recorded_by:currentActor(),created_at:new Date().toISOString()});
+ });
+ setArr(WASTE_KEY,records);closeModal();openPage('Recipes');viewRecipe(id);
+}
 
 // PRODUCTION ENGINE — recipe execution, stock check, FEFO deduction and QC handoff
 const PROD_KEY='kitch_demo_production_v1';
@@ -2249,7 +2297,7 @@ function wastePage(){
  return `<div class="grid"><div class="card"><span>WASTE RECORDS</span><b>${wasteOnly.length}</b></div><div class="card"><span>TODAY WASTE</span><b>AED ${todayCost.toFixed(2)}</b></div><div class="card"><span>RAW WASTE COST</span><b>AED ${rawCost.toFixed(2)}</b></div><div class="card"><span>FINISHED WASTE COST</span><b>AED ${finishedCost.toFixed(2)}</b></div></div>
  <div class="panel"><h2>Waste & Adjustments</h2><p class="muted">Record waste against the location where it happened. KITCH deducts stock only from that Store, Central Kitchen or Restaurant location and keeps the location for audit and reporting.</p>
  <div class="actions"><button class="btn black" onclick="openWasteType()">+ Record Waste</button><button class="btn" onclick="openAdjustment()">+ Stock Adjustment</button></div>
- <table><tr><th>REFERENCE</th><th>TYPE</th><th>ITEM</th><th>QTY</th><th>LOCATION</th><th>REASON</th><th>COST</th><th>RECORDED BY</th><th>DATE</th></tr>${rows.map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td><b>${esc(x.ingredient||x.item||'')}</b>${x.production_code?`<br><small>${esc(x.production_code)}</small>`:''}</td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td><b>${esc(x.location||primaryRestaurantName())}</b></td><td>${esc(x.reason)}${x.note?`<br><small>${esc(x.note)}</small>`:''}</td><td>${x.type==='Stock Adjustment'?'AED '+Math.abs(Number(x.value_impact||0)).toFixed(2)+' value impact':'AED '+Number(x.cost||0).toFixed(2)}</td><td>${esc(x.recorded_by||'Legacy record')}</td><td>${esc(String(x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="11" class="empty">No waste or stock adjustments yet.</td></tr>'}</table></div>`;
+ <table><tr><th>REFERENCE</th><th>TYPE</th><th>ITEM</th><th>QTY</th><th>LOCATION</th><th>REASON</th><th>COST</th><th>RECORDED BY</th><th>DATE</th></tr>${rows.map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td><b>${esc(x.ingredient||x.item||'')}</b>${x.production_code?`<br><small>${esc(x.production_code)}</small>`:''}</td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td><b>${esc(x.location||primaryRestaurantName())}</b></td><td>${esc(x.reason)}${x.note?`<br><small>${esc(x.note)}</small>`:''}</td><td>${(x.type==='Stock Adjustment'||x.type==='Preparation Yield Loss')?'AED '+Math.abs(Number(x.value_impact||0)).toFixed(2)+' value impact':'AED '+Number(x.cost||0).toFixed(2)}</td><td>${esc(x.recorded_by||'Legacy record')}</td><td>${esc(String(x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="11" class="empty">No waste or stock adjustments yet.</td></tr>'}</table></div>`;
 }
 function openWasteType(){modal(`<div class="modalHead"><div><div class="sub">WASTE CONTROL</div><h2>Record Waste</h2></div><button class="close" onclick="closeModal()">×</button></div><div class="note">Choose what was actually wasted. Normal recipe usage is already counted automatically as production food cost.</div><div class="actions" style="margin-top:18px"><button class="btn black" onclick="openWaste()">Raw Ingredient Waste</button><button class="btn" onclick="openFinishedWaste()">Finished Product Waste</button></div>`)}
 function wasteIngredientOptions(location){return ingredients().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${prettyCanonical(wasteLocationStock(x,location),x.base_unit)}</option>`).join('')}
