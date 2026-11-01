@@ -2395,7 +2395,7 @@ async function cloudUpsertIngredient(x){
    p_receiving_type:x.receiving_type||null,
    p_reference_cost:Number(x.reference_cost||x.cost||0),
    p_par:Number(x.par||0),p_minimum:Number(x.minimum||0),
-   p_opening_stock:Number(x.opening_stock||x.stock||0),
+   p_opening_stock:x._importOpening===true?Number(x.opening_stock):0,
    p_opening_unit_cost:Number(x.opening_unit_cost||x.reference_cost||x.cost||0)
   });
   if(error)throw new Error(error.message||'Team ingredient write failed');
@@ -3181,7 +3181,7 @@ function kitchStockValue(x){
 function inventoryPage(){
  if(window.__kitchInventoryLoadError)return `<div class="note"><b>Live inventory unavailable:</b> ${esc(window.__kitchInventoryLoadError)}. No stock has been changed. Please check the browser console or access policy.</div>`;
  const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager',storeMaster=hasCentralStore()&&session==='store';
- const emptyStoreNotice=window.__kitchInventoryEmptyLocation?'<div class="note"><b>Central Store is connected.</b> No stock has been received into this location yet. All quantities are currently zero. Receive physical stock into Central Store before approving stock transfers; existing Main Kitchen inventory is separate.</div>':'';
+ const emptyStoreNotice=window.__kitchInventoryEmptyLocation?'<div class="note"><b>No saved stock for this location.</b> Import opening quantities using Upload / Import Excel, or record a delivery in Receiving.</div>':'';
  const rows=a.map(x=>{const qty=contextStockCanonical(x);const status=qty<=0?'OUT / NOT ENTERED':fromCanonical(qty,x.base_unit)<Number(x.minimum||0)?'LOW':'OK';const latest=Number(x.latest_cost)>0?x.latest_cost:x.reference_cost;const edit=(manage||storeMaster)?'<button class="btn" onclick="openEditIngredient(&quot;'+esc(x.sku)+'&quot;)">Edit</button>':'—';return `<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${kitchQuantityLabel(qty,x.base_unit)}</td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(latest,x.base_unit)}</td><td>AED ${kitchStockValue(x).toFixed(2)}</td><td>${esc(status)}</td><td>${edit}</td></tr>`;}).join('');
  return `<div class="kitchInventory">${emptyStoreNotice}<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>fromCanonical(contextStockCanonical(x),x.base_unit)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
  <div class="panel"><h2>Ingredient Master & Inventory</h2><p class="muted"><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
@@ -3312,7 +3312,7 @@ async function readExcel(file){
  try{
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
   const pick=(o,names)=>{for(const n of names)if(Object.prototype.hasOwnProperty.call(o,n))return o[n];return''};
-  importRows=rows.map(r=>{const ref=Number(pick(r,['Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED'])||0),open=Number(pick(r,['Opening Stock','Opening Quantity'])||0),openCost=Number(pick(r,['Opening Unit Cost AED','Opening Cost AED'])||ref||0);return {name:String(pick(r,['Ingredient Name','Ingredient'])).trim(),category:String(pick(r,['Category'])).trim(),supplier:String(pick(r,['Supplier','Supplier Name','Default Supplier'])).trim(),base_unit:unit(pick(r,['Base Unit'])),cost:openCost||ref,reference_cost:ref,opening_stock:open,opening_unit_cost:openCost,par:Number(pick(r,['PAR Target Stock','PAR Level','PAR'])||0),minimum:Number(pick(r,['Minimum Stock','Min Stock'])||0),receiving_type:correctedReceivingType(String(pick(r,['Ingredient Name','Ingredient','Name'])||'').trim(),String(pick(r,['Receiving Type','Storage Type'])||'Room Temperature').trim()||'Room Temperature')}}).filter(x=>x.name);
+  importRows=rows.map(r=>{const ref=Number(pick(r,['Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED'])||0),open=Number(pick(r,['Opening Stock','Opening Quantity'])||0),openCost=Number(pick(r,['Opening Unit Cost AED','Opening Cost AED'])||ref||0);return {_importOpening:String(pick(r,['Opening Stock','Opening Quantity'])).trim()!=='',name:String(pick(r,['Ingredient Name','Ingredient'])).trim(),category:String(pick(r,['Category'])).trim(),supplier:String(pick(r,['Supplier','Supplier Name','Default Supplier'])).trim(),base_unit:unit(pick(r,['Base Unit'])),cost:openCost||ref,reference_cost:ref,opening_stock:open,opening_unit_cost:openCost,par:Number(pick(r,['PAR Target Stock','PAR Level','PAR'])||0),minimum:Number(pick(r,['Minimum Stock','Min Stock'])||0),receiving_type:correctedReceivingType(String(pick(r,['Ingredient Name','Ingredient','Name'])||'').trim(),String(pick(r,['Receiving Type','Storage Type'])||'Room Temperature').trim()||'Room Temperature')}}).filter(x=>x.name);
   const existing=ingredients();
   // Import preview only: raw Excel amounts are in grams or millilitres.
   const shortImportQty=(value,base)=>{
@@ -3359,7 +3359,7 @@ async function confirmImport(){
   for(const x0 of importRows){
    const e=a.find(z=>z.name.toLowerCase()===x0.name.toLowerCase());
    if(e){
-    const candidate={...e,...x0,stock:e.stock,stock_canonical:e.stock_canonical,branch_stock_canonical:e.branch_stock_canonical,restaurant_stock_canonical:e.restaurant_stock_canonical,opening_stock:e.opening_stock,opening_unit_cost:e.opening_unit_cost,stock_location:e.stock_location||assignedLocationName()};
+    const candidate={...e,...x0,stock:e.stock,stock_canonical:e.stock_canonical,branch_stock_canonical:e.branch_stock_canonical,restaurant_stock_canonical:e.restaurant_stock_canonical,opening_stock:x0._importOpening?x0.opening_stock:e.opening_stock,opening_unit_cost:x0._importOpening?x0.opening_unit_cost:e.opening_unit_cost,stock_location:e.stock_location||assignedLocationName()};
     await cloudUpsertIngredient(candidate);
     Object.assign(e,candidate);updated++;
    }else{
@@ -3388,6 +3388,14 @@ async function confirmImport(){
    const keepSet=new Set(keepNames);
    for(let i=a.length-1;i>=0;i--)if(!keepSet.has(a[i].name.trim().toLowerCase()))a.splice(i,1);
    saveIngredients(a);
+  }
+  await cloudLoadIngredients();
+  if(window.__kitchInventoryLoadError)throw Error('Imported, but stock could not reload: '+window.__kitchInventoryLoadError);
+  if(teamCloudAuth?.pin){
+   for(const row of importRows.filter(x=>x._importOpening&&x.opening_stock>0)){
+    const saved=ingredients().find(x=>x.name.toLowerCase()===row.name.toLowerCase());
+    if(!saved||!(contextStockCanonical(saved)>0))throw Error('Opening stock was not saved for '+row.name);
+   }
   }
   syncSupplierMasterFromIngredients();
   importRows=[];
