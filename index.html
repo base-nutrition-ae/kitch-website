@@ -3228,28 +3228,28 @@ async function saveBranchOpeningStock(){
  const btn=document.getElementById('kitchOpeningSave'),status=document.getElementById('kitchOpeningStatus');
  if(!btn||btn.disabled)return;
  if(kitchOpeningRows.some(r=>!Number.isFinite(r.qty)||r.qty<0||!Number.isFinite(r.cost)||r.cost<0))return alert('Opening quantities and costs must be valid nonnegative numbers.');
- if(!confirm('Save '+kitchOpeningRows.length+' ingredient opening balances to Supabase for '+currentBranchName()+'? This replaces the current balances for this branch.'))return;
- btn.disabled=true;btn.textContent='Saving…';let done=0;
+ if(!confirm('Replace opening balances for '+currentBranchName()+' with '+kitchOpeningRows.length+' ingredient quantities?'))return;
+ btn.disabled=true;btn.textContent='Saving to cloud…';
  try{
-  if(teamCloudAuth?.pin)throw Error('This PIN session needs a secure opening-stock database function. No changes were made. Sign in as the authenticated owner or install the required database RPC.');
-  if(!cloud.restaurant_id||!cloud.branch_id){const ok=await ensureCloudWorkspace();if(!ok)throw Error('Cloud workspace unavailable. Sign in again.')}
-  const branch=currentBranch(),branchId=branch.cloud_id||cloud.branch_id;
-  if(!branchId)throw Error('No cloud branch ID.');
-  for(const r of kitchOpeningRows){
-   const x=r.x;if(!x.cloud_id)throw Error('Missing cloud ingredient ID for '+x.name);
-   const match={restaurant_id:cloud.restaurant_id,branch_id:branchId,ingredient_id:x.cloud_id};
-   const {data:existing,error:readErr}=await sb.from('inventory_balances').select('ingredient_id').match(match).limit(1);
-   if(readErr)throw Error(x.name+': '+readErr.message);
-   const payload={...match,unit:x.base_unit,quantity_on_hand:r.qty,indicative_unit_cost:r.cost};
-   const result=existing?.length?await sb.from('inventory_balances').update({unit:x.base_unit,quantity_on_hand:r.qty,indicative_unit_cost:r.cost}).match(match):await sb.from('inventory_balances').insert(payload);
-   if(result.error)throw Error(x.name+': '+result.error.message);
-   done++;status.textContent='Saved '+done+' / '+kitchOpeningRows.length+' to Supabase…';
-  }
+  if(teamCloudAuth?.pin)throw Error('Opening stock requires the authenticated Main Office owner login, not a staff PIN.');
+  if(!cloud.restaurant_id||!cloud.branch_id){if(!await ensureCloudWorkspace())throw Error('Sign in as the owner again.');}
+  const branchId=currentBranch()?.cloud_id||cloud.branch_id;
+  const rows=kitchOpeningRows.map(r=>{
+   if(!r.x.cloud_id)throw Error('Missing cloud ingredient ID: '+r.x.name);
+   return {ingredient_id:r.x.cloud_id,unit:r.x.base_unit,quantity:r.qty,cost:r.cost};
+  });
+  const {data,error}=await sb.rpc('kitch_save_opening_stock',{p_restaurant_id:cloud.restaurant_id,p_branch_id:branchId,p_rows:rows});
+  if(error)throw Error(error.message||'Opening stock save failed');
+  if(Number(data)!==rows.length)throw Error('Only '+data+' of '+rows.length+' balances were saved.');
   await cloudLoadIngredients();
-  if(window.__kitchInventoryLoadError)throw Error(window.__kitchInventoryLoadError);
-  closeModal();openPage('Inventory');alert('Opening stock saved and verified from Supabase for '+done+' ingredients.');
- }catch(e){status.textContent='Stopped after '+done+' of '+kitchOpeningRows.length+' ingredients. '+e.message+' Existing successful saves remain in cloud. Retry to finish.';console.error(e)}
- finally{btn.disabled=false;btn.textContent='Save All Opening Stock to Cloud'}
+  if(window.__kitchInventoryLoadError)throw Error('Saved, but reload failed: '+window.__kitchInventoryLoadError);
+  const {data:verified,error:verifyError}=await sb.from('inventory_balances').select('ingredient_id,quantity_on_hand').eq('restaurant_id',cloud.restaurant_id).eq('branch_id',branchId);
+  if(verifyError)throw Error('Saved but readback permission failed: '+verifyError.message);
+  const byId=new Map((verified||[]).map(x=>[String(x.ingredient_id),Number(x.quantity_on_hand)]));
+  for(const r of rows){if(Math.abs((byId.get(String(r.ingredient_id))??NaN)-r.quantity)>0.000001)throw Error('Cloud verification failed for '+r.ingredient_id);}
+  closeModal();openPage('Inventory');alert('Opening stock saved and verified for '+rows.length+' ingredients.');
+ }catch(e){status.textContent='Opening stock was not fully verified: '+e.message;console.error('Opening stock save',e)}
+ finally{btn.disabled=false;btn.textContent='Save All Opening Stock to Cloud';}
 }
 
 let __kitchModalScrollY=0;
