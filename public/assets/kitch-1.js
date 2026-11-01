@@ -1848,7 +1848,7 @@ function linkRecipeIngredients(){
 }
 function recipeYieldPercent(it){
  const n=Number(it.yield_pct ?? 100);
- return Number.isFinite(n)&&n>0&&n<=100?n:100;
+ return Number.isFinite(n)&&n>0&&n<=300?n:100;
 }
 function recipeUsableQty(it){return Number(it.qty||0)*recipeYieldPercent(it)/100}
 function recipeIngredientCost(it,master=ingredients()){
@@ -1862,7 +1862,7 @@ function recipeIngredientCost(it,master=ingredients()){
 }
 function recipeYieldValueDetails(r){
  let raw=0,usable=0,loss=0;
- (r.items||[]).forEach(it=>{const c=recipeIngredientCost(it);if(c===null)return;const yieldRate=recipeYieldPercent(it)/100;raw+=c;usable+=c*yieldRate;loss+=c*(1-yieldRate)});
+ (r.items||[]).forEach(it=>{const c=recipeIngredientCost(it);if(c===null)return;const yieldRate=recipeYieldPercent(it)/100;raw+=c;usable+=c*yieldRate;loss+=Math.max(0,c*(1-yieldRate))});
  return {raw,usable,loss};
 }
 function recipeCostDetails(r){
@@ -1881,7 +1881,7 @@ function recipeYieldRows(r,showCost){
  return `<table><tr><th>INGREDIENT</th><th>RAW (AP)</th><th>YIELD %</th><th>USABLE / COOKED (EP)</th><th>AP / EP FACTOR</th>${showCost?'<th>SUPPLIER PRICE</th><th>RAW COST</th><th>NET VALUE</th><th>PREP LOSS</th>':''}</tr>${(r.items||[]).map(it=>{
   const x=ingredientForRecipeItem(it,master),pct=recipeYieldPercent(it),cost=recipeIngredientCost(it,master);
   const price=x?(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost')):0;
-  return `<tr><td><b>${esc(it.ingredient)}</b>${!x?'<small class="bad"> · Unmatched</small>':''}</td><td>${cleanQty(it.qty)} ${esc(it.unit)}</td><td>${pct}%</td><td><b>${cleanQty(recipeUsableQty(it))} ${esc(it.unit)}</b></td><td>${(100/pct).toFixed(3)}×</td>${showCost?`<td>${price>0?'AED '+price.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+cost.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+(cost*pct/100).toFixed(2):'—'}</td><td>${cost!==null?'AED '+(cost*(100-pct)/100).toFixed(2):'—'}</td>`:''}</tr>`
+  return `<tr><td><b>${esc(it.ingredient)}</b>${!x?'<small class="bad"> · Unmatched</small>':''}</td><td>${cleanQty(it.qty)} ${esc(it.unit)}</td><td>${pct}%</td><td><b>${cleanQty(recipeUsableQty(it))} ${esc(it.unit)}</b></td><td>${(100/pct).toFixed(3)}×</td>${showCost?`<td>${price>0?'AED '+price.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+cost.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+(cost*pct/100).toFixed(2):'—'}</td><td>${cost!==null?'AED '+Math.max(0,cost*(100-pct)/100).toFixed(2):'—'}</td>`:''}</tr>`
  }).join('')}</table>`;
 }
 function recipeCost(r){return recipeCostDetails(r).total}
@@ -1942,7 +1942,7 @@ function addRecipeLine(){
  document.getElementById('rcItems').insertAdjacentHTML('beforeend',`<div class="formGrid recipeLine" style="border-bottom:1px solid #eee;padding-bottom:12px;margin-bottom:12px">
  <div class="field"><label>INGREDIENT</label><select class="riIng ingredientSelect" onfocus="openIngredientSelect(this)" onblur="closeIngredientSelect(this)" onchange="closeIngredientSelect(this)">${m.map(x=>`<option value="${esc(x.name)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div>
  <div class="field"><label>RAW AP QUANTITY</label><input class="riQty" type="number" min="0" step=".001" oninput="updateRecipeLinePreview(this)"></div>
- <div class="field"><label>UNIT</label><select class="riUnit" onchange="updateRecipeLinePreview(this)"><option>kg</option><option>g</option><option>ltr</option><option>ml</option><option>pcs</option></select></div><div class="field"><label>COOKED / USABLE YIELD %</label><input class="riYield" type="number" min="0.01" max="100" step=".01" value="100" oninput="updateRecipeLinePreview(this)"></div><div class="field"><label>COOKED / USABLE EP</label><output class="riEp">Enter raw quantity</output></div></div>`)
+ <div class="field"><label>UNIT</label><select class="riUnit" onchange="updateRecipeLinePreview(this)"><option>kg</option><option>g</option><option>ltr</option><option>ml</option><option>pcs</option></select></div><div class="field"><label>COOKED / USABLE YIELD %</label><input class="riYield" type="number" min="0.01" max="300" step=".01" value="100" oninput="updateRecipeLinePreview(this)"></div><div class="field"><label>COOKED / USABLE EP</label><output class="riEp">Enter raw quantity</output></div></div>`)
 }
 function updateRecipeLinePreview(el){
  const line=el.closest('.recipeLine');if(!line)return;
@@ -2018,7 +2018,7 @@ function recipeSheetQty(q,u){return (Number(q)/recipeSheetFactor(u)).toFixed(3)}
 function openRecipeYieldEdit(id){
  if(session!=='manager'&&session!=='owner')return;
  const r=recipes().find(x=>String(x.id)===String(id));if(!r)return;closeModal();
- const rows=r.items.map((it,i)=>'<tr class="yieldEditRow"><td>'+esc(it.sku||'ING-'+String(i+1).padStart(3,'0'))+'</td><td><b>'+esc(it.ingredient)+'</b></td><td>'+esc(recipeSheetUnit(it.unit))+'</td><td><input class="yieldQty" type="number" min=".001" step=".001" value="'+recipeSheetQty(it.qty,it.unit)+'" oninput="previewYieldEdit(this)"></td><td class="yieldSupplierPrice">—</td><td class="yieldRaw">—</td><td>'+esc(recipeSheetUnit(it.unit))+'</td><td><input class="yieldPct" type="number" min=".01" max="100" step=".01" value="'+recipeYieldPercent(it)+'" oninput="previewYieldEdit(this)"></td><td><input class="yieldCooked" type="number" min=".001" step=".001" value="'+recipeSheetQty(recipeUsableQty(it),it.unit)+'" oninput="previewYieldEdit(this)"></td><td class="yieldNet">—</td><td class="yieldLoss">—</td></tr>').join('');
+ const rows=r.items.map((it,i)=>'<tr class="yieldEditRow"><td>'+esc(it.sku||'ING-'+String(i+1).padStart(3,'0'))+'</td><td><b>'+esc(it.ingredient)+'</b></td><td>'+esc(recipeSheetUnit(it.unit))+'</td><td><input class="yieldQty" type="number" min=".001" step=".001" value="'+recipeSheetQty(it.qty,it.unit)+'" oninput="previewYieldEdit(this)"></td><td class="yieldSupplierPrice">—</td><td class="yieldRaw">—</td><td>'+esc(recipeSheetUnit(it.unit))+'</td><td><input class="yieldPct" type="number" min=".01" max="300" step=".01" value="'+recipeYieldPercent(it)+'" oninput="previewYieldEdit(this)"></td><td><input class="yieldCooked" type="number" min=".001" step=".001" value="'+recipeSheetQty(recipeUsableQty(it),it.unit)+'" oninput="previewYieldEdit(this)"></td><td class="yieldNet">—</td><td class="yieldLoss">—</td></tr>').join('');
  const style='<style>.modal:has(.recipeSheet) .modalBox{width:min(1450px,98vw);max-height:93vh}.recipeSheet .sheetGrid,.recipeSheet .sheetCosts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}.recipeSheet .sheetGrid>div,.recipeSheet .sheetCosts>div{background:#f4f6f9;border:1px solid #dce3ec;border-radius:10px;padding:12px;min-width:0}.recipeSheet .sheetGrid label,.recipeSheet .sheetCosts small{display:block;color:#647084;font-size:10px;font-weight:800;letter-spacing:.05em;margin-bottom:5px}.recipeSheet .sheetGrid span,.recipeSheet .sheetGrid input{display:block;width:100%;padding:10px;background:#fff;border:1px solid #ddd;border-radius:8px;min-height:38px}.recipeSheet .sheetCosts b{font-size:19px}.recipeSheet .sheetWrap{overflow-x:auto}.recipeSheet table{min-width:1000px;border:1px solid #dde3eb}.recipeSheet th{background:#e6ecf6;text-align:center}.recipeSheet td{border:1px solid #e9e9e9}.recipeSheet td input{width:75px;border:1px solid #ddd;border-radius:7px;padding:8px}.recipeSheet .sheetActions{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:15px}.recipeSheet .sheetActions button{border:0;border-radius:999px;background:#111;color:#fff;font-weight:800;padding:14px 22px}@media(max-width:700px){.recipeSheet .sheetGrid,.recipeSheet .sheetCosts{grid-template-columns:repeat(2,minmax(0,1fr))}}</style>';
  const grid='<div class="sheetGrid"><div><label>RECIPE NO.</label><span>REC-'+esc(String(r.id))+'</span></div><div><label>DATE</label><span>'+new Date().toLocaleDateString('en-GB')+'</span></div><div><label>PREPARED BY</label><span>'+esc(currentActor())+'</span></div><div><label>PORTIONS</label><input id="yieldPortions" type="number" min="1" step="1" value="'+(r.portions||1)+'" oninput="previewYieldEdit()"></div><div><label>SELLING PRICE / PORTION (AED)</label><input id="yieldSelling" type="number" min="0" step=".01" placeholder="Optional" value="'+(r.selling_price||'')+'"></div><div><label>RECIPE CATEGORY</label><span>'+esc(r.category||'Mains')+'</span></div><div><label>AP QUANTITY</label><span>Purchased/raw quantity</span></div><div><label>EP YIELD</label><span>Cooked/usable quantity</span></div></div>';
  modal('<div class="recipeSheet">'+style+'<div class="modalHead"><div><small style="letter-spacing:.16em;color:#777;font-weight:800">KITCH · RECIPE COSTING SHEET</small><h2>'+esc(r.name)+'</h2><small>AP purchased / raw ingredients · EP usable yield after preparation</small></div><button class="close" onclick="closeModal()">×</button></div>'+grid+'<div class="sheetCosts"><div><small>COST PER RECIPE</small><b id="sheetRaw">—</b></div><div><small>COST PER PORTION</small><b id="sheetPortion">—</b></div><div><small>TOTAL EDIBLE COST</small><b id="sheetNet">—</b></div><div><small>PREPARATION LOSS</small><b id="sheetLoss">—</b></div></div><div class="sheetWrap"><table><tr><th>ITEM CODE</th><th>INGREDIENT</th><th>AP UNIT</th><th>AP QTY USED</th><th>ORIGINAL PRICE / KG · L · PCS</th><th>RAW COST</th><th>EP UNIT</th><th>YIELD %</th><th>EP QTY</th><th>TOTAL EDIBLE COST</th><th>WASTAGE VALUE</th></tr>'+rows+'<tr><td colspan="9"><b>TOTAL EDIBLE INGREDIENT COST</b></td><td id="sheetFoot">—</td><td></td></tr></table></div><div class="note">Edible value = purchased raw cost × yield %. Raw purchase cost remains the true food cost; expected preparation loss is displayed separately and is not deducted from stock twice.</div><div class="sheetActions"><small>Saved in browser only, not shared Supabase storage.</small><button onclick="saveYieldEdit()">Save Recipe Costing Sheet</button></div></div>');
@@ -2033,7 +2033,7 @@ function previewYieldEdit(changed){
   const originalIngredient=ingredientForRecipeItem(r.items[i],ingredients());const supplierPrice=originalIngredient?(kitchSupplierPrice(originalIngredient,'latest_cost')||kitchSupplierPrice(originalIngredient,'reference_cost')):0;
   const supplierUnit=recipeSheetUnit(r.items[i].unit);
   row.querySelector('.yieldSupplierPrice').textContent=supplierPrice>0?'AED '+supplierPrice.toFixed(2)+'/'+(supplierUnit==='kg'?'kg':supplierUnit==='L'?'L':'pcs'):'Missing';
-  const cost=recipeIngredientCost({...r.items[i],qty,yield_pct:pct});const c=cost===null?0:cost,edible=c*pct/100,lost=c-edible;
+  const cost=recipeIngredientCost({...r.items[i],qty,yield_pct:pct});const c=cost===null?0:cost,edible=c*pct/100,lost=Math.max(0,c-edible);
   row.querySelector('.yieldRaw').textContent=cost===null?'Missing':'AED '+c.toFixed(2);
   row.querySelector('.yieldNet').textContent=cost===null?'Missing':'AED '+edible.toFixed(2);
   row.querySelector('.yieldLoss').textContent=cost===null?'Missing':'AED '+lost.toFixed(2);
@@ -2047,7 +2047,7 @@ function saveYieldEdit(){
  const all=recipes(),id=window._editingYieldRecipeId,recipe=all.find(r=>String(r.id)===String(id));if(!recipe)return;
  const rows=[...document.querySelectorAll('.yieldEditRow')];if(rows.length!==recipe.items.length)return alert('Reopen editor.');
  const edits=rows.map((row,i)=>({qty:Number(row.querySelector('.yieldQty').value)*recipeSheetFactor(recipe.items[i].unit),pct:Number(row.querySelector('.yieldPct').value)}));
- if(edits.some(e=>!(e.qty>0)||!(e.pct>0&&e.pct<=100)))return alert('Quantity must be positive and yield 0–100%.');
+ if(edits.some(e=>!(e.qty>0)||!(e.pct>0&&e.pct<=300)))return alert('Quantity must be positive and yield greater than 0% (maximum 300%).');
  const portions=Number(document.getElementById('yieldPortions').value);if(!Number.isInteger(portions)||portions<1)return alert('Portions must be a positive whole number.');
  recipe.items.forEach((it,i)=>{it.qty=edits[i].qty;it.yield_pct=edits[i].pct});recipe.portions=portions;recipe.selling_price=Number(document.getElementById('yieldSelling')?.value)||0;recipe.updated_at=new Date().toISOString();
  setArr(RECIPE_KEY,all);
