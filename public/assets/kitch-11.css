@@ -1,0 +1,7 @@
+
+@media(max-width:850px){
+  #app.hidden{display:none!important;}
+  #app.hidden .appMobileMenu,#app.hidden .appSideBackdrop,#app.hidden .side,#app.hidden .main{display:none!important;}
+  #login.hidden{display:none!important;}
+  #app:not(.hidden) .appMobileMenu{display:flex!important;}
+}

@@ -1,0 +1,30 @@
+
+/* Distinct Operations dashboard redesign, not a color-only override. */
+.kitch2026-dashboard{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#181818;max-width:1600px}
+.k26-heading{display:flex;align-items:center;justify-content:space-between;gap:22px;margin:8px 0 30px}
+.k26-eyebrow{font-size:10px;font-weight:850;letter-spacing:.18em;color:#8b8b8b}
+.k26-heading h2{font-size:clamp(32px,3vw,49px);font-weight:780;letter-spacing:-.06em;line-height:1.12;margin:11px 0 10px}
+.k26-heading p{color:#858585;font-size:13px;margin:0}.k26-orange{color:#ff782b}
+.k26-date{border:1px solid #e8e8e8;border-radius:30px;background:#fff;padding:12px 17px;font-size:10px;font-weight:850;letter-spacing:.11em;white-space:nowrap}
+.k26-pulse{display:inline-block;width:8px;height:8px;background:#30aa71;border-radius:50%;margin-right:8px;box-shadow:0 0 0 4px #30aa711b}
+.k26-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-bottom:17px}
+.k26-metric{position:relative;text-align:left;display:flex;flex-direction:column;align-items:flex-start;min-width:0;min-height:195px;padding:23px!important;background:#fff!important;border:1px solid #e7e7e7!important;border-radius:22px!important;color:#181818!important;box-shadow:none!important}
+.k26-metric:hover{border-color:#ffb48a!important;transform:translateY(-2px);box-shadow:0 12px 28px #0000000a!important}
+.k26-metric-icon{display:grid;place-items:center;width:35px;height:35px;border-radius:11px;background:#fff1e8;color:#ff792c;font-size:20px;margin-bottom:17px}
+.k26-metric small{font-size:10px;letter-spacing:.12em;font-weight:850;color:#999}.k26-metric strong{font-size:clamp(22px,2vw,31px);font-weight:800;letter-spacing:-.045em;margin:11px 0 14px;white-space:nowrap}
+.k26-metric em{font-style:normal;color:#8d8d8d;font-size:11px;margin-top:auto;display:flex;justify-content:space-between;width:100%}.k26-metric em span{font-size:17px;color:#ff792c}
+.k26-body{display:grid;grid-template-columns:1.45fr 1fr;gap:16px;margin-bottom:16px}
+.k26-panel{background:#fff;border:1px solid #e7e7e7;border-radius:23px;padding:26px;min-width:0}
+.k26-panel-top{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:24px}.k26-panel h3{font-size:21px;letter-spacing:-.045em;margin:8px 0 0;font-weight:780}
+.k26-status{font-size:10px;font-weight:850;background:#fff1e8;color:#c96122;padding:9px 12px;border-radius:20px;white-space:nowrap}
+.k26-health{display:flex;align-items:center;gap:25px;background:#181818;color:#fff;border-radius:17px;padding:19px 22px;margin-bottom:15px}
+.k26-health>div:first-child{min-width:145px}.k26-health small{display:block;color:#aaa;font-size:10px;font-weight:750;letter-spacing:.12em}.k26-health strong{display:block;font-size:30px;letter-spacing:-.05em;margin-top:5px}
+.k26-health-track{height:9px;border-radius:20px;background:#4d4d4d;flex:1;overflow:hidden}.k26-health-track span{display:block;height:100%;border-radius:20px;background:#ff8b49}
+.k26-priority-list button{display:flex;align-items:center;gap:15px;text-align:left;width:100%;padding:16px 2px!important;background:transparent!important;color:#222!important;border:0!important;border-bottom:1px solid #efefef!important;border-radius:0!important}
+.k26-priority-list button:hover{background:#fafafa!important}.k26-priority-list button>span:nth-child(2){flex:1}.k26-priority-list b{display:block;font-size:13px}.k26-priority-list small{display:block;color:#999;margin-top:6px;font-size:11px}.k26-number{font-size:12px;color:#ff7b24;font-weight:850}
+.k26-indicator{display:flex;justify-content:space-between;gap:15px;padding:19px 0;border-bottom:1px solid #f0f0f0;font-size:13px}.k26-indicator span{color:#777}.k26-indicator strong{font-size:15px}
+.k26-control-footer{color:#aaa;font-size:11px;margin-top:20px;line-height:1.5}
+.k26-actions{display:flex;align-items:center;justify-content:space-between;gap:20px}.k26-actions h3{font-size:18px}
+.k26-action-grid{display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end}.k26-action-grid button{border:1px solid #e8e8e8!important;background:#f8f8f8!important;color:#222!important;border-radius:13px!important;padding:14px 15px!important;font-size:12px!important;font-weight:750!important;display:flex;align-items:center;gap:10px}.k26-action-grid button:hover{background:#fff1e8!important;border-color:#ffb98d!important}.k26-action-grid button span{font-size:18px;color:#ff7b24}.k26-action-grid button b{color:#999;font-size:14px}
+@media(max-width:1100px){.k26-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.k26-body{grid-template-columns:1fr}.k26-actions{align-items:flex-start;flex-direction:column}.k26-action-grid{justify-content:flex-start}}
+@media(max-width:650px){.k26-heading{align-items:flex-start;flex-direction:column}.k26-metrics{gap:9px}.k26-metric{padding:15px!important;min-height:165px}.k26-metric strong{font-size:21px}.k26-panel{padding:17px}.k26-health{flex-direction:column;align-items:stretch}.k26-panel-top{align-items:flex-start;flex-direction:column}}

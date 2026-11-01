@@ -1,0 +1,6 @@
+
+/* Match the Management and Team sign-in panels without altering other dialogs. */
+#publicModal .publicBox:has(.loginTabs){min-height:690px;display:flex;flex-direction:column;justify-content:flex-start;}
+#publicModal .publicBox:has(.loginTabs) .primary{flex-shrink:0}
+@media(max-height:760px){#publicModal .publicBox:has(.loginTabs){min-height:min(690px,85vh)}}
+@media(max-width:600px){#publicModal .publicBox:has(.loginTabs){min-height:min(690px,88vh)}}

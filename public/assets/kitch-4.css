@@ -1,0 +1,13 @@
+
+/* Definitive desktop landing header fix */
+@media (min-width:701px){
+ #login .publicTop{padding:22px 68px 0!important;align-items:flex-start!important;}
+ #login .publicBrand{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:7px!important;margin:0!important;padding:0!important;}
+ #login .kitchPublicLogo{display:block!important;width:46px!important;height:auto!important;max-width:none!important;margin:0!important;object-fit:contain!important;}
+ #login .publicBrand span{display:block!important;margin:0!important;font-size:13px!important;line-height:1!important;letter-spacing:.23em!important;font-weight:800!important;color:#fff!important;opacity:.78!important;white-space:nowrap!important;}
+ #login .publicLinks{margin-left:auto!important;padding-top:9px!important;gap:14px!important;align-items:center!important;}
+ #login .publicLinks button,#login .publicLinks a{padding:11px 18px!important;font-size:13px!important;}
+}
+@media (max-width:700px){
+ #login .kitchPublicLogo{width:42px!important;height:auto!important;}
+}

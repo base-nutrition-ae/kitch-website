@@ -1,0 +1,41 @@
+
+/* Desktop: K logo + descriptor on one centered line, with header lowered slightly */
+@media (min-width:701px){
+  #login .publicTop{
+    padding:44px 68px 0!important;
+    align-items:center!important;
+  }
+  #login .publicBrand{
+    display:flex!important;
+    flex-direction:row!important;
+    align-items:center!important;
+    justify-content:flex-start!important;
+    gap:16px!important;
+    margin:0!important;
+    padding:0!important;
+  }
+  #login .kitchPublicLogo{
+    display:block!important;
+    width:46px!important;
+    height:auto!important;
+    margin:0!important;
+    flex:0 0 auto!important;
+  }
+  #login .publicBrand span{
+    display:block!important;
+    margin:0!important;
+    padding:0!important;
+    font-size:13px!important;
+    line-height:1!important;
+    letter-spacing:.23em!important;
+    white-space:nowrap!important;
+    color:#fff!important;
+    opacity:.82!important;
+    transform:translateY(6px)!important;
+  }
+  #login .publicLinks{
+    margin-left:auto!important;
+    padding-top:0!important;
+    align-items:center!important;
+  }
+}

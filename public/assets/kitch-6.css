@@ -1,0 +1,21 @@
+
+/* Workspace logo: keep the K compact and anchored to the upper-left */
+#app .sideLogoWrap{
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:flex-start!important;
+  padding:10px 0 14px 0!important;
+  margin:0 0 14px 0!important;
+}
+#app .kitchSideLogo{
+  display:block!important;
+  width:54px!important;
+  height:54px!important;
+  object-fit:contain!important;
+  object-position:left top!important;
+  margin:0!important;
+}
+@media(max-width:850px){
+  #app .sideLogoWrap{padding:8px 0 12px 0!important;}
+  #app .kitchSideLogo{width:48px!important;height:48px!important;}
+}

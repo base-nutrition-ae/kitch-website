@@ -1,0 +1,6 @@
+
+.mainOfficeDash .dashKpis .dashKpi{overflow:hidden}
+.mainOfficeDash .dashKpi small{line-height:1.35}
+@media(max-width:650px){
+  .mainOfficeDash .dashKpis{grid-template-columns:1fr 1fr!important}
+}

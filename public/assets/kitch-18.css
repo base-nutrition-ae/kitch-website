@@ -1,0 +1,35 @@
+
+/* Operations: Main Office aligned top navigation; no vertical sidebar */
+@media (min-width: 851px) {
+ #app.app:not(.hidden){display:flex!important;flex-direction:column!important;grid-template-columns:none!important;min-height:100vh!important;background:#f8f8f8!important;}
+ #app .side{position:sticky!important;top:0!important;z-index:110!important;box-sizing:border-box!important;width:100%!important;max-width:none!important;height:96px!important;min-height:96px!important;max-height:96px!important;display:flex!important;flex-direction:row!important;align-items:center!important;gap:18px!important;padding:12px 32px!important;margin:0!important;background:#fff!important;color:#161616!important;border:0!important;border-bottom:1px solid #e8e8e8!important;overflow:visible!important;box-shadow:none!important;}
+ #app .sideLogoWrap{display:flex!important;align-items:center!important;flex:0 0 auto!important;gap:10px!important;margin:0!important;padding:0!important;border:0!important;min-width:220px!important;}
+ #app .sideLogoWrap .kitchSideLogo{display:none!important;}
+ #app .kitchNavBrand{font-size:19px;font-weight:900;letter-spacing:-.05em;white-space:nowrap;}
+ #app .kitchNavBrand small{font-size:10px;color:#999;font-weight:600;letter-spacing:0;}
+ #app .nav{display:flex!important;flex:1 1 auto!important;align-items:center!important;justify-content:center!important;flex-wrap:nowrap!important;gap:3px!important;min-width:0!important;max-height:none!important;overflow:visible!important;padding:5px!important;margin:0!important;background:#f7f7f7!important;border:1px solid #ececec!important;border-radius:16px!important;scrollbar-width:thin!important;}
+ #app .nav button{display:inline-flex!important;flex:0 0 auto!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:0!important;white-space:nowrap!important;margin:0!important;padding:11px 12px!important;border:1px solid transparent!important;border-radius:11px!important;background:transparent!important;color:#666!important;font-size:14px!important;font-weight:650!important;}
+ #app .nav button.active,#app .nav button:hover{background:#ebebeb!important;color:#161616!important;border-color:#dcdcdc!important;}
+ #app .user{display:flex!important;flex-direction:column!important;justify-content:center!important;flex:0 0 auto!important;max-width:210px!important;min-width:150px!important;max-height:80px!important;margin:0!important;padding:3px 0!important;background:transparent!important;border:0!important;border-radius:0!important;overflow:hidden!important;}
+ #app .user b{color:#222!important;font-size:15px!important;white-space:nowrap!important;text-overflow:ellipsis!important;overflow:hidden!important;}
+ #app .user small{color:#888!important;font-size:12px!important;margin-top:2px!important;white-space:nowrap!important;text-overflow:ellipsis!important;overflow:hidden!important;}
+ #app .sideUtility{display:flex!important;flex:0 0 auto!important;margin:0!important;padding:0!important;border:0!important;gap:5px!important;align-items:center!important;}
+ #app .sideUtility button{display:none!important;}
+ #app .sideUtility button:last-child{display:inline-flex!important;align-items:center!important;background:#f4f4f4!important;border:0!important;color:#222!important;border-radius:12px!important;padding:13px 16px!important;font-weight:700!important;white-space:nowrap!important;}
+ #app .upgradeNav{display:none!important;}
+ #app .main{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:1600px!important;margin:0 auto!important;padding:38px 38px 60px!important;overflow:visible!important;}
+ #app .top{margin:0 0 30px!important;border-bottom:1px solid #e6e6e6!important;padding:0 0 22px!important;}
+ #app .top h1{font-size:34px!important;letter-spacing:-.05em!important;}
+ #app .card,#app .panel{border-radius:24px!important;border-color:#e8e8e8!important;box-shadow:none!important;}
+ #app .grid{min-width:0!important;}
+ #app .appMobileMenu,#app #appSideBackdrop{display:none!important;}
+}
+@media (max-width: 850px){#app .kitchNavBrand{display:none!important;}#app .side{background:#fff!important;color:#111!important;}#app .side .nav button{color:#333!important;}#app .side .nav button.active{background:#eee!important;color:#111!important;}}
+
+ #app .sideLogoWrap .kitchNavBrand{font-size:25px!important;letter-spacing:-.045em!important}
+ #app .sideLogoWrap .kitchNavBrand small{font-size:13px!important;letter-spacing:0!important;color:#aaa!important}
+ #app .nav{flex:0 1 auto!important;width:min(700px,49vw)!important;justify-content:space-around!important;gap:4px!important;overflow:visible!important;}
+ #app .nav button{flex:1 1 auto!important;padding:13px 15px!important;}
+ #app .user{max-width:180px!important;min-width:130px!important;}
+ #app .side{gap:14px!important;padding-left:28px!important;padding-right:28px!important;}
+ #app .main{max-width:1550px!important;}

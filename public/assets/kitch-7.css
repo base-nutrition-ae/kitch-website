@@ -1,0 +1,13 @@
+
+/* Final desktop landing header spacing: sit near the top like the Base Nutrition header */
+@media (min-width:701px){
+  #login.publicLanding .publicTop{
+    padding:18px 68px 0!important;
+    align-items:center!important;
+  }
+  #login.publicLanding .publicBrand,
+  #login.publicLanding .publicLinks{
+    margin-top:0!important;
+    padding-top:0!important;
+  }
+}

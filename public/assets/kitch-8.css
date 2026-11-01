@@ -1,0 +1,8 @@
+
+/* One desktop content rail: logo/header, hero copy and footer align exactly. */
+@media (min-width:701px){
+  #login.publicLanding{--landing-x:68px;}
+  #login.publicLanding .publicTop{padding-left:var(--landing-x)!important;padding-right:var(--landing-x)!important;}
+  #login.publicLanding .heroCopy{padding-left:var(--landing-x)!important;padding-right:var(--landing-x)!important;}
+  #login.publicLanding .publicFooter{left:var(--landing-x)!important;right:var(--landing-x)!important;}
+}

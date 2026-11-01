@@ -1,0 +1,22 @@
+
+@media(min-width:851px){
+#app .main{padding-top:18px!important}
+#app .top{padding:7px 0 12px!important;margin-bottom:15px!important}
+#app .top h1{font-size:26px!important;line-height:1.2!important}
+#app .top small,#app .top .muted{font-size:11px!important}
+.kitch2026-dashboard{max-width:none!important}
+.k26-heading{margin:2px 0 18px!important;gap:12px!important}
+.k26-heading h2{font-size:27px!important;letter-spacing:-.035em!important;margin:5px 0!important}
+.k26-heading p{font-size:12px!important}
+.k26-eyebrow{font-size:9px!important}
+.k26-metrics{gap:12px!important;margin-bottom:12px!important}
+.k26-metric{min-height:145px!important;padding:17px!important;border-radius:18px!important}
+.k26-metric-icon{width:28px!important;height:28px!important;font-size:15px!important;margin-bottom:9px!important}
+.k26-metric strong{font-size:23px!important;margin:7px 0 10px!important}
+.k26-panel{padding:20px!important;border-radius:18px!important}
+.k26-panel-top{margin-bottom:12px!important}
+.k26-panel h3{font-size:17px!important;margin-top:4px!important}
+.k26-priority-list button{padding:12px 2px!important}
+.k26-indicator{padding:14px 0!important}
+}
+.k26-health{display:none!important}

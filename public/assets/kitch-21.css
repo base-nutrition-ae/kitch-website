@@ -1,0 +1,9 @@
+
+@media(min-width:851px){
+ #app .kitchNavBrand{font-size:22px!important;font-weight:850!important;letter-spacing:-.045em!important}
+ #app .kitchNavBrand small{font-size:12px!important;font-weight:600!important;letter-spacing:0!important}
+ #app .nav button{font-size:15px!important;font-weight:700!important;line-height:1.3!important;padding:13px 17px!important}
+ #app .nav button.active{background:#ededed!important;color:#191919!important;border:1px solid #dedede!important}
+ #app .sideUtility button:last-child{font-size:15px!important;font-weight:600!important}
+}
+@media(min-width:851px) and (max-width:1350px){#app .nav button{font-size:13px!important;padding:12px 9px!important}}

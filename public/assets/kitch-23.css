@@ -1,0 +1,4 @@
+
+/* Keep all content scrollable without displaying browser scroll tracks. */
+html,body,#app,.main,.nav,.modalBox,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,#app::-webkit-scrollbar,.main::-webkit-scrollbar,.nav::-webkit-scrollbar,.modalBox::-webkit-scrollbar,*::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}
