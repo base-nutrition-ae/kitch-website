@@ -4006,17 +4006,33 @@ function normIngName(v){return String(v||'').toLowerCase().trim().replace(/[^a-z
 function ingTokenKey(v){return normIngName(v).split(' ').filter(Boolean).sort().join(' ')}
 function editDistance(a,b){a=normIngName(a);b=normIngName(b);const dp=Array(b.length+1).fill(0).map((_,j)=>j);for(let i=1;i<=a.length;i++){let prev=dp[0];dp[0]=i;for(let j=1;j<=b.length;j++){const old=dp[j];dp[j]=Math.min(dp[j]+1,dp[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return dp[b.length]}
 function ingredientForRecipeItem(it,master=ingredients()){
- if(it.sku){const bySku=master.find(x=>x.sku===it.sku);if(bySku)return bySku}
- const n=normIngName(it.ingredient);
- let hits=master.filter(x=>normIngName(x.name)===n);if(hits.length===1)return hits[0];
- const tk=ingTokenKey(it.ingredient);hits=master.filter(x=>ingTokenKey(x.name)===tk);if(hits.length===1)return hits[0];
- hits=master.filter(x=>editDistance(x.name,it.ingredient)<=1);if(hits.length===1)return hits[0];
- return null
+ // Older recipe SKUs can be duplicated. Prefer exact ingredient names and permanent IDs.
+ const n=normIngName(it?.ingredient);
+ let hits=n?master.filter(x=>normIngName(x.name)===n):[];
+ if(hits.length===1)return hits[0];
+ const id=String(it?.ingredient_id||'');
+ if(id){const byId=master.find(x=>String(x.cloud_id||'')===id);if(byId)return byId}
+ const tk=ingTokenKey(it?.ingredient);
+ hits=tk?master.filter(x=>ingTokenKey(x.name)===tk):[];
+ if(hits.length===1)return hits[0];
+ if(it?.sku){
+  hits=master.filter(x=>String(x.sku||'')===String(it.sku));
+  if(hits.length===1)return hits[0];
+ }
+ hits=n?master.filter(x=>editDistance(x.name,it.ingredient)<=1):[];
+ return hits.length===1?hits[0]:null;
 }
 function linkRecipeIngredients(){
  const a=recipes(),m=ingredients();let changed=false;
- a.forEach(r=>(r.items||[]).forEach(it=>{const x=ingredientForRecipeItem(it,m);if(x&&it.sku!==x.sku){it.sku=x.sku;changed=true}}));
- if(changed)setArr(RECIPE_KEY,a);return changed
+ a.forEach(r=>(r.items||[]).forEach(it=>{
+  const x=ingredientForRecipeItem(it,m);if(!x)return;
+  if(it.sku!==x.sku){it.sku=x.sku;changed=true}
+  if(x.cloud_id&&String(it.ingredient_id||'')!==String(x.cloud_id)){
+   it.ingredient_id=x.cloud_id;changed=true;
+  }
+ }));
+ if(changed)setArr(RECIPE_KEY,a);
+ return changed;
 }
 function recipeCostDetails(r){
  const master=ingredients(),missingPrices=[],missingIngredients=[];
@@ -4079,7 +4095,7 @@ function recipesPage(){
  <div class="panel"><h2>Recipe Master</h2><p class="muted">Chef defines ingredient quantities in kg/g/ltr/ml/pcs for exactly 1 Batch. KITCH converts units automatically and Production will deduct from the production location stock.</p>
  <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button>':''}</div>
  <table><tr><th>RECIPE</th><th>CATEGORY</th><th>INGREDIENTS</th><th>INPUT QTY</th><th>PORTIONS</th><th>1 BATCH COST</th><th>STATUS</th></tr>
- ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r),costInfo=recipeCostDetails(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${Number(r.portions||0)||'—'}</td><td>${recipeCostLabel(r)}</td><td>${miss.length||costInfo.missingPrices.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length?miss.length+" unmatched":costInfo.missingPrices.length+" missing prices"} · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
+ ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r),costInfo=recipeCostDetails(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${Number(r.portions||0)||'—'}</td><td>${recipeCostLabel(r)}</td><td>${miss.length||costInfo.missingPrices.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length?miss.length+" unmatched: "+esc(miss.join(', ')):costInfo.missingPrices.length+" missing prices: "+esc([...new Set(costInfo.missingPrices)].join(', '))} · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
 }
 function openRecipe(){
  if(session!=='manager')return;
@@ -4100,7 +4116,7 @@ function addRecipeLine(){
 }
 function saveRecipe(){
  let name=rcName.value.trim();if(!name)return alert('Enter recipe name.');
- let items=[...document.querySelectorAll('.recipeLine')].map(x=>{const name=x.querySelector('.riIng').value,master=ingredients().find(i=>i.name===name);return {ingredient:name,sku:master?.sku||'',qty:Number(x.querySelector('.riQty').value||0),unit:x.querySelector('.riUnit').value}}).filter(x=>x.qty>0);
+ let items=[...document.querySelectorAll('.recipeLine')].map(x=>{const name=x.querySelector('.riIng').value,master=ingredients().find(i=>i.name===name);return {ingredient:name,sku:master?.sku||'',ingredient_id:master?.cloud_id||'',qty:Number(x.querySelector('.riQty').value||0),unit:x.querySelector('.riUnit').value}}).filter(x=>x.qty>0);
  if(!items.length)return alert('Add at least one ingredient quantity.');
  let a=recipes();if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert('Recipe already exists.');
  a.push({id:Date.now(),name,category:rcCat.value.trim(),portions:Number(rcPortions.value||0),instructions:(document.getElementById('rcMethod')?.value||'').trim(),items});
@@ -4122,7 +4138,7 @@ async function readRecipeExcel(file){
    const name=String(row['Recipe Name']||'').trim(),ing=String(row['Ingredient Name']||'').trim();if(!name||!ing)return;
    if(!groups[name])groups[name]={id:Date.now()+Object.keys(groups).length,name,category:String(row['Recipe Category']||'').trim(),yield:Number(row['Expected Yield']||0),yield_unit:unit(row['Yield Unit']||'kg'),portions:Number(row['Portions per Batch']||0),instructions:String(row['Instructions']||'').trim(),items:[]};
    const matched=ingredientForRecipeItem({ingredient:ing});
-   groups[name].items.push({ingredient:ing,sku:matched?.sku||'',qty:Number(row['Quantity']||0),unit:unit(row['Unit'])});
+   groups[name].items.push({ingredient:ing,sku:matched?.sku||'',ingredient_id:matched?.cloud_id||'',qty:Number(row['Quantity']||0),unit:unit(row['Unit'])});
    if(!groups[name].instructions&&row['Instructions'])groups[name].instructions=String(row['Instructions']).trim();
   });
   recipeImport=Object.values(groups);
@@ -4138,7 +4154,7 @@ function confirmRecipeImport(){
  setArr(RECIPE_KEY,a);recipeImport=[];closeModal();openPage('Recipes');alert(`Recipe import complete: ${added} new · ${updated} updated`);
 }
 function viewRecipe(id){
- linkRecipeIngredients();const r=recipes().find(x=>x.id===id);if(!r)return;let miss=recipeMissing(r),m=ingredients();
+ linkRecipeIngredients();const r=recipes().find(x=>x.id===id);if(!r)return;let miss=recipeMissing(r),m=ingredients(),costInfo=recipeCostDetails(r);
  const chef=session==='production';
  if(chef){
   modal(`<div class="modalHead"><div><h2>${esc(r.name)}</h2><div class="muted">Approved Recipe · Exactly 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
@@ -4151,6 +4167,7 @@ function viewRecipe(id){
  modal(`<div class="modalHead"><div><h2>${esc(r.name)}</h2><div class="muted">Locked Master · Exactly 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
  <div class="grid" style="margin-top:18px"><div class="card"><span>1 BATCH COST</span><b>${recipeCostLabel(r)}</b></div><div class="card"><span>AUTO INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${recipeNeedsReview(r)?'Needs Review':'Approved'}</b></div></div>
  ${miss.length?`<div class="note bad"><b>Missing from Ingredient Master (${miss.length})</b><br>${miss.map(x=>esc(x)).join(' · ')}<br><small>KITCH links recipe ingredients to the Ingredient Master by SKU/ID. Only truly unmatched ingredients need review.</small></div>`:`<div class="note ok"><b>All ingredients matched.</b> Ingredient links are valid. Check that all ingredient prices are entered before Production.</div>`}
+ ${costInfo.missingPrices.length?`<div class="note bad"><b>Missing ingredient prices (${costInfo.missingPrices.length})</b><br>${[...new Set(costInfo.missingPrices)].map(esc).join(' · ')}<p>Enter actual purchase prices in Inventory → Edit. KITCH will calculate the recipe automatically.</p><button class="btn" onclick="closeModal();openPage('Inventory')">Open Ingredient Master</button></div>`:''}
  <table><tr><th>INGREDIENT</th><th>QTY / 1 BATCH</th><th>MASTER UNIT</th><th>UNIT COST</th></tr>${r.items.map(it=>{let x=ingredientForRecipeItem(it,m);return `<tr><td><b>${esc(it.ingredient)}</b>${x&&normIngName(x.name)!==normIngName(it.ingredient)?`<br><small>Linked to ${esc(x.name)} · ${esc(x.sku)}</small>`:''}</td><td>${it.qty} ${esc(it.unit)}</td><td>${x?esc(x.base_unit):'<span class="bad">Missing</span>'}</td><td>${x?(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost')?'AED '+(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost')).toFixed(2):'<span class="bad">Price missing</span>'):'—'}</td></tr>`}).join('')}</table>
  ${r.instructions?`<div class="note"><b>Instructions:</b> ${esc(r.instructions)}</div>`:''}</div>`)
 }
