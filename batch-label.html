@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>KITCH | Batch Label</title>
+<style>
+*{box-sizing:border-box}body{font:14px Arial,sans-serif;background:#f5f5f2;color:#181818;margin:0}.shell{max-width:780px;margin:45px auto;padding:24px}.card{background:white;border:1px solid #e5e5df;border-radius:18px;padding:25px}.logo{font-size:27px;color:#ff681d;font-weight:900}h1{margin:12px 0 4px}p{color:#666;line-height:1.5}label{font-weight:bold;display:block;margin:15px 0 7px}input{width:100%;border:1px solid #ddd;border-radius:10px;padding:12px;font:inherit}button{background:#191919;color:white;border:0;border-radius:10px;padding:12px 16px;cursor:pointer;margin:12px 8px 0 0}button:disabled{opacity:.5}.status{min-height:20px;color:#9a4c12}.label{width:70mm;min-height:32mm;padding:2mm 2.5mm;background:white;color:#111;border:1px solid #aaa;margin-top:22px;font:9pt Arial,sans-serif;overflow:hidden}.company{font-weight:800;font-size:11pt;border-bottom:1px solid #111;padding-bottom:1mm;margin-bottom:1mm;overflow-wrap:anywhere}.line{display:flex;justify-content:space-between;gap:8px;margin-top:1mm}.line span{overflow-wrap:anywhere}.footer{font-size:7pt;margin-top:1mm;color:#555}.hidden{display:none}
+@media print{@page{size:70mm 32mm;margin:0}body{background:white}.shell{padding:0;margin:0;max-width:none}.card{border:0;padding:0}.controls,h1,.logo,p{display:none!important}.label{margin:0;border:0;width:70mm;min-height:32mm;max-height:32mm;page-break-after:avoid}}
+</style></head><body><main class="shell"><div class="card"><div class="controls"><div class="logo">KITCH</div><h1>Production batch label</h1><p>Uses the restaurant name registered in KITCH. No custom branding or manual company name.</p><label for="batch">Batch ID</label><input id="batch" placeholder="Paste production batch UUID" autocomplete="off"><button id="load">Load batch</button><button id="print" disabled>Print 70 × 32 mm</button><p id="message" class="status" aria-live="polite"></p></div><section id="label" class="label hidden" aria-label="Print label"><div id="company" class="company"></div><div id="recipe" style="font-weight:700"></div><div class="line"><span>Batch: <b id="batchNo"></b></span><span id="count"></span></div><div class="line"><span>Produced: <b id="produced"></b></span><span id="yield"></span></div><div class="footer">Powered by KITCH</div></section></div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+'use strict';
+const client=window.supabase.createClient('https://rtovpjgrezwxuvantxgt.supabase.co','sb_publishable_ERMt86IhOTqRSRXE05CQ-A_JXi27ode',{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+const by=id=>document.getElementById(id),message=by('message'),btn=by('load');
+function dateFmt(s){if(!s)return '—';const d=new Date(s);return Number.isNaN(d.getTime())?'—':d.toLocaleString('en-GB',{timeZone:'Asia/Dubai',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+async function loadBatch(){
+  const id=by('batch').value.trim();
+  by('label').classList.add('hidden');by('print').disabled=true;
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){message.textContent='Enter a valid batch UUID.';return;}
+  btn.disabled=true;message.textContent='Loading batch…';
+  try{
+    const {data:{user},error:authError}=await client.auth.getUser();
+    if(authError||!user)throw new Error('Please sign in to KITCH first, then return here.');
+    const {data,error}=await client.from('kitch_batch_label_details').select('id,restaurant_id,restaurant_name,recipe_id,batch_no,batch_count,actual_finished_yield,yield_unit,produced_at').eq('id',id).maybeSingle();
+    if(error)throw error;
+    if(!data)throw new Error('Batch not found or you do not have access to its restaurant.');
+    let recipeName='Production batch';
+    if(data.recipe_id){
+      const recipe=await client.from('recipes').select('name').eq('id',data.recipe_id).eq('restaurant_id',data.restaurant_id).maybeSingle();
+      if(!recipe.error&&recipe.data?.name)recipeName=recipe.data.name;
+    }
+    by('company').textContent=data.restaurant_name||'Restaurant';
+    by('recipe').textContent=recipeName;
+    by('batchNo').textContent=data.batch_no||String(data.id).slice(0,8);
+    by('count').textContent=data.batch_count!=null?'Count: '+data.batch_count:'';
+    by('produced').textContent=dateFmt(data.produced_at);
+    by('yield').textContent=data.actual_finished_yield!=null?'Yield: '+data.actual_finished_yield+' '+(data.yield_unit||''):'';
+    by('label').classList.remove('hidden');by('print').disabled=false;message.textContent='Ready to print.';
+  }catch(e){message.textContent=e.message||'Unable to load batch.';}
+  finally{btn.disabled=false;}
+}
+by('load').addEventListener('click',loadBatch);by('print').addEventListener('click',()=>window.print());
+by('batch').addEventListener('keydown',e=>{if(e.key==='Enter')loadBatch();});
+const params=new URLSearchParams(location.search);const initial=params.get('batch_id');if(initial){by('batch').value=initial;loadBatch();}
+</script></body></html>
