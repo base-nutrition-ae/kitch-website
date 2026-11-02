@@ -1631,7 +1631,7 @@ let transferDispatchPhotoData='';
 // Stock units: never silently treat a box as a kilogram or litre.
 function stockTransferUnits(x){
  const base=unit(x.base_unit);
- const choices=base==='kg'||base==='g'?['kg']:base==='ltr'||base==='ml'?['ltr']:base==='pcs'?['pcs']:base==='box'?['box']:[];
+ const choices=base==='kg'||base==='g'?['kg','g']:base==='ltr'||base==='ml'?['ltr','ml']:base==='pcs'?['pcs']:base==='box'?['box']:[];
  const pack=Number(x.units_per_box||x.pieces_per_box||x.box_size||0);
  if(base==='pcs'&&pack>0)choices.push('box');
  return choices;
@@ -1709,10 +1709,10 @@ function sendStockRequest(id){
  <div class="formGrid">
   <div class="field"><label>ACTUAL SENT QTY *</label><input id="tsQty" type="number" min="0" step=".001" value="${Number(r.qty)}"></div>
   <div class="field"><label>UNIT</label><input value="${esc(r.unit)}" disabled></div>
-  <div class="field"><label>BATCH / LOT *</label><input id="tsBatch" placeholder="Batch or lot number"></div>
+  <div class="field"><label>INTERNAL DISPATCH BATCH *</label><input id="tsBatch" value="${esc('KITCH-'+String(r.id))}" title="Automatic KITCH dispatch reference. Enter the original supplier lot in notes for traceability."></div>
   <div class="field"><label>EXPIRY DATE *</label><input id="tsExpiry" type="date"></div>
   <div class="field"><label>DISPATCH TEMPERATURE °C</label><input id="tsTemp" type="number" step=".1" placeholder="e.g. 3.5"></div>
-  <div class="field"><label>NOTE</label><input id="tsNote" placeholder="Optional dispatch note"></div>
+  <div class="field"><label>NOTE / SUPPLIER LOT</label><input id="tsNote" placeholder="Original supplier lot or optional dispatch note"></div>
  </div>
  <label class="filePick"><b>DISPATCH PHOTO PROOF *</b><br><small>Attach a photo of the stock being sent.</small><input id="tsPhoto" type="file" accept="image/*" capture="environment" onchange="previewTransferDispatchPhoto(this.files[0])"><div id="tsPhotoPreview"></div></label>
  <button class="primary" onclick="confirmStockRequestDispatch(${r.id})">Send to Restaurant</button>`);
