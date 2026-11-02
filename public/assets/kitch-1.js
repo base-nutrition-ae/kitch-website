@@ -375,8 +375,8 @@ function contextStockCanonical(ing){
  return session==='store'?centralStockCanonical(ing):branchStockCanonical(ing);
 }
 const roles={
- owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
- manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
+ owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
+ manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
  store:{name:'Central Store Manager',label:'Central Store Manager',nav:['Inventory','Receiving','Expiry & Batches','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
  production:{name:'Production Staff',label:'Production Staff',nav:['Production','Recipes','Suppliers & Purchasing','Label','Notifications']}
 };
