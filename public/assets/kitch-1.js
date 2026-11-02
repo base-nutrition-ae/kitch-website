@@ -1603,11 +1603,11 @@ async function kitchRefreshStockRequests(){
  try{
   const rows=await kitchStockRpc('list',null);
   const previous=getArr(STOCK_REQUEST_KEY),byId=new Map(previous.filter(x=>x.cloud_saved).map(x=>[String(x.id),x]));
-  const branches=typeof allBranches==='function'?allBranches():[];
+  const branches=locations().filter(b=>b.type==='Branch'||b.type==='Central Store');
   const updated=(rows||[]).map(x=>{
    const prior=byId.get(String(x.id))||{};
    const ing=ingredients().find(i=>i.sku===x.sku);
-   const b=branches.find(b=>String(b.id)===String(x.branch_id));
+   const b=branches.find(b=>String(b.cloud_id||b.id)===String(x.branch_id));
    return {...prior,...x,id:Number(x.id),ref:'REQ-'+String(x.id).slice(-6),branch:b?.name||prior.branch||currentBranchName(),ingredient:ing?.name||x.sku,requested_by:prior.requested_by||'KITCH Team',cloud_saved:true,...(x.details||{})};
   });
   setArr(STOCK_REQUEST_KEY,updated);
