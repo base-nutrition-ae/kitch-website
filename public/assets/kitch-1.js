@@ -595,7 +595,7 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+function openPage(name){if(name==='Recipes'&&cloud?.user?.id&&cloud?.restaurant_id){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -1830,6 +1830,29 @@ function filterIngredients(){
 
 const RECIPE_KEY='kitch_demo_recipes_v1';
 function recipes(){return getArr(RECIPE_KEY)}
+
+const KITCH_RECIPE_SYNC_TABLE='kitch_recipe_sync';
+async function kitchLoadSyncedRecipes(){
+ if(!cloud?.restaurant_id||!cloud?.user?.id||!sb)return;
+ const {data,error}=await sb.from(KITCH_RECIPE_SYNC_TABLE).select('recipe_key,payload,updated_at').eq('restaurant_id',cloud.restaurant_id);
+ if(error){console.warn('KITCH recipe cloud read failed',error.message);return;}
+ if(!Array.isArray(data)||!data.length)return;
+ const local=recipes(),byId=new Map(local.map(r=>[String(r.id),r]));
+ for(const row of data){
+  if(!row.payload||!Array.isArray(row.payload.items))continue;
+  const incoming={...row.payload,id:row.payload.id??row.recipe_key};
+  const prior=byId.get(String(incoming.id));
+  if(!prior || String(incoming.updated_at||'')>String(prior.updated_at||''))byId.set(String(incoming.id),incoming);
+ }
+ setArr(RECIPE_KEY,[...byId.values()]);
+}
+async function kitchSaveSyncedRecipe(recipe){
+ if(!cloud?.restaurant_id||!cloud?.user?.id)throw Error('Sign in as Main Office with Supabase authentication to save shared recipes.');
+ const record={restaurant_id:cloud.restaurant_id,recipe_key:String(recipe.id),payload:recipe,updated_at:new Date().toISOString(),updated_by:cloud.user.id};
+ const {error}=await sb.from(KITCH_RECIPE_SYNC_TABLE).upsert(record,{onConflict:'restaurant_id,recipe_key'});
+ if(error)throw Error(error.message);
+}
+
 function normIngName(v){return String(v||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim()}
 function ingTokenKey(v){return normIngName(v).split(' ').filter(Boolean).sort().join(' ')}
 function editDistance(a,b){a=normIngName(a);b=normIngName(b);const dp=Array(b.length+1).fill(0).map((_,j)=>j);for(let i=1;i<=a.length;i++){let prev=dp[0];dp[0]=i;for(let j=1;j<=b.length;j++){const old=dp[j];dp[j]=Math.min(dp[j]+1,dp[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return dp[b.length]}
@@ -2042,7 +2065,7 @@ function previewYieldEdit(changed){
  const portions=Math.max(1,Number(document.getElementById('yieldPortions').value)||1);
  for(const [id,val] of [['sheetRaw',raw],['sheetPortion',raw/portions],['sheetNet',net],['sheetLoss',loss],['sheetFoot',net]])document.getElementById(id).textContent='AED '+val.toFixed(2);
 }
-function saveYieldEdit(){
+async function saveYieldEdit(){
  if(session!=='manager'&&session!=='owner')return;
  const all=recipes(),id=window._editingYieldRecipeId,recipe=all.find(r=>String(r.id)===String(id));if(!recipe)return;
  const rows=[...document.querySelectorAll('.yieldEditRow')];if(rows.length!==recipe.items.length)return alert('Reopen editor.');
@@ -2050,6 +2073,7 @@ function saveYieldEdit(){
  if(edits.some(e=>!(e.qty>0)||!(e.pct>0&&e.pct<=300)))return alert('Quantity must be positive and yield greater than 0% (maximum 300%).');
  const portions=Number(document.getElementById('yieldPortions').value);if(!Number.isInteger(portions)||portions<1)return alert('Portions must be a positive whole number.');
  recipe.items.forEach((it,i)=>{it.qty=edits[i].qty;it.yield_pct=edits[i].pct});recipe.portions=portions;recipe.selling_price=Number(document.getElementById('yieldSelling')?.value)||0;recipe.updated_at=new Date().toISOString();
+ try{await kitchSaveSyncedRecipe(recipe)}catch(err){alert('Cloud save failed: '+err.message+'\nNo recipe changes were saved.');return}
  setArr(RECIPE_KEY,all);
  const records=wasteRecords().filter(w=>!(w.type==='Preparation Yield Loss'&&String(w.recipe_id)===String(id)));
  recipe.items.forEach((it,i)=>{const cost=recipeIngredientCost(it),fraction=1-recipeYieldPercent(it)/100;if(cost===null||fraction<=0)return;
