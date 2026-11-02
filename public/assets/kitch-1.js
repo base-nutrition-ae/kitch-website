@@ -1699,17 +1699,26 @@ function previewTransferDispatchPhoto(file){
  transferDispatchPhotoData='';const p=document.getElementById('tsPhotoPreview');if(p)p.innerHTML='';
  if(!file)return;const rd=new FileReader();rd.onload=e=>{transferDispatchPhotoData=e.target.result;if(p)p.innerHTML=`<img src="${transferDispatchPhotoData}" style="display:block;max-width:180px;max-height:130px;margin-top:10px;border-radius:10px;object-fit:cover">`};rd.readAsDataURL(file);
 }
+function kitchCompanyDispatchBatch(requestId){
+ // Use the company name returned by the authenticated staff login, never KITCH's brand.
+ const company=String(currentStaff?.workspace_name||'').trim();
+ if(!company)return null;
+ const prefix=company.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24).replace(/-$/,'');
+ return prefix?prefix+'-'+String(requestId):null;
+}
 function sendStockRequest(id){
  if(session!=='store'||!centralStockReady())return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Accepted')return;
  let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
  const have=fromCanonical(centralStockCanonical(x),x.base_unit);
+ const generatedBatch=kitchCompanyDispatchBatch(r.id);
+ if(!generatedBatch)return alert('Company name is missing from your staff workspace. Sign in again before dispatching.');
  transferDispatchPhotoData='';
  modal(`<div class="modalHead"><div><div class="sub">CENTRAL STORE DISPATCH</div><h2>${esc(r.ref)} · ${esc(r.ingredient)}</h2></div><button class="close" onclick="closeModal()">×</button></div>
  <div class="note"><b>Requested by:</b> ${esc(r.branch)} · ${cleanQty(r.qty)} ${esc(r.unit)}<br><b>Central Store available:</b> ${cleanQty(have)} ${esc(x.base_unit)}</div>
  <div class="formGrid">
   <div class="field"><label>ACTUAL SENT QTY *</label><input id="tsQty" type="number" min="0" step=".001" value="${Number(r.qty)}"></div>
   <div class="field"><label>UNIT</label><input value="${esc(r.unit)}" disabled></div>
-  <div class="field"><label>INTERNAL DISPATCH BATCH *</label><input id="tsBatch" value="${esc('KITCH-'+String(r.id))}" title="Automatic KITCH dispatch reference. Enter the original supplier lot in notes for traceability."></div>
+  <div class="field"><label>INTERNAL DISPATCH BATCH *</label><input id="tsBatch" value="${esc(generatedBatch)}" title="Automatic company dispatch reference. Enter the original supplier lot in notes for traceability."></div>
   <div class="field"><label>EXPIRY DATE *</label><input id="tsExpiry" type="date"></div>
   <div class="field"><label>DISPATCH TEMPERATURE °C</label><input id="tsTemp" type="number" step=".1" placeholder="e.g. 3.5"></div>
   <div class="field"><label>NOTE / SUPPLIER LOT</label><input id="tsNote" placeholder="Original supplier lot or optional dispatch note"></div>
