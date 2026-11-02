@@ -2218,7 +2218,7 @@ function deductFEFO(sku,need){
  setArr(BATCH_KEY,batches);return {cost,used};
 }
 let kitchProductionSubmitting=false;
-function confirmProduction(){
+async function confirmProduction(){
  if(kitchProductionSubmitting)return;
  const r=recipes().find(x=>String(x.id)===String(prRecipe.value)),mult=Number(prBatches.value||0);
  if(!r||!Number.isFinite(mult)||mult<=0)return alert('Enter a valid number of batches.');
@@ -2231,9 +2231,25 @@ function confirmProduction(){
  for(const [sku,required] of totals){const ing=a.find(x=>x.sku===sku);if(!ing||productionStockCanonical(ing)+1e-9<required)return alert('Stock changed or insufficient for '+(ing?.name||sku)+'. Refresh and try again.');}
  kitchProductionSubmitting=true;
  try{
- for(const req of requirements){const ing=a.find(x=>x.sku===req.sku);if(hasCentralStore()){setBranchStockCanonical(ing,currentBranchId(),branchStockCanonical(ing)-req.canonical)}else{let have=productionStockCanonical(ing);ing.stock_canonical=have-req.canonical;ing.stock=fromCanonical(ing.stock_canonical,ing.base_unit);const fefo=deductFEFO(ing.sku,req.canonical);if(fefo&&fefo.used&&fefo.used.length){req.cost=fefo.cost;req.fefo_batches=fefo.used}}}saveIngredients(a);
- let runs=getArr(PROD_KEY),code='PRD-'+String(runs.length+1).padStart(5,'0'),productionCost=requirements.reduce((t,x)=>t+Number(x.cost||0),0);runs.push({id:Date.now(),code,recipe_id:r.id,recipe:r.name,batches:mult,requirements,production_cost:productionCost,location:hasCentralStore()?currentBranchName():primaryRestaurantName(),status:'In Production',created_by:currentActor(),staff_name:currentActor(),created_at:new Date().toISOString(),actual_yield:'',yield_unit:r.yield_unit||'kg'});setArr(PROD_KEY,runs);closeModal();openActualYield(runs[runs.length-1].id)
- }finally{kitchProductionSubmitting=false;}
+  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in with an authorized KITCH Team account to start cloud production.');
+  const requestId=crypto.randomUUID();
+  const {data,error}=await sb.rpc('kitch_team_start_production',{
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+   p_request_id:requestId,p_recipe_key:String(r.id),p_batches:mult
+  });
+  if(error)throw Error(error.message);
+  if(!data?.saved)throw Error('Cloud production confirmation was not returned.');
+  const runs=getArr(PROD_KEY),code='PRD-'+String(runs.length+1).padStart(5,'0'),
+        productionCost=requirements.reduce((t,x)=>t+Number(x.cost||0),0);
+  runs.push({id:Date.now(),cloud_request_id:requestId,code,recipe_id:r.id,recipe:r.name,batches:mult,requirements,
+   production_cost:productionCost,location:hasCentralStore()?currentBranchName():primaryRestaurantName(),
+   status:'In Production',created_by:currentActor(),staff_name:currentActor(),created_at:new Date().toISOString(),
+   actual_yield:'',yield_unit:r.yield_unit||'kg'});
+  setArr(PROD_KEY,runs);
+  await cloudLoadIngredients();
+  closeModal();openActualYield(runs[runs.length-1].id);
+ }catch(err){alert('Production not started: '+err.message+'\\nStock was not deducted by this failed request.');}
+ finally{kitchProductionSubmitting=false;}
 }
 function openActualYield(id){
  const x=getArr(PROD_KEY).find(p=>p.id===id);if(!x)return;
