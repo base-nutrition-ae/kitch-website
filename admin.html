@@ -153,7 +153,7 @@ function renderOverview(){
 async function loadOverview(){
  document.getElementById('loadState').textContent='Refreshing restaurant and trial details…';
  const [restaurantsResult,trialsResult,subscriptionsResult,membersResult]=await Promise.all([
-  client.from('restaurants').select('id,name,is_active,created_at').order('created_at',{ascending:false}).limit(500),
+  client.from('restaurants').select('id,name,is_active,created_at').eq('is_active',true).order('created_at',{ascending:false}).limit(500),
   client.from('kitch_restaurant_trials').select('restaurant_id,plan,status,trial_started_at,trial_ends_at').limit(500),
   client.from('kitch_subscriptions').select('user_id,plan,status,created_at').limit(500),
   client.from('restaurant_members').select('user_id,restaurant_id,is_active').limit(500)
