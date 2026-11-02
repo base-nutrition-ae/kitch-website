@@ -4,9 +4,9 @@ const $=id=>document.getElementById(id);
 const msg=s=>$('message').textContent=s;
 async function check(){
  const {data:{user}}=await sb.auth.getUser();
- if(!user){$('sign').classList.remove('hidden');$('activate').classList.add('hidden');return;}
+ if(!user){$('sign').classList.remove('hidden');$('activate').classList.add('hidden');msg('Sign in with the Business account you used at Stripe checkout.');return;}
  const {data:sub,error}=await sb.from('kitch_subscriptions').select('plan,status').eq('user_id',user.id).maybeSingle();
- if(error||!sub||!['active','trialing'].includes(sub.status)){msg('No verified active KITCH subscription found for this account. Do not make another payment. Contact KITCH support.');return;}
+ if(error||!sub||!['active','trialing'].includes(sub.status)){$('sign').classList.remove('hidden');$('activate').classList.add('hidden');msg('This signed-in account has no active subscription. Enter the email and password for your Business test account below. Do not pay again.');return;}
  const {data:workspace, error:we}=await sb.rpc('kitch_current_workspace');
  if(!we&&workspace&&((Array.isArray(workspace)&&workspace.length)||(!Array.isArray(workspace)&&workspace.restaurant_id))){msg('Your restaurant workspace is already connected. Open KITCH and sign in to Management.');$('sign').classList.add('hidden');return;}
  $('sign').classList.add('hidden');$('activate').classList.remove('hidden');
@@ -16,7 +16,7 @@ async function check(){
  $('branch').value=metadata.kitch_branch||'';
  msg('Authenticated as '+user.email+'. Enter the company and first branch exactly as you want them displayed.');
 }
-$('signBtn').onclick=async()=>{const email=$('email').value.trim(),password=$('password').value; if(!email||!password)return msg('Enter your KITCH account email and password.'); $('signBtn').disabled=true;try{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;await check();}catch(e){msg(e.message||String(e));}finally{$('signBtn').disabled=false;}};
+$('signBtn').onclick=async()=>{await sb.auth.signOut({scope:'local'});const email=$('email').value.trim(),password=$('password').value; if(!email||!password)return msg('Enter your KITCH account email and password.'); $('signBtn').disabled=true;try{const {error}=await sb.auth.signInWithPassword({email,password});if(error)throw error;await check();}catch(e){msg(e.message||String(e));}finally{$('signBtn').disabled=false;}};
 $('activateBtn').onclick=async()=>{const company=$('company').value.trim(),branch=$('branch').value.trim();if(company.length<2||branch.length<2)return msg('Enter restaurant and branch names (at least 2 characters).');$('activateBtn').disabled=true;try{const {data:sub,error:se}=await sb.from('kitch_subscriptions').select('plan,status').maybeSingle();if(se||!sub||!['active','trialing'].includes(sub.status))throw Error('Verified subscription not found.');const {error}=await sb.rpc('kitch_create_owner_workspace',{p_company:company,p_branch:branch,p_plan:sub.plan,p_operation:sub.plan==='business'?'multi':'restaurant'});if(error)throw error;msg('Workspace activated! Open KITCH and sign in with this account.');$('activate').classList.add('hidden');}catch(e){msg('Activation failed: '+(e.message||String(e)));}finally{$('activateBtn').disabled=false;}};
-$('signoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload()};check().catch(e=>msg(e.message||String(e)));
+$('signoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload()};$('sign').classList.remove('hidden');$('activate').classList.add('hidden');msg('Sign in below using your Business subscription account.');
 </script></body></html>
