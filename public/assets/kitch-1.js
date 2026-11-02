@@ -1912,12 +1912,13 @@ function recipeCostDetails(r){
  },0);
  return {total,missingPrices,missingIngredients,complete:!missingPrices.length&&!missingIngredients.length};
 }
+function recipeDisplayQty(q,u){const v=Number(q||0),n=unit(u)==='g'||unit(u)==='ml'||unit(u)==='pcs'?Number(v.toFixed(2)):Number(v.toFixed(3));return String(n)}
 function recipeYieldRows(r,showCost){
  const master=ingredients();
  return `<table><tr><th>INGREDIENT</th><th>RAW (AP)</th><th>YIELD %</th><th>USABLE / COOKED (EP)</th><th>AP / EP FACTOR</th>${showCost?'<th>SUPPLIER PRICE</th><th>RAW COST</th><th>NET VALUE</th><th>PREP LOSS</th>':''}</tr>${(r.items||[]).map(it=>{
   const x=ingredientForRecipeItem(it,master),pct=recipeYieldPercent(it),cost=recipeIngredientCost(it,master);
   const price=x?(kitchSupplierPrice(x,'latest_cost')||kitchSupplierPrice(x,'reference_cost')):0;
-  return `<tr><td><b>${esc(it.ingredient)}</b>${!x?'<small class="bad"> · Unmatched</small>':''}</td><td>${cleanQty(it.qty)} ${esc(it.unit)}</td><td>${pct}%</td><td><b>${cleanQty(recipeUsableQty(it))} ${esc(it.unit)}</b></td><td>${(100/pct).toFixed(3)}×</td>${showCost?`<td>${price>0?'AED '+price.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+cost.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+(cost*pct/100).toFixed(2):'—'}</td><td>${cost!==null?'AED '+Math.max(0,cost*(100-pct)/100).toFixed(2):'—'}</td>`:''}</tr>`
+  return `<tr><td><b>${esc(it.ingredient)}</b>${!x?'<small class="bad"> · Unmatched</small>':''}</td><td>${cleanQty(it.qty)} ${esc(it.unit)}</td><td>${pct}%</td><td><b>${recipeDisplayQty(recipeUsableQty(it),it.unit)} ${esc(it.unit)}</b></td><td>${(100/pct).toFixed(3)}×</td>${showCost?`<td>${price>0?'AED '+price.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+cost.toFixed(2):'<span class="bad">Missing</span>'}</td><td>${cost!==null?'AED '+(cost*pct/100).toFixed(2):'—'}</td><td>${cost!==null?'AED '+Math.max(0,cost*(100-pct)/100).toFixed(2):'—'}</td>`:''}</tr>`
  }).join('')}</table>`;
 }
 function recipeCost(r){return recipeCostDetails(r).total}
