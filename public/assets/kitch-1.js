@@ -2678,10 +2678,21 @@ function managementDashboard(){
  </div>`;
 }
 
+function kitchDubaiDay(value){
+ const d=value?new Date(value):new Date();
+ if(!Number.isFinite(d.getTime()))return String(value||'').slice(0,10);
+ return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Dubai',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+}
+let kitchDashboardWasteDate=kitchDubaiDay();
+function setKitchDashboardWasteDate(value){
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value||'')))return;
+ kitchDashboardWasteDate=value;
+ if(pageTitle?.textContent==='Dashboard')openPage('Dashboard');
+}
 function managerDashboard(){
  const loc=assignedLocationName(),ings=ingredients();
  const inv=ings.reduce((t,x)=>t+(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))*Number(x.cost||0),0);
- const wr=scopedRows(wasteRecords()).filter(x=>x.type!=='Stock Adjustment'),w=wr.filter(x=>x.type!=='Preparation Yield Loss').reduce((t,x)=>t+Number(x.cost||0),0),prepLossValue=wr.filter(x=>x.type==='Preparation Yield Loss').reduce((t,x)=>t+Math.max(0,Number(x.value_impact||0)),0);
+ const wasteDate=kitchDashboardWasteDate,wr=scopedRows(wasteRecords()).filter(x=>x.type!=='Stock Adjustment'&&kitchDubaiDay(x.created_at)===wasteDate),w=wr.filter(x=>x.type!=='Preparation Yield Loss').reduce((t,x)=>t+Number(x.cost||0),0),prepLossValue=wr.filter(x=>x.type==='Preparation Yield Loss').reduce((t,x)=>t+Math.max(0,Number(x.value_impact||0)),0);
  const counts=scopedRows(stockCounts()).filter(x=>x.status==='Completed');
  const varianceRows=counts.flatMap(c=>(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).map(i=>({...i,location:c.location})));
  let shortage=0,overage=0;varianceRows.forEach(i=>{const v=Number(i.variance_canonical||0),val=Math.abs(fromCanonical(v,i.unit)*Number(i.cost||0));if(v<0)shortage+=val;else overage+=val});
@@ -2693,7 +2704,7 @@ function managerDashboard(){
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">▦</span><small>INVENTORY VALUE</small><strong>${window.__kitchInventoryLoadError?'Unavailable':money(inv)}</strong><em>View current stock <span>↗</span></em></button>
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">◉</span><small>LOW / OUT OF STOCK</small><strong>${window.__kitchInventoryLoadError?'—':low}</strong><em>${window.__kitchInventoryLoadError?'Check inventory connection':(low?'Items need attention':'Stock levels healthy')} <span>↗</span></em></button>
  <button class="k26-metric" onclick="openPage('Production')"><span class="k26-metric-icon">▤</span><small>PRODUCTION RUNS</small><strong>${runs.length}</strong><em>Open production <span>↗</span></em></button>
- <button class="k26-metric" onclick="openPage('Waste & Adjustments')"><span class="k26-metric-icon">↘</span><small>ACTUAL WASTE COST</small><strong>${money(w)}</strong><em>Prep yield loss: ${money(prepLossValue)} · ${wr.length} events <span>↗</span></em></button></div>
+ <div class="k26-metric" style="cursor:default;display:flex;flex-direction:column;align-items:stretch;gap:3px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="k26-metric-icon">↘</span><label style="font-size:10px;font-weight:800;display:flex;align-items:center;gap:4px">DATE <input aria-label="Select waste report date" type="date" value="${esc(wasteDate)}" onchange="setKitchDashboardWasteDate(this.value)" style="width:126px;max-width:100%;font-size:12px;padding:5px;border:1px solid #ddd;border-radius:8px;background:white"></label></div><small>ACTUAL WASTE COST · SELECTED DAY</small><strong>${money(w)}</strong><div style="font-size:12px;margin-top:4px">Preparation yield loss: <b>${money(prepLossValue)}</b></div><div style="font-size:11px;color:#777">${wr.length} recorded events · No double stock deduction</div><button onclick="openPage('Waste & Adjustments')" style="align-self:flex-start;border:0;padding:5px 0;background:transparent;font-size:12px;cursor:pointer;color:inherit;font-weight:700">View Wastage ↗</button></div></div>
  <div class="k26-body">
  <section class="k26-panel k26-priority"><div class="k26-panel-top"><div><div class="k26-eyebrow">TODAY'S FOCUS</div><h3>Operations at a glance</h3></div><span class="k26-status">${window.__kitchInventoryLoadError?'STOCK DATA UNAVAILABLE':(low?'ATTENTION NEEDED':'ON TRACK')}</span></div>
  <div class="k26-priority-list">
