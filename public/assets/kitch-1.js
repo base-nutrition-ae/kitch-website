@@ -671,7 +671,7 @@ function startSubscription(plan){
 }
 const STRIPE_PAYMENT_LINKS={
  starter:'https://buy.stripe.com/test_fZueVd73MaYR26ocIr6Ri00',
- business:'https://buy.stripe.com/test_fZu5kDafY9UN9yQaAj6Ri01'
+ business:'https://buy.stripe.com/test_8x2fZh73M8QJ9yQ6k36Ri02'
 };
 
 async function testSubscriptionPayment(plan){
