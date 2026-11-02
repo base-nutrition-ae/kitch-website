@@ -16,4 +16,20 @@ for (const name of scripts) execFileSync(process.execPath,['--check',`public/ass
 if(!page.includes('assets/kitch-1.js')) throw new Error('Main app script missing');
 if(!fs.existsSync('office-source.html')) throw new Error('Main Office source is missing');
 if (!scripts.some(n => /const KITCH_OFFICE_EMBED\s*=\s*'[^']+'/.test(fs.readFileSync(`public/assets/${n}`,'utf8')))) throw new Error('Missing Main Office embed');
+
+const app=fs.readFileSync('public/assets/kitch-1.js','utf8');
+const releaseChecks=[
+ ['daily waste date control', 'Select waste report date'],
+ ['daily waste date handler', 'setKitchDashboardWasteDate'],
+ ['actual waste total', 'ACTUAL WASTE COST'],
+ ['preparation yield loss', 'PREPARATION YIELD LOSS'],
+ ['Supabase recipe sync', 'kitchSaveSyncedRecipe'],
+ ['recipe cloud reload', 'kitchLoadSyncedRecipes'],
+ ['editable cooked quantity', 'yieldCooked']
+];
+for(const [name,pattern] of releaseChecks){
+ if(!app.includes(pattern)) throw new Error('Missing KITCH release feature: '+name);
+}
+console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
+
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} local asset references, and Main Office embed.`);
