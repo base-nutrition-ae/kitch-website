@@ -493,8 +493,9 @@ async function teamLogin(){
   try{await Promise.race([syncTeamWorkspaceContext(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Workspace sync timed out')),8000))]);}
   catch(syncError){console.warn('Team workspace sync:',syncError);}
   const r=(role==='kitchen_manager'||role==='executive_chef')?'manager':((role==='store_manager'||role==='receiving_staff')?'store':'production');
-  enter(r);
   await cloudLoadIngredients();
+  await kitchLoadSyncedRecipes();
+  enter(r);
   openPage(roles[r].nav[0]);
  }catch(e){console.error('KITCH team login error',e);say('Unable to sign in: '+(e?.message||String(e)));}
  finally{if(button){button.disabled=false;button.textContent='Team sign in';}}
