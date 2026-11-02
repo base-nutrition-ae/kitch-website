@@ -595,7 +595,7 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+function openPage(name){if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -1592,6 +1592,29 @@ function confirmReceive(id){
 
 const STOCK_REQUEST_KEY='kitch_demo_stock_requests_v1';
 const TRANSFER_KEY='kitch_demo_transfers_v1';
+async function kitchStockRpc(action,r,qty=null,details={}){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in with your KITCH staff PIN.');
+ const args={p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_action:action,p_id:r?.id??null,p_sku:r?.sku??null,p_qty:qty??null,p_unit:r?.unit??null,p_details:details};
+ const {data,error}=await sb.rpc('kitch_team_stock_request',args);
+ if(error)throw Error(error.message);return data;
+}
+async function kitchRefreshStockRequests(){
+ if(!teamCloudAuth?.staff_name)return;
+ try{
+  const rows=await kitchStockRpc('list',null);
+  const previous=getArr(STOCK_REQUEST_KEY),byId=new Map(previous.filter(x=>x.cloud_saved).map(x=>[String(x.id),x]));
+  const branches=typeof allBranches==='function'?allBranches():[];
+  const updated=(rows||[]).map(x=>{
+   const prior=byId.get(String(x.id))||{};
+   const ing=ingredients().find(i=>i.sku===x.sku);
+   const b=branches.find(b=>String(b.id)===String(x.branch_id));
+   return {...prior,...x,id:Number(x.id),ref:'REQ-'+String(x.id).slice(-6),branch:b?.name||prior.branch||currentBranchName(),ingredient:ing?.name||x.sku,requested_by:prior.requested_by||'KITCH Team',cloud_saved:true,...(x.details||{})};
+  });
+  setArr(STOCK_REQUEST_KEY,updated);
+  if(pageTitle?.textContent==='Stock Requests')content.innerHTML=page('Stock Requests');
+ }catch(e){console.error('Stock requests sync',e);alert('Stock Requests cloud sync failed: '+e.message);}
+}
+
 let transferReceiptPhotoData='';
 let transferDispatchPhotoData='';
 
@@ -1651,14 +1674,15 @@ function openStockRequest(){
  modal(`<div class="modalHead"><h2>Request Stock</h2><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>From:</b> Central Store<br><b>To:</b> ${esc(branch.name)}</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="srIng" class="ingredientSelect" onchange="stockRequestIngredientChanged()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="srQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><select id="srUnit"></select></div></div><button class="primary" onclick="saveStockRequest()">Send Stock Request</button>`);stockRequestIngredientChanged();
 }
 function stockRequestIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('srIng')?.value),e=document.getElementById('srUnit');if(x&&e)e.innerHTML=stockTransferUnitOptions(x,stockTransferUnits(x)[0]);}
-function saveStockRequest(){
+async function saveStockRequest(){
  const sku=document.getElementById('srIng')?.value,x=ingredients().find(i=>i.sku===sku),q=Number(document.getElementById('srQty')?.value||0),u=document.getElementById('srUnit')?.value,branch=currentBranch();if(!x||stockTransferCanonical(q,u,x)===null)return alert('Enter a valid quantity and compatible unit.');if(!branch)return alert('Branch not found.');
- let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests');
+ let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});try{await kitchStockRpc('create',a[a.length-1],q)}catch(e){return alert('Cloud request failed: '+e.message)}a[a.length-1].cloud_saved=true;setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests');
 }
-function acceptStockRequest(id){
+async function acceptStockRequest(id){
  if(session!=='store'||!centralStockReady())return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Requested')return;
  const x=ingredients().find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
  const need=stockTransferCanonical(r.qty,r.unit,x),have=centralStockCanonical(x);if(need===null)return alert('This unit requires a valid Master List pack conversion.');if(need>have+1e-9)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,x.base_unit))} ${x.base_unit}`);
+ try{await kitchStockRpc('accept',r)}catch(e){return alert('Cloud approval failed: '+e.message)}
  r.status='Accepted';r.accepted_by=currentActor();r.accepted_at=new Date().toISOString();setArr(STOCK_REQUEST_KEY,req);openPage('Stock Requests');
 }
 function previewTransferDispatchPhoto(file){
@@ -1683,9 +1707,9 @@ function sendStockRequest(id){
  <label class="filePick"><b>DISPATCH PHOTO PROOF *</b><br><small>Attach a photo of the stock being sent.</small><input id="tsPhoto" type="file" accept="image/*" capture="environment" onchange="previewTransferDispatchPhoto(this.files[0])"><div id="tsPhotoPreview"></div></label>
  <button class="primary" onclick="confirmStockRequestDispatch(${r.id})">Send to Restaurant</button>`);
 }
-function confirmStockRequestDispatch(id){
+async function confirmStockRequestDispatch(id){
  if(session!=='store'||!centralStockReady())return;
- if(teamCloudAuth?.staff_name)return alert('Live stock dispatch is not yet connected to a secure Supabase transfer transaction. No inventory was changed.');
+
  let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Accepted')return;
  let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
  const q=Number(document.getElementById('tsQty')?.value||0),batch=(document.getElementById('tsBatch')?.value||'').trim(),
@@ -1697,7 +1721,8 @@ function confirmStockRequestDispatch(id){
  if(!transferDispatchPhotoData)return alert('Dispatch photo proof is required.');
  const need=stockTransferCanonical(q,r.unit,x),have=centralStockCanonical(x);if(need===null)return alert('Missing or incompatible Master List unit conversion.');
  if(need>have+1e-9)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,x.base_unit))} ${x.base_unit}`);
- x.stock_canonical=have-need;x.stock=fromCanonical(x.stock_canonical,x.base_unit);x.stock_location='Central Store';saveIngredients(a);
+ try{await kitchStockRpc('dispatch',r,q,{dispatch_batch:batch,dispatch_expiry:expiry,dispatch_temperature:temp,dispatch_note:note})}catch(e){return alert('Dispatch failed; no stock moved: '+e.message)}
+ await cloudLoadIngredients();
  const now=new Date().toISOString();
  Object.assign(r,{status:'In Transfer',sent_qty:q,sent_by:currentActor(),sent_at:now,fulfilled_by:currentActor(),fulfilled_at:now,
    dispatch_batch:batch,dispatch_expiry:expiry,dispatch_temperature:temp,dispatch_note:note,dispatch_photo:transferDispatchPhotoData});
@@ -1729,8 +1754,8 @@ function openTransferReceiving(id){
  <label class="filePick"><b>PHOTO PROOF *</b><br><small>Take or attach a photo of the stock received.</small><input id="trPhoto" type="file" accept="image/*" capture="environment" onchange="previewTransferReceiptPhoto(this.files[0])"><div id="trPhotoPreview"></div></label>
  <button class="primary" onclick="confirmTransferReceipt(${r.id})">Confirm Restaurant Receipt</button>`);
 }
-function confirmTransferReceipt(id){
- if(teamCloudAuth?.staff_name)return alert('Live stock receipt is not yet connected to a secure Supabase transaction. No inventory was changed.');
+async function confirmTransferReceipt(id){
+
  let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='In Transfer'||session!=='manager'||r.branch!==currentBranchName())return;
  const delivered=Number(document.getElementById('trDelivered')?.value||0),rejected=Number(document.getElementById('trRejected')?.value||0),sent=Number(r.sent_qty||r.qty),accepted=delivered-rejected;
  const temp=(document.getElementById('trTemp')?.value||'').trim(),tempCheck=document.getElementById('trTempCheck')?.value||'Not Checked',pack=document.getElementById('trPackaging')?.value||'Pass',quality=document.getElementById('trQuality')?.value||'Pass',note=(document.getElementById('trNote')?.value||'').trim();
@@ -1739,7 +1764,8 @@ function confirmTransferReceipt(id){
  const variance=delivered-sent,failed=tempCheck==='Fail'||pack==='Fail'||quality==='Fail'||rejected>0||Math.abs(variance)>.000001;
  if(failed&&!note)return alert('Add a note / reason for rejection, failed check or quantity variance.');
  let a=ingredients(),x=a.find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
- const acceptedCanonical=toCanonical(accepted,r.unit);setBranchStockCanonical(x,r.branch_id,branchStockCanonical(x,r.branch_id)+acceptedCanonical);saveIngredients(a);
+ try{await kitchStockRpc('receive',r,accepted,{receiving_temperature:temp,temperature_check:tempCheck,packaging_check:pack,quality_check:quality,receiving_note:note,delivered_qty:delivered,rejected_qty:rejected})}catch(e){return alert('Receipt failed; no stock added: '+e.message)}
+ await cloudLoadIngredients();
  const now=new Date().toISOString();Object.assign(r,{status:'Received',delivered_qty:delivered,rejected_qty:rejected,accepted_qty:accepted,transfer_variance_qty:variance,receiving_temperature:temp,temperature_check:tempCheck,packaging_check:pack,quality_check:quality,receiving_note:note,receiving_photo:transferReceiptPhotoData,received_by:currentActor(),received_at:now});setArr(STOCK_REQUEST_KEY,req);
  let tr=getArr(TRANSFER_KEY),t=tr.find(x=>x.request_id===r.id);if(t)Object.assign(t,{status:'Received',delivered_qty:delivered,rejected_qty:rejected,accepted_qty:accepted,variance_qty:variance,temperature:temp,temperature_check:tempCheck,packaging_check:pack,quality_check:quality,note,photo:transferReceiptPhotoData,received_by:currentActor(),received_at:now});setArr(TRANSFER_KEY,tr);
  let mv=getArr('kitch_demo_inventory_movements_v1');mv.push({id:Date.now(),type:'Central Store Transfer Received',sku:x.sku,ingredient:x.name,qty:accepted,unit:r.unit,location:r.branch,from:'Central Store',request:r.ref,staff:currentActor(),created_at:now});setArr('kitch_demo_inventory_movements_v1',mv);
@@ -2185,7 +2211,7 @@ function previewProduction(){
     <button class="primary" ${ok?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="confirmProduction()">Start ${cleanQty(mult)} Batch${mult===1?'':'es'}</button>`;
 }
 
-function requestProductionShortages(){
+async function requestProductionShortages(){
  if(!hasCentralStore()||session!=='manager')return;
  const r=recipes().find(x=>String(x.id)===String(document.getElementById('prRecipe')?.value)),mult=Number(document.getElementById('prBatches')?.value||0),m=ingredients(),branch=currentBranch();
  if(!r||mult<=0)return;
@@ -2201,6 +2227,11 @@ function requestProductionShortages(){
    created.push(`${ing.name}: ${cleanQty(qty)} ${ing.base_unit}`);
  }
  if(!created.length)return alert('No shortage to request.');
+ try{
+  for(const r of req.filter(x=>x.source==='Production Shortage'&&x.status==='Requested'&&!x.cloud_saved)){
+   await kitchStockRpc('create',r,Number(r.qty));r.cloud_saved=true;
+  }
+ }catch(e){return alert('Cloud request failed: '+e.message)}
  setArr(STOCK_REQUEST_KEY,req);closeModal();openPage('Stock Requests');alert('Stock request sent to Central Store for:\n'+created.join('\n'));
 }
 
