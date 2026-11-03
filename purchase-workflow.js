@@ -162,12 +162,23 @@ function installOffice(){
  section.innerHTML='<div class="hero"><div><h1>Purchasing Approvals</h1><p>Review kitchen requests, authorize orders and manage approved suppliers.</p></div><span class="tag">Main Office · Owner only</span></div><div id="officePurchaseContent" class="card">Open this tab to load purchasing records.</div>';
  const footer=app.querySelector('.footer');if(footer)footer.before(section);else app.querySelector('.content')?.appendChild(section);
  button.addEventListener('click',()=>{officeFrame.contentWindow.showPage('approvals');officeRefresh(officeFrame)});
- // Restore this page when Safari reopens, after authentication and owner scope load.
- const checker=setInterval(()=>{
-  if(!officeFrame.isConnected||!officeFrame.contentDocument?.getElementById('officePurchaseContent')){clearInterval(checker);return}
-  if(section.classList.contains('active')){clearInterval(checker);officeRefresh(officeFrame)}
- },1500);
- setTimeout(()=>clearInterval(checker),15000);
+ // Restore the purchasing tab after Safari refresh once Main Office owner access is loaded.
+ let checks=0;
+ const checker=setInterval(async()=>{
+  checks++;
+  if(checks>16||!officeFrame.isConnected||!officeFrame.contentDocument?.getElementById('officePurchaseContent')){clearInterval(checker);return;}
+  if(section.classList.contains('active')){clearInterval(checker);officeRefresh(officeFrame);return;}
+  if(!officeFrame.contentDocument.getElementById('officeApp')?.classList.contains('officeHidden')){
+   clearInterval(checker);
+   try{
+    const rid=await officeContext();
+    if(localStorage.getItem('kitch_office_lastpage_'+rid)==='approvals'){
+      officeFrame.contentWindow.showPage('approvals');
+      await officeRefresh(officeFrame);
+    }
+   }catch(e){console.warn('Purchasing tab restore:',e);}
+  }
+ },1000);
 }
 officeFrame.addEventListener('load',installOffice);
 if(officeFrame.contentDocument?.getElementById('officeApp'))installOffice();
