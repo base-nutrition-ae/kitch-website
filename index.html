@@ -2575,6 +2575,7 @@ async function managementLogin(){
  if(!ok){
   const {data:ownerMembership,error:ownerLookupError}=await sb.from('kitch_office_owners').select('restaurant_id').eq('user_id',loginData.user.id).eq('is_active',true).limit(1);
   if(!ownerLookupError&&ownerMembership?.length){closePublicModal();openKitchMainOffice();return;}
+  if(await openSubscribedWorkspaceSetup())return;
   return alert('This account has no accessible KITCH workspace. Please contact KITCH support to check the owner membership.');
  }
  restoreScopedStaff();await cloudLoadIngredients();await refreshStaffAccessFromCloud(false);currentStaff=null;closePublicModal();openKitchMainOffice();
@@ -5089,6 +5090,43 @@ async function completeStripeReturn(){
  return true;
 }
 
+async function openSubscribedWorkspaceSetup(){
+ const {data:{user}}=await sb.auth.getUser();
+ if(!user)return false;
+ const {data:sub,error}=await sb.from('kitch_subscriptions').select('plan,status').eq('user_id',user.id).maybeSingle();
+ if(error||!sub||!['active','trialing'].includes(String(sub.status||'').toLowerCase()))return false;
+ const pending=JSON.parse(sessionStorage.getItem('kitch_pending_subscription')||'null');
+ const ownPending=String(pending?.email||'').trim().toLowerCase()===String(user.email||'').trim().toLowerCase()?pending:null;
+ const company=ownPending?.company||user.user_metadata?.kitch_company||'';
+ const branch=ownPending?.branch||user.user_metadata?.kitch_branch||'';
+ window.__kitchSetupPlan=String(sub.plan||'').toLowerCase();
+ publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:20px"><b>KITCH</b><span>WORKSPACE SETUP</span></div><h2>Finish setting up your restaurant</h2><p class="muted">Your ${window.__kitchSetupPlan==='business'?'Business':'Starter'} subscription is connected. Add your restaurant details to enter KITCH. No additional payment.</p><div class="field"><label>RESTAURANT / COMPANY NAME</label><input id="kitchSetupCompany" maxlength="120"></div><div class="field"><label>FIRST BRANCH NAME</label><input id="kitchSetupBranch" maxlength="100" placeholder="e.g. Main Branch"></div><button class="primary" id="kitchSetupConfirm" onclick="completeSubscribedWorkspaceSetup()">Open my KITCH workspace</button><p id="kitchSetupError" style="color:#a54d11"></p>`);
+ document.getElementById('kitchSetupCompany').value=company;
+ document.getElementById('kitchSetupBranch').value=branch;
+ return true;
+}
+async function completeSubscribedWorkspaceSetup(){
+ const company=document.getElementById('kitchSetupCompany')?.value.trim(),branch=document.getElementById('kitchSetupBranch')?.value.trim();
+ if(!company||company.length<2||!branch||branch.length<2){document.getElementById('kitchSetupError').textContent='Enter a restaurant and branch name.';return;}
+ const btn=document.getElementById('kitchSetupConfirm');btn.disabled=true;
+ try{
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user)throw Error('Your login expired. Sign in again.');
+  const {data:sub,error:se}=await sb.from('kitch_subscriptions').select('plan,status').eq('user_id',user.id).maybeSingle();
+  if(se||!sub||!['active','trialing'].includes(String(sub.status||'').toLowerCase()))throw Error('An active KITCH subscription is required.');
+  const plan=String(sub.plan).toLowerCase();
+  const {error}=await sb.rpc('kitch_create_owner_workspace',{p_company:company,p_branch:branch,p_plan:plan,p_operation:plan==='business'?'multi':'restaurant'});
+  if(error)throw error;
+  cloud={restaurant_id:null,branch_id:null,workspace_code:null,user};
+  const ok=await loadCloudWorkspace();
+  if(!ok)throw Error('Workspace created but could not be opened. Try signing in again.');
+  sessionStorage.removeItem('kitch_pending_subscription');
+  await syncPackageFromCloud();await cloudLoadIngredients();
+  closePublicModal();openKitchMainOffice();
+ }catch(e){document.getElementById('kitchSetupError').textContent=e?.message||String(e);}
+ finally{if(btn.isConnected)btn.disabled=false;}
+}
+
 // LIVE CLIENT BOOT:
 // The cloud workspace is the source of truth. Never display old local demo
 // locations (Central Store / Main Branch / Base) before the signed-in client's
@@ -5128,6 +5166,7 @@ async function completeStripeReturn(){
     cloud.restaurant_id=null;cloud.branch_id=null;cloud.workspace_code=null;
     app.classList.add('hidden');
     login.classList.remove('hidden');
+    await openSubscribedWorkspaceSetup();
     return;
   }
 
