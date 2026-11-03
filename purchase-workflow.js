@@ -41,20 +41,10 @@ async function staffAct(action,extra){
  }catch(e){alert('Purchasing: '+e.message)}
 }
 window.kitchCloudRefresh=()=>staffRefresh(true);
-window.kitchCloudCreateRequest=()=>{
- const id=document.getElementById('cloudPrIngredient')?.value;
- const ing=staffCache?.ingredients?.find(x=>x.id===id);
- const qty=Number(document.getElementById('cloudPrQty')?.value);
- if(!ing||!Number.isFinite(qty)||qty<=0)return alert('Choose an ingredient and valid quantity.');
- staffAct('create',{p_ingredient_id:id,p_qty:qty,p_unit:ing.unit,p_notes:document.getElementById('cloudPrNotes')?.value||''});
-};
-window.kitchCloudMakeOrder=id=>{
- const supplier=document.getElementById('cloudSupplier_'+id)?.value;
- const text=document.getElementById('cloudPrice_'+id)?.value;
- const price=Number(text);
- if(!supplier||text===''||!Number.isFinite(price)||price<0)return alert('Choose an approved supplier and enter unit price.');
- staffAct('create_order',{p_request_id:id,p_supplier_id:supplier,p_price:price});
-};
+window.kitchAddLine=()=>{const root=document.querySelector('#cloudPurchaseItems .kitch-lines');if(!root)return;if(root.children.length>=50)return alert('Maximum 50 items');const line=root.firstElementChild.cloneNode(true);line.querySelector('select').value='';line.querySelector('input').value='';root.appendChild(line)};
+document.addEventListener('click',e=>{if(e.target.closest('#cloudPurchaseItems .kitch-remove')){const line=e.target.closest('.kitch-line');if(line.parentElement.children.length>1)line.remove()}});
+window.kitchCloudCreateRequest=()=>{try{const p_items=readItems(document.getElementById('cloudPurchaseItems'),staffCache?.ingredients||[]);staffAct('create',{p_items,p_notes:document.getElementById('cloudPrNotes')?.value||''})}catch(e){alert(e.message)}};
+window.kitchCloudMakeOrder=id=>{try{const p_supplier_id=document.getElementById('cloudSupplier_'+id)?.value;if(!p_supplier_id)throw Error('Choose approved supplier');const p_items=readPrices(document,id);staffAct('create_order',{p_request_id:id,p_supplier_id,p_items})}catch(e){alert(e.message)}};
 if(typeof roles!=='undefined' && roles.store && !roles.store.nav.includes('Suppliers & Purchasing')){
  roles.store.nav.splice(1,0,'Suppliers & Purchasing');
 }
