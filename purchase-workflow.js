@@ -6,7 +6,7 @@ const AED=v=>'AED '+Number(v||0).toLocaleString('en-AE',{minimumFractionDigits:2
 let staffCache=null,staffKey='',staffLoading=false,staffError='';
 const listOpt=(items,empty)=>'<option value="">'+E(empty)+'</option>'+items.map(x=>'<option value="'+E(x.id)+'">'+E(x.name)+(x.unit?' ('+E(x.unit)+')':'')+'</option>').join('');
 async function workflow(args){
- const {data,error}=await sb.rpc('kitch_purchase_workflow',args);
+ const {data,error}=await sb.rpc(args.p_items?'kitch_purchase_multi':'kitch_purchase_workflow',args);
  if(error)throw Error(error.message||'Unable to connect to purchasing');
  return data;
 }
