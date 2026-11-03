@@ -59,14 +59,17 @@ if(typeof purchasingPage==='function'){
   const reqs=d.requests||[],orders=d.orders||[],suppliers=d.suppliers||[],ingredients=d.ingredients||[];
   const ingredientSel=listOpt(ingredients,'Select ingredient');
   const supplierSel=listOpt(suppliers,'Approved supplier');
-  const reqRows=reqs.map(r=>{
-   const canMake=canPO&&r.status==='approved'&&!orders.some(o=>o.request_id===r.id&&o.status!=='cancelled');
-   const action=canMake?'<select id="cloudSupplier_'+E(r.id)+'">'+supplierSel+'</select> <input id="cloudPrice_'+E(r.id)+'" type="number" min="0" step="0.01" style="width:95px" placeholder="Unit AED"><button class="btn black" onclick="kitchCloudMakeOrder(\''+E(r.id)+'\')">Prepare PO</button>':'—';
-   return '<tr><td>'+E(r.request_no)+'</td><td>'+E(r.ingredient)+'</td><td>'+E(r.quantity)+' '+E(r.unit)+'</td><td>'+E(String(r.status).replaceAll('_',' '))+'</td><td>'+action+'</td></tr>';
+  const requestGroups=groupLines(reqs),orderGroups=groupLines(orders);
+  const reqRows=requestGroups.map(r=>{
+   const canMake=canPO&&r.status==='approved'&&!orderGroups.some(o=>o.request_id===r.id&&o.status!=='cancelled');
+   const action=canMake?'<select id="cloudSupplier_'+E(r.id)+'">'+supplierSel+'</select>'+priceFields(r)+
+    '<button class="btn black" data-create-po="'+E(r.id)+'">Prepare PO</button>':'—';
+   return '<tr><td>'+E(r.request_no)+'</td><td>'+r.lines.map(x=>E(x.ingredient)).join(', ')+'</td><td>'+
+     r.lines.map(x=>E(x.quantity)+' '+E(x.unit)).join(', ')+'</td><td>'+E(r.status)+'</td><td>'+action+'</td></tr>';
   }).join('');
-  const orderRows=orders.map(o=>'<tr><td>'+E(o.po_no)+'</td><td>'+E(o.supplier)+'</td><td>'+E(o.status)+'</td><td>'+AED(o.total)+'</td></tr>').join('');
+  const orderRows=orderGroups.map(o=>'<tr><td>'+E(o.po_no)+'</td><td>'+E(o.supplier)+'</td><td>'+E(o.status)+'</td><td>'+AED(o.lines.reduce((sum,x)=>sum+Number(x.total||0),0))+'</td></tr>').join('');
   return '<div class="panel"><h2>Cloud Purchasing</h2><p class="muted">Kitchen request → Main Office approval → Store Manager order → Store receiving. Purchase approvals never change inventory.</p><div class="actions"><button class="btn" onclick="kitchCloudRefresh()">Refresh from cloud</button></div>'+
-   (canReq?'<h3>Request Ingredients</h3><div class="actions"><select id="cloudPrIngredient">'+ingredientSel+'</select><input id="cloudPrQty" type="number" min="0.001" step="any" placeholder="Quantity in ingredient unit"><input id="cloudPrNotes" maxlength="300" placeholder="Notes (optional)"><button class="btn black" onclick="kitchCloudCreateRequest()">Submit Request</button></div>':'')+
+   (canReq?'<h3>Request Ingredients</h3><div id="cloudPurchaseItems">'+itemRows(ingredients)+'</div><div class="actions"><button class="btn" onclick="kitchAddLine()">+ Add ingredient</button><input id="cloudPrNotes" maxlength="300" placeholder="Notes (optional)"><button class="btn black" onclick="kitchCloudCreateRequest()">Submit all items</button></div>':'')+
    (canPO&&!suppliers.length?'<p class="note">No approved suppliers available. Ask Main Office to register a supplier before preparing an order.</p>':'')+
    '<h3>Purchase Requests</h3><div style="overflow:auto"><table><tr><th>Request</th><th>Ingredient</th><th>Quantity</th><th>Status</th><th>Action</th></tr>'+reqRows+'</table></div>'+
    '<h3>Purchase Orders</h3><div style="overflow:auto"><table><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Amount</th></tr>'+orderRows+'</table></div></div>';
