@@ -161,24 +161,45 @@ function installOffice(){
  const section=doc.createElement('section');section.className='section';section.id='approvals';
  section.innerHTML='<div class="hero"><div><h1>Purchasing Approvals</h1><p>Review kitchen requests, authorize orders and manage approved suppliers.</p></div><span class="tag">Main Office · Owner only</span></div><div id="officePurchaseContent" class="card">Open this tab to load purchasing records.</div>';
  const footer=app.querySelector('.footer');if(footer)footer.before(section);else app.querySelector('.content')?.appendChild(section);
- button.addEventListener('click',()=>{officeFrame.contentWindow.showPage('approvals');officeRefresh(officeFrame)});
- // Restore the purchasing tab after Safari refresh once Main Office owner access is loaded.
+ // The Main Office is embedded using iframe.srcdoc. Safari may throw on
+ // history.replaceState() in the original showPage(), after visually switching
+ // tabs but before the purchasing fetch runs. Switch the section directly.
+ function activatePurchasing(){
+  doc.querySelectorAll('.section').forEach(item=>item.classList.toggle('active',item.id==='approvals'));
+  doc.querySelectorAll('[data-page]').forEach(item=>item.classList.toggle('active',item.dataset.page==='approvals'));
+  try{if(officeRid)localStorage.setItem('kitch_office_lastpage_'+officeRid,'approvals');}catch(e){}
+  void officeRefresh(officeFrame);
+ }
+ button.addEventListener('click',activatePurchasing);
+ // Show a loading indicator rather than an inert placeholder.
+ const placeholder=doc.getElementById('officePurchaseContent');
+ if(placeholder)placeholder.textContent='Select Purchasing to load your company records.';
+ // Handle restored tabs, and also any tab activation performed by older code.
+ const tabObserver=new MutationObserver(()=>{
+  if(section.classList.contains('active')&&doc.getElementById('officePurchaseContent')?.textContent?.includes('Select Purchasing')){
+   void officeRefresh(officeFrame);
+  }
+ });
+ tabObserver.observe(section,{attributes:true,attributeFilter:['class']});
+ const onOwnerLoaded=async()=>{
+  if(!officeFrame.isConnected||!officeFrame.contentDocument?.getElementById('officePurchaseContent'))return;
+  if(doc.getElementById('officeApp')?.classList.contains('officeHidden'))return;
+  if(section.classList.contains('active')){void officeRefresh(officeFrame);return;}
+  try{
+   const rid=await officeContext();
+   if(localStorage.getItem('kitch_office_lastpage_'+rid)==='approvals')activatePurchasing();
+  }catch(e){console.warn('Purchasing tab restore:',e);}
+ };
  let checks=0;
- const checker=setInterval(async()=>{
+ const checker=setInterval(()=>{
   checks++;
-  if(checks>16||!officeFrame.isConnected||!officeFrame.contentDocument?.getElementById('officePurchaseContent')){clearInterval(checker);return;}
-  if(section.classList.contains('active')){clearInterval(checker);officeRefresh(officeFrame);return;}
-  if(!officeFrame.contentDocument.getElementById('officeApp')?.classList.contains('officeHidden')){
+  if(checks>=45||!officeFrame.isConnected){clearInterval(checker);return;}
+  if(!doc.getElementById('officeApp')?.classList.contains('officeHidden')){
    clearInterval(checker);
-   try{
-    const rid=await officeContext();
-    if(localStorage.getItem('kitch_office_lastpage_'+rid)==='approvals'){
-      officeFrame.contentWindow.showPage('approvals');
-      await officeRefresh(officeFrame);
-    }
-   }catch(e){console.warn('Purchasing tab restore:',e);}
+   void onOwnerLoaded();
   }
  },1000);
+ if(!doc.getElementById('officeApp')?.classList.contains('officeHidden'))void onOwnerLoaded();
 }
 officeFrame.addEventListener('load',installOffice);
 if(officeFrame.contentDocument?.getElementById('officeApp'))installOffice();
