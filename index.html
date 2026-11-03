@@ -2659,7 +2659,7 @@ async function teamLogin(){
 function enter(r){closePublicModal();session=r;login.classList.add('hidden');document.getElementById('publicLanding')?.classList.add('hidden');app.classList.remove('hidden');userName.textContent=currentStaff?.name||roles[r].name;userRole.textContent=(currentStaff?`${currentStaff.role} · ${currentStaff.location_name||locationName(currentStaff.location_id)}`:roles[r].label);userScope.textContent=currentStaff?.workspace_name||cloud.workspace_code||primaryRestaurantName();renderNav();openPage(roles[r].nav[0])}
 async function logout(){
  const ownerId=cloud.user?.id||localStorage.getItem('kitch_owner_active_id');
- if(ownerId)localStorage.removeItem('kitch_owner_signin_at_'+ownerId);
+ if(ownerId){localStorage.removeItem('kitch_owner_signin_at_'+ownerId);localStorage.removeItem('kitch_owner_page_'+ownerId);}
  localStorage.removeItem('kitch_owner_active_id');
  toggleAppMobileMenu(false);window.__kitchTeamLiveCatalog=null;window.__kitchTeamCatalogLoaded=false;window.__kitchTeamLiveStock=null;session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
 function renderNav(){
@@ -2756,7 +2756,7 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+function openPage(name){if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();if(session==='owner'&&cloud.user?.id)localStorage.setItem('kitch_owner_page_'+cloud.user.id,name);pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -5174,14 +5174,22 @@ async function completeSubscribedWorkspaceSetup(){
     if(activated)return;
   }
 
+  // Owners need the Main Office even if they also have a restaurant workspace.
+  // Check owner permission before the operational workspace fallback.
+  const ownerUser=cloud.user;
+  if(ownerUser?.id){
+    const {data:officeOwners,error:officeError}=await sb.from('kitch_office_owners')
+      .select('restaurant_id').eq('user_id',ownerUser.id).eq('is_active',true).limit(1);
+    if(!officeError&&officeOwners?.length){
+      app.classList.add('hidden');
+      login.classList.add('hidden');
+      openKitchMainOffice();
+      return;
+    }
+  }
   const workspaceOk=await loadCloudWorkspace();
   if(teamCloudAuth?.staff_name)return;
   if(!workspaceOk){
-    // Main Office owners may be assigned in kitch_office_owners without an
-    // operational workspace membership. Restore the owner dashboard on refresh.
-    const {data:officeOwners,error:officeError}=await sb.from('kitch_office_owners')
-      .select('restaurant_id').eq('user_id',cloud.user.id).eq('is_active',true).limit(1);
-    if(!officeError&&officeOwners?.length){openKitchMainOffice();return;}
     // Authenticated account without a workspace must not inherit another
     // customer's browser data.
     session=null;currentStaff=null;
@@ -5197,7 +5205,11 @@ async function completeSubscribedWorkspaceSetup(){
   ensureStructure();
   await cloudLoadIngredients();
   if(teamCloudAuth?.staff_name)return;
-  if(session && !app.classList.contains('hidden')) openPage(document.getElementById('pageTitle')?.textContent?.trim()||'Dashboard');
+  // Restore the restaurant dashboard instead of leaving a signed-in user on login.
+  if(!session||app.classList.contains('hidden'))enter('owner');
+  else openPage(document.getElementById('pageTitle')?.textContent?.trim()||'Dashboard');
+  const savedPage=localStorage.getItem('kitch_owner_page_'+cloud.user.id);
+  if(savedPage&&roles[session]?.nav.includes(savedPage))openPage(savedPage);
  }catch(e){
   console.warn('KITCH workspace restore:',e?.message||e);
   session=null;currentStaff=null;
