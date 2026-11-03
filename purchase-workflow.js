@@ -44,6 +44,7 @@ window.kitchCloudRefresh=()=>staffRefresh(true);
 window.kitchAddLine=()=>{const root=document.querySelector('#cloudPurchaseItems .kitch-lines');if(!root)return;if(root.children.length>=50)return alert('Maximum 50 items');const line=root.firstElementChild.cloneNode(true);line.querySelector('select').value='';line.querySelector('input').value='';root.appendChild(line)};
 document.addEventListener('click',e=>{if(e.target.closest('#cloudPurchaseItems .kitch-remove')){const line=e.target.closest('.kitch-line');if(line.parentElement.children.length>1)line.remove()}});
 window.kitchCloudCreateRequest=()=>{try{const p_items=readItems(document.getElementById('cloudPurchaseItems'),staffCache?.ingredients||[]);staffAct('create',{p_items,p_notes:document.getElementById('cloudPrNotes')?.value||''})}catch(e){alert(e.message)}};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-create-po]');if(b)window.kitchCloudMakeOrder(b.dataset.createPo)});
 window.kitchCloudMakeOrder=id=>{try{const p_supplier_id=document.getElementById('cloudSupplier_'+id)?.value;if(!p_supplier_id)throw Error('Choose approved supplier');const p_items=readPrices(document,id);staffAct('create_order',{p_request_id:id,p_supplier_id,p_items})}catch(e){alert(e.message)}};
 if(typeof roles!=='undefined' && roles.store && !roles.store.nav.includes('Suppliers & Purchasing')){
  roles.store.nav.splice(1,0,'Suppliers & Purchasing');
