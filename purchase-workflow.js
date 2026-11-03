@@ -127,6 +127,11 @@ function officeRender(frame){
  '<div class="split" style="margin-top:16px"><div class="card"><h2>Emergency Ingredient Request</h2><p class="subhead">Owner override, still requires approval before an order.</p><div class="purchase-fields"><label class="wide">Location <select id="officeReqBranch">'+listOpt(officeBranches,'Choose location')+'</select></label><div class="wide" id="officeRequestItems">'+itemRows(ingredients)+'</div><button class="btn wide" data-act="add_item" type="button">+ Add ingredient</button><label class="wide">Note <input id="officeReqNote" maxlength="300" placeholder="Reason"></label></div><button class="btn purchase-primary" data-act="create">Submit all ingredients</button></div>'+
  '<div class="card"><h2>Approved Suppliers</h2><p class="subhead">Register a supplier for Store Managers to use when preparing orders.</p><p class="purchase-supplier-empty">'+E(suppliers.map(x=>x.name).join(', ')||'No suppliers registered yet')+'</p><label>Supplier name <input id="officeNewSupplier" maxlength="120" style="width:100%" placeholder="Supplier / company"></label><button class="btn purchase-primary" data-act="add_supplier">Add supplier</button></div></div>'+
  '<div class="card" style="margin-top:16px"><h2>Purchase Orders</h2><table><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Commitment</th></tr>'+orders.map(o=>'<tr><td>'+E(o.po_no)+'</td><td>'+E(o.supplier)+'</td><td>'+E(o.status)+'</td><td>'+AED(o.lines.reduce((sum,x)=>sum+Number(x.total||0),0))+'</td></tr>').join('')+'</table></div>';
+ root.querySelector('#officeRequestItems')?.addEventListener('click',e=>{
+   const btn=e.target.closest('.kitch-remove');if(!btn)return;
+   const line=btn.closest('.kitch-line'),list=line?.parentElement;
+   if(list?.children.length>1)line.remove();
+ });
  root.querySelectorAll('[data-act]').forEach(button=>button.addEventListener('click',async()=>{
   const act=button.dataset.act,id=button.dataset.id;
   if(act==='refresh')return officeRefresh(frame);
@@ -147,10 +152,12 @@ function officeRender(frame){
     }catch(e){return alert(e.message)}
   }
   if(act==='create_order'){
-   const supplier=root.querySelector('#officeSupplier_'+id)?.value;
-   const inp=root.querySelector('#officePrice_'+id),price=Number(inp?.value);
-   if(!supplier||!inp?.value||!Number.isFinite(price)||price<0)return alert('Select approved supplier and unit price.');
-   return officeAction(frame,'create_order',{p_request_id:id,p_supplier_id:supplier,p_price:price});
+   try{
+    const p_supplier_id=root.querySelector('#officeSupplier_'+id)?.value;
+    if(!p_supplier_id)throw Error('Select approved supplier');
+    const p_items=readPrices(root,id);
+    return officeAction(frame,'create_order',{p_request_id:id,p_supplier_id,p_items});
+   }catch(e){return alert(e.message)}
   }
  }));
 }
