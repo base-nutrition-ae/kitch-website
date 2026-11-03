@@ -124,7 +124,7 @@ function officeRender(frame){
  }).join('');
  root.innerHTML='<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="card"><small>Pending approval</small><div class="number">'+pending+'</div></div><div class="card"><small>Requests</small><div class="number">'+reqs.length+'</div></div><div class="card"><small>Purchase orders</small><div class="number">'+orders.length+'</div></div></div>'+
  '<div class="card" style="margin-top:16px"><h2>Approve or Reject Requests</h2><p class="subhead">Requests are visible for your company only. Approval does not deduct or add stock.</p><div style="overflow:auto"><table><thead><tr><th>Request</th><th>Ingredient</th><th>Quantity</th><th>Status</th><th>Decision</th></tr></thead><tbody>'+row+'</tbody></table></div><button class="btn purchase-primary" data-act="refresh">Refresh</button></div>'+
- '<div class="split" style="margin-top:16px"><div class="card"><h2>Emergency Ingredient Request</h2><p class="subhead">Owner override, still requires approval before an order.</p><div class="purchase-fields"><label>Location <select id="officeReqBranch">'+listOpt(officeBranches,'Choose location')+'</select></label><label>Ingredient <select id="officeReqIngredient">'+listOpt(ingredients,'Choose ingredient')+'</select></label><label class="wide">Quantity <input id="officeReqQty" type="number" min="0.001" step="any" style="width:100%" placeholder="Quantity in ingredient unit"></label><label class="wide">Note <input id="officeReqNote" maxlength="300" style="width:100%" placeholder="Reason"></label></div><button class="btn purchase-primary" data-act="create">Submit emergency request</button></div>'+
+ '<div class="split" style="margin-top:16px"><div class="card"><h2>Emergency Ingredient Request</h2><p class="subhead">Owner override, still requires approval before an order.</p><div class="purchase-fields"><label class="wide">Location <select id="officeReqBranch">'+listOpt(officeBranches,'Choose location')+'</select></label><div class="wide" id="officeRequestItems">'+itemRows(ingredients)+'</div><button class="btn wide" data-act="add_item" type="button">+ Add ingredient</button><label class="wide">Note <input id="officeReqNote" maxlength="300" placeholder="Reason"></label></div><button class="btn purchase-primary" data-act="create">Submit all ingredients</button></div>'+
  '<div class="card"><h2>Approved Suppliers</h2><p class="subhead">Register a supplier for Store Managers to use when preparing orders.</p><p class="purchase-supplier-empty">'+E(suppliers.map(x=>x.name).join(', ')||'No suppliers registered yet')+'</p><label>Supplier name <input id="officeNewSupplier" maxlength="120" style="width:100%" placeholder="Supplier / company"></label><button class="btn purchase-primary" data-act="add_supplier">Add supplier</button></div></div>'+
  '<div class="card" style="margin-top:16px"><h2>Purchase Orders</h2><table><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Commitment</th></tr>'+orders.map(o=>'<tr><td>'+E(o.po_no)+'</td><td>'+E(o.supplier)+'</td><td>'+E(o.status)+'</td><td>'+AED(o.lines.reduce((sum,x)=>sum+Number(x.total||0),0))+'</td></tr>').join('')+'</table></div>';
  root.querySelectorAll('[data-act]').forEach(button=>button.addEventListener('click',async()=>{
@@ -133,11 +133,18 @@ function officeRender(frame){
   if(act==='approve')return officeAction(frame,'approve',{p_request_id:id});
   if(act==='reject'){const reason=prompt('Reason for rejection:');if(reason===null)return;return officeAction(frame,'reject',{p_request_id:id,p_notes:reason})}
   if(act==='add_supplier'){const name=root.querySelector('#officeNewSupplier')?.value.trim();if(!name)return alert('Enter supplier name.');return officeAction(frame,'add_supplier',{p_notes:name})}
+  if(act==='add_item'){
+    const lines=root.querySelector('#officeRequestItems .kitch-lines');
+    if(lines.children.length>=50)return alert('Maximum 50 ingredients');
+    const row=lines.firstElementChild.cloneNode(true);row.querySelector('select').value='';row.querySelector('input').value='';lines.appendChild(row);return;
+  }
   if(act==='create'){
-   const branch=root.querySelector('#officeReqBranch')?.value,ingid=root.querySelector('#officeReqIngredient')?.value;
-   const qty=Number(root.querySelector('#officeReqQty')?.value),ingredient=ingredients.find(x=>x.id===ingid);
-   if(!branch||!ingredient||!Number.isFinite(qty)||qty<=0)return alert('Select location, ingredient and quantity.');
-   return officeAction(frame,'create',{p_branch_id:branch,p_ingredient_id:ingid,p_qty:qty,p_unit:ingredient.unit,p_notes:root.querySelector('#officeReqNote')?.value||''});
+    try{
+      const p_branch_id=root.querySelector('#officeReqBranch')?.value;
+      if(!p_branch_id)throw Error('Select a location');
+      const p_items=readItems(root.querySelector('#officeRequestItems'),ingredients);
+      return officeAction(frame,'create',{p_branch_id,p_items,p_notes:root.querySelector('#officeReqNote')?.value||''});
+    }catch(e){return alert(e.message)}
   }
   if(act==='create_order'){
    const supplier=root.querySelector('#officeSupplier_'+id)?.value;
