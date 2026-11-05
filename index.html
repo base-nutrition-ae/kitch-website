@@ -5250,8 +5250,8 @@ let kitchOfficeDecodePromise=null;
 function prepareKitchOffice(){
  if(kitchOfficeDecodePromise)return kitchOfficeDecodePromise;
  kitchOfficeDecodePromise=new Promise((resolve,reject)=>{
-  const work=()=>{try{const binary=atob(KITCH_OFFICE_EMBED);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);resolve(new TextDecoder().decode(bytes))}catch(e){kitchOfficeDecodePromise=null;reject(e)}};
-  if('requestIdleCallback' in window)requestIdleCallback(work,{timeout:1200});else setTimeout(work,0);
+  const work=()=>{try{const binary=atob(KITCH_OFFICE_EMBED);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);const officeHtml=new TextDecoder().decode(bytes);const fix='<style id="kitch-office-full-width-20261105">'+"\n#officeApp.frame{max-width:none!important;width:100%!important;margin:0!important;padding:0!important;box-sizing:border-box!important}\n#officeApp>.app{width:100%!important;max-width:none!important;min-height:100vh!important;margin:0!important;border-radius:0!important;box-shadow:none!important}\n#officeApp .content{width:100%!important;max-width:none!important;min-width:0!important;box-sizing:border-box!important}\n#officeApp .header{box-sizing:border-box!important}\n#officeApp .section{width:100%;max-width:none;box-sizing:border-box}\n#officeApp .grid,#officeApp .split,#officeApp .lower{max-width:100%;min-width:0}\n@media(max-width:700px){#officeApp.frame{padding:0!important}#officeApp .content{padding-left:15px!important;padding-right:15px!important}}"+'</style>';resolve(officeHtml.replace('</head>',fix+'</head>'))}catch(e){kitchOfficeDecodePromise=null;reject(e)}};
+  work();
  });return kitchOfficeDecodePromise;
 }
 function openKitchMainOffice(){
@@ -5300,5 +5300,5 @@ window.addEventListener('message',function(event){
 });
 
 </script>
-<script src="./purchase-workflow.js?v=20261104-office-header-3"></script>
+<script src="./purchase-workflow.js?v=20261105-office-layout-4"></script>
 </body></html>
