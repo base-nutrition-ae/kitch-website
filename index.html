@@ -2086,6 +2086,56 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0;display:none}
 </style>
+<style id="kitch-recipe-modal-close-visibility-fix">
+/* Scope to Recipe Costing Sheet only: rise above sticky operations navigation. */
+#modal.kitchCostingModal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147482000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 16px !important;
+  overflow: hidden !important;
+}
+#modal.kitchCostingModal > .modalBox {
+  position: relative !important;
+  flex: 0 1 1530px;
+  width: min(1530px, 100%) !important;
+  max-height: calc(100dvh - 32px) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  padding-top: 20px !important;
+}
+#modal.kitchCostingModal .kitchRecipeSheet > .modalHead {
+  position: sticky !important;
+  top: -20px !important;
+  z-index: 20 !important;
+  background: #fff !important;
+  padding: 8px 0 12px !important;
+  margin-top: 0 !important;
+  border-bottom: 1px solid #eef0f3;
+}
+#modal.kitchCostingModal .kitchRecipeSheet .modalHead > .close {
+  position: relative !important;
+  inset: auto !important;
+  flex: 0 0 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  line-height: 1 !important;
+  font-size: 22px !important;
+  z-index: 21 !important;
+}
+@media (max-width: 700px) {
+  #modal.kitchCostingModal { padding: 8px !important; align-items: center !important; }
+  #modal.kitchCostingModal > .modalBox { max-height: calc(100dvh - 16px) !important; padding-top: 14px !important; border-radius: 16px !important; }
+  #modal.kitchCostingModal .kitchRecipeSheet > .modalHead { top: -14px !important; }
+}
+</style>
 </head>
 <body>
 
