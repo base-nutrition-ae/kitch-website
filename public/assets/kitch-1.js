@@ -2017,7 +2017,25 @@ function recipeYieldRows(r,showCost){
 }
 function recipeCost(r){return recipeCostDetails(r).total}
 function recipeCostLabel(r){const d=recipeCostDetails(r);return d.complete?'AED '+d.total.toFixed(2):'Price missing'}
-function recipeNeedsReview(r){const d=recipeCostDetails(r);return !d.complete}
+function recipeUnitIssues(r,master=ingredients()){
+ return (r.items||[]).flatMap(it=>{
+   const ing=ingredientForRecipeItem(it,master);
+   if(!ing)return [];
+   if(compatibleUnits(it.unit,ing.base_unit))return [];
+   return [{ingredient:ing.name,recipe_unit:unit(it.unit),master_unit:unit(ing.base_unit)}];
+ });
+}
+function recipeNeedsReview(r){
+ const d=recipeCostDetails(r);
+ return !d.complete||recipeUnitIssues(r).length>0;
+}
+function showRecipeUnitAudit(){
+ const affected=recipes().map(r=>({r,issues:recipeUnitIssues(r)})).filter(x=>x.issues.length);
+ const rows=affected.flatMap(({r,issues})=>issues.map(i=>'<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(i.ingredient)+'</td><td>'+esc(i.recipe_unit)+'</td><td>'+esc(i.master_unit)+'</td></tr>')).join('');
+ modal('<div class="modalHead"><div><div class="sub">RECIPE / MASTER UNIT AUDIT</div><h2>Unit compatibility review</h2></div><button class="close" onclick="closeModal()">×</button></div>'
+ +'<div class="note"><b>'+affected.length+' recipes need unit review.</b> '+affected.reduce((n,x)=>n+x.issues.length,0)+' mismatched ingredient lines. No inventory, recipe quantities, or costs were changed. Confirm conversion and historical stock before correcting master units.</div>'
+ +'<div style="overflow:auto;max-height:60vh"><table><tr><th>RECIPE</th><th>INGREDIENT</th><th>RECIPE UNIT</th><th>MASTER UNIT</th></tr>'+rows+'</table></div>');
+}
 
 function recipeMissing(r){
  const m=ingredients();return r.items.filter(it=>!ingredientForRecipeItem(it,m)).map(x=>x.ingredient)
@@ -2053,7 +2071,7 @@ function recipesPage(){
  }
  return `<div class="grid"><div class="card"><span>RECIPES</span><b>${a.length}</b></div><div class="card"><span>APPROVED</span><b>${a.filter(x=>!recipeNeedsReview(x)).length}</b></div><div class="card"><span>NEEDS REVIEW</span><b>${a.filter(x=>recipeNeedsReview(x)).length}</b></div><div class="card"><span>1 BATCH RULE</span><b>ON</b></div></div>
  <div class="panel"><h2>Recipe Master</h2><p class="muted">Chef defines ingredient quantities in kg/g/ltr/ml/pcs for exactly 1 Batch. KITCH converts units automatically and Production will deduct from the production location stock.</p>
- <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button>':''}</div>
+ <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button><button class="btn" onclick="showRecipeUnitAudit()">Review Unit Mismatches</button>':''}</div>
  <div class="note"><b>How to read:</b> Raw input = ingredients purchased for one batch. Raw food cost = amount spent on ingredients. Edible value = value after preparation yield. Click a recipe for its costing sheet.</div>
  <table><tr><th>RECIPE NAME</th><th>CATEGORY</th><th>INGREDIENTS</th><th>RAW INPUT / BATCH</th><th>FINISHED BATCH</th><th>PORTIONS</th><th>RAW COST / BATCH</th><th>EDIBLE VALUE</th><th>STATUS</th></tr>
  ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r),costInfo=recipeCostDetails(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${r.yield?cleanQty(r.yield)+' '+esc(r.yield_unit||'kg'):'<small class="muted">Not recorded</small>'}</td><td>${Number(r.portions||0)||'—'}</td><td><b>${recipeCostLabel(r)}</b><br><small>Supplier cost</small></td><td>${costInfo.complete?'AED '+recipeYieldValueDetails(r).usable.toFixed(2):'Price missing'}</td><td>${miss.length||costInfo.missingPrices.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length?miss.length+" unmatched":costInfo.missingPrices.length+" missing prices"} · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="9" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
@@ -2239,7 +2257,7 @@ function openQCProof(id){
 }
 
 function openProduction(){
- const a=recipes().filter(r=>!recipeMissing(r).length);if(!a.length)return alert('No approved recipes available.');
+ const a=recipes().filter(r=>!recipeNeedsReview(r));if(!a.length)return alert('No recipes pass ingredient and unit validation. Review the Recipe Master first.');
  modal(`<div class="modalHead"><h2>Start Production</h2><button class="close" onclick="closeModal()">×</button></div>
  <div class="formGrid"><div class="field"><label>APPROVED RECIPE</label><select id="prRecipe" onchange="previewProduction()">${a.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>NUMBER OF BATCHES</label><input id="prBatches" type="number" min="0.001" step="0.001" value="1" oninput="previewProduction()"></div></div>
  <div class="note"><b>Production Location:</b> ${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())} · Recipe quantities are multiplied by the number of batches.</div>
