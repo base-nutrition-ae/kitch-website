@@ -596,7 +596,7 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+function openPage(name){if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();if(name==='Dashboard'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchRefreshProductionDashboard();if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -2813,6 +2813,23 @@ function setKitchDashboardWasteDate(value){
  kitchDashboardWasteDate=value;
  if(pageTitle?.textContent==='Dashboard')openPage('Dashboard');
 }
+// Read-only branch production summary; never mutate inventory while refreshing a dashboard.
+let kitchCloudProductionSummary=null;
+let kitchCloudProductionFetchPending=false;
+async function kitchRefreshProductionDashboard(){
+ if(kitchCloudProductionFetchPending||!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!sb)return;
+ kitchCloudProductionFetchPending=true;
+ try{
+  const {data,error}=await sb.rpc('kitch_team_production_dashboard',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  if(error)throw error;
+  if(!data||!Number.isFinite(Number(data.stock_deducted_runs))||!Number.isFinite(Number(data.stock_usage_cost)))throw Error('Invalid cloud production summary');
+  kitchCloudProductionSummary={count:Number(data.stock_deducted_runs),cost:Number(data.stock_usage_cost),branch_id:data.branch_id};
+  if(pageTitle?.textContent==='Dashboard'&&session!=='owner')content.innerHTML=page('Dashboard');
+ }catch(err){
+  kitchCloudProductionSummary=null;
+  console.warn('Cloud production dashboard unavailable',err?.message||err);
+ }finally{kitchCloudProductionFetchPending=false;}
+}
 function managerDashboard(){
  const loc=assignedLocationName(),ings=ingredients();
  const inv=ings.reduce((t,x)=>t+(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))*Number(x.cost||0),0);
@@ -2820,21 +2837,21 @@ function managerDashboard(){
  const counts=scopedRows(stockCounts()).filter(x=>x.status==='Completed');
  const varianceRows=counts.flatMap(c=>(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).map(i=>({...i,location:c.location})));
  let shortage=0,overage=0;varianceRows.forEach(i=>{const v=Number(i.variance_canonical||0),val=Math.abs(fromCanonical(v,i.unit)*Number(i.cost||0));if(v<0)shortage+=val;else overage+=val});
- const runs=scopedRows(getArr(PROD_KEY)),productionValue=runs.reduce((total,run)=>total+Math.max(0,Number(run.production_cost||0)),0),low=ings.filter(x=>(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))<=Number(x.minimum||0)).length;
+ const runs=scopedRows(getArr(PROD_KEY)),cloudProduction=kitchCloudProductionSummary,displayProductionRuns=cloudProduction?String(cloudProduction.count):'—',productionValue=cloudProduction?money(cloudProduction.cost):'—',low=ings.filter(x=>(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))<=Number(x.minimum||0)).length;
  const openReq=session==='manager'?getArr(STOCK_REQUEST_KEY).filter(x=>x.branch===loc&&!['Received','Completed'].includes(x.status)).length:0;
  return `<div class="kitch2026-dashboard">
  <div class="k26-heading"><div><div class="k26-eyebrow">KITCH / OPERATIONS / ${esc(loc).toUpperCase()}</div><h2>Kitchen command center<span class="k26-orange">.</span></h2><p>Live stock, production and operational controls for your location.</p></div><div class="k26-date"><span class="k26-pulse"></span> LIVE WORKSPACE</div></div>
  <div class="k26-metrics">
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">▦</span><small>INVENTORY VALUE</small><strong>${window.__kitchInventoryLoadError?'Unavailable':money(inv)}</strong><em>View current stock <span>↗</span></em></button>
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">◉</span><small>LOW / OUT OF STOCK</small><strong>${window.__kitchInventoryLoadError?'—':low}</strong><em>${window.__kitchInventoryLoadError?'Check inventory connection':(low?'Items need attention':'Stock levels healthy')} <span>↗</span></em></button>
- <button class="k26-metric" onclick="openPage('Production')"><span class="k26-metric-icon">▤</span><small>PRODUCTION RUNS</small><strong>${runs.length}</strong><div style="font-size:12px;margin-top:5px;font-weight:700">PRODUCTION VALUE: ${money(productionValue)}</div><em>Open production <span>↗</span></em></button>
+ <button class="k26-metric" onclick="openPage('Production')"><span class="k26-metric-icon">▤</span><small>STOCK-DEDUCTED RUNS</small><strong>${displayProductionRuns}</strong><div style="font-size:12px;margin-top:5px;font-weight:700">STOCK USAGE COST: ${productionValue}</div><em>Open production <span>↗</span></em></button>
  <div class="k26-metric" style="cursor:default;display:flex;flex-direction:column;align-items:stretch;gap:3px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="k26-metric-icon">↘</span><label style="font-size:10px;font-weight:800;display:flex;align-items:center;gap:4px">DATE <input aria-label="Select waste report date" type="date" value="${esc(wasteDate)}" onchange="setKitchDashboardWasteDate(this.value)" style="width:126px;max-width:100%;font-size:12px;padding:5px;border:1px solid #ddd;border-radius:8px;background:white"></label></div><small>ACTUAL WASTE COST · SELECTED DAY</small><strong>${money(w)}</strong><div style="font-size:12px;margin-top:4px">Preparation yield loss: <b>${money(prepLossValue)}</b></div><div style="font-size:11px;color:#777">${wr.length} recorded events · No double stock deduction</div><button onclick="openPage('Waste & Adjustments')" style="align-self:flex-start;border:0;padding:5px 0;background:transparent;font-size:12px;cursor:pointer;color:inherit;font-weight:700">View Wastage ↗</button></div></div>
  <div class="k26-body">
  <section class="k26-panel k26-priority"><div class="k26-panel-top"><div><div class="k26-eyebrow">TODAY'S FOCUS</div><h3>Operations at a glance</h3></div><span class="k26-status">${window.__kitchInventoryLoadError?'STOCK DATA UNAVAILABLE':(low?'ATTENTION NEEDED':'ON TRACK')}</span></div>
  <div class="k26-priority-list">
  <button onclick="openPage('Inventory')"><span class="k26-number">01</span><span><b>Stock availability</b><small>${low} ingredients at or below minimum</small></span><span>↗</span></button>
  <button onclick="openPage('Stock Count')"><span class="k26-number">02</span><span><b>Stock reconciliation</b><small>${counts.length} completed counts · ${money(shortage+overage)} variance</small></span><span>↗</span></button>
- <button onclick="openPage('Production')"><span class="k26-number">03</span><span><b>Production tracking</b><small>${runs.length} production runs recorded</small></span><span>↗</span></button>
+ <button onclick="openPage('Production')"><span class="k26-number">03</span><span><b>Production tracking</b><small>${cloudProduction?displayProductionRuns+' cloud stock-deducted runs':'Cloud production count unavailable'}</small></span><span>↗</span></button>
  </div></section>
  <section class="k26-panel k26-control"><div class="k26-panel-top"><div><div class="k26-eyebrow">CONTROL CENTER</div><h3>Key indicators</h3></div></div>
  <div class="k26-indicator"><span>Stock variance</span><strong>${money(shortage+overage)}</strong></div>
