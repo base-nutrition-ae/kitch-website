@@ -213,7 +213,16 @@ async function cloudLoadIngredients(){
    // Render stock from this snapshot directly rather than depending on legacy
    // Starter/Business browser package flags or branch aliases.
    if(teamCloudAuth?.staff_name){
-     window.__kitchTeamLiveStock=new Map(matchingBalances.map(b=>[String(b.ingredient_id),{qty:toCanonical(Number(b.quantity_on_hand||0),b.unit),value:Number(b.quantity_on_hand||0)*Number(b.indicative_unit_cost||0)}]));
+     // Balance rows are per movement/source; aggregate all rows of the same ingredient.
+     // Map([...]) discarded earlier duplicate-key rows and underreported stock by AED 70.
+     const teamTotals=new Map();
+     matchingBalances.forEach(b=>{
+       const key=String(b.ingredient_id),prior=teamTotals.get(key)||{qty:0,value:0};
+       prior.qty+=toCanonical(Number(b.quantity_on_hand||0),b.unit);
+       prior.value+=Number(b.quantity_on_hand||0)*Number(b.indicative_unit_cost||0);
+       teamTotals.set(key,prior);
+     });
+     window.__kitchTeamLiveStock=teamTotals;
    }
    matchingBalances.forEach(b=>{
      const key=String(b.ingredient_id);
@@ -2832,12 +2841,13 @@ async function kitchRefreshProductionDashboard(){
 }
 function managerDashboard(){
  const loc=assignedLocationName(),ings=ingredients();
- const inv=ings.reduce((t,x)=>t+(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))*Number(x.cost||0),0);
+ // Use the same branch-scoped, cloud-valued stock calculation as Inventory.
+ const inv=ings.reduce((t,x)=>t+kitchStockValue(x),0);
  const wasteDate=kitchDashboardWasteDate,wr=scopedRows(wasteRecords()).filter(x=>x.type!=='Stock Adjustment'&&kitchDubaiDay(x.created_at)===wasteDate),w=wr.filter(x=>x.type!=='Preparation Yield Loss').reduce((t,x)=>t+Number(x.cost||0),0),prepLossValue=wr.filter(x=>x.type==='Preparation Yield Loss').reduce((t,x)=>t+Math.max(0,Number(x.value_impact||0)),0);
  const counts=scopedRows(stockCounts()).filter(x=>x.status==='Completed');
  const varianceRows=counts.flatMap(c=>(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).map(i=>({...i,location:c.location})));
  let shortage=0,overage=0;varianceRows.forEach(i=>{const v=Number(i.variance_canonical||0),val=Math.abs(fromCanonical(v,i.unit)*Number(i.cost||0));if(v<0)shortage+=val;else overage+=val});
- const runs=scopedRows(getArr(PROD_KEY)),cloudProduction=kitchCloudProductionSummary,displayProductionRuns=cloudProduction?String(cloudProduction.count):'—',productionValue=cloudProduction?money(cloudProduction.cost):'—',low=ings.filter(x=>(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))<=Number(x.minimum||0)).length;
+ const runs=scopedRows(getArr(PROD_KEY)),cloudProduction=kitchCloudProductionSummary,displayProductionRuns=cloudProduction?String(cloudProduction.count):'—',productionValue=cloudProduction?money(cloudProduction.cost):'—',low=ings.filter(x=>displayStock(x)<=Number(x.minimum||0)).length;
  const openReq=session==='manager'?getArr(STOCK_REQUEST_KEY).filter(x=>x.branch===loc&&!['Received','Completed'].includes(x.status)).length:0;
  return `<div class="kitch2026-dashboard">
  <div class="k26-heading"><div><div class="k26-eyebrow">KITCH / OPERATIONS / ${esc(loc).toUpperCase()}</div><h2>Kitchen command center<span class="k26-orange">.</span></h2><p>Live stock, production and operational controls for your location.</p></div><div class="k26-date"><span class="k26-pulse"></span> LIVE WORKSPACE</div></div>
