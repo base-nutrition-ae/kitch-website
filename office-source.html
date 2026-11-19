@@ -92,7 +92,7 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,#app::-webkit-scrollbar,.main::-
 </head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
 <section class="section active" id="overview">
 <div class="hero"><div><h1>Main Office Overview</h1><p>All your restaurant operations in one place.</p></div><span class="tag">Main Office · Owner View</span></div>
-<div class="note">Live data is shown where available. Production batches are read from Supabase; production stock deductions and costs are not yet connected. Purchasing remains device-local.</div>
+<div class="note">Live inventory and cloud-synced recipe counts are shown where available. Production stock deductions and costs come from the cloud ledger; final completion and purchasing are not yet fully cloud-connected.</div>
 <div class="overview-kpis">
 <div class="card"><small>Active Locations</small><div class="number">—</div><div class="foot">Unlimited locations · one subscription</div></div>
 <div class="card"><small>Active Staff</small><div class="number">—</div><div class="foot">Unlimited staff included</div></div>
@@ -157,9 +157,9 @@ async function loadOwner(){
  db.from('staff_access').select('id,staff_name,role,section,branch_id,is_active').eq('restaurant_id',rid),
  db.from('kitch_office_inventory_read').select('ingredient_id,quantity_on_hand,indicative_unit_cost,branch_id').eq('restaurant_id',rid),
  db.from('ingredients').select('id,name,minimum_stock,is_active').eq('restaurant_id',rid),
- db.from('recipes').select('id,name,status').eq('restaurant_id',rid),
+ db.rpc('kitch_owner_operations_summary'),
  db.from('kitch_receiving_entries').select('id,branch_id,delivered_qty,rejected_qty,unit_price,received_at,invoice_filename').eq('restaurant_id',rid).gte('received_at',new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString()),
- db.from('production_batches').select('id,branch_id,batch_no,batch_count,status,produced_at,produced_by').eq('restaurant_id',rid).gte('produced_at',new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString())
+ Promise.resolve({data:null,error:null}) // Production runs are summarized securely by owner RPC above
  ]);
  const errors=[r,b,staff,inventory,ings].filter(x=>x.error).map(x=>x.error.message);if(errors.length){setVisible(false);say('Data access needs attention: '+errors.join('; '));return;} if(recipes.error){setVisible(false);say('Recipe access needs attention: '+recipes.error.message);return;}
  setVisible(true);
@@ -169,21 +169,23 @@ async function loadOwner(){
  setKpi('Active Locations',String(branches.length).padStart(2,'0'));
  setKpi('Active Staff',String(team.length));
  setKpi('Inventory Value',money(val));
- // Approved recipes and monthly receiving movements are read live, never simulated.
- const approved=(recipes.data||[]).filter(x=>x.status==='active');
- setKpi('Active Recipes',String(approved.length));
+ // Count only actual cloud-synced recipes, not browser-local recipe drafts.
+ const ownerOps=(!recipes.error&&recipes.data&&typeof recipes.data==='object')?recipes.data:null;
+ setKpi('Active Recipes',ownerOps?String(Number(ownerOps.synced_recipe_count||0)):'—');
+ const recipeCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Active Recipes');
+ if(recipeCard){recipeCard.querySelector('small').textContent='Cloud-Synced Recipes';recipeCard.querySelector('.foot').textContent=ownerOps?'Saved in shared Supabase storage; local recipes may differ':'Cloud recipe summary unavailable';}
  // Use actual receiving records, not the legacy movement source filter.
  // A denied table read is shown as unavailable, never as a misleading zero.
  const receivingConnected=!receipts.error;
  const received=receivingConnected?(receipts.data||[]):[];
  const receivedValue=received.reduce((sum,x)=>sum+Math.max(0,Number(x.delivered_qty||0)-Number(x.rejected_qty||0))*Number(x.unit_price||0),0);
  setKpi('Receiving Entries',receivingConnected?String(received.length):'—');
- const productionConnected=!production.error;
- const productionRows=productionConnected?(production.data||[]):[];
- const completedProduction=productionRows.filter(x=>x.status==='completed');
- setKpi('Production Batches',productionConnected?String(completedProduction.length):'—');
+ const productionConnected=Boolean(ownerOps);
+ const productionRows=[]; // Completion is not represented by stock-deduction request logs.
+ const completedProduction=[];
+ setKpi('Production Batches',ownerOps?String(Number(ownerOps.production_runs_this_month||0)):'—');
  const productionCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Production Batches');
- if(productionCard)productionCard.querySelector('.foot').textContent=productionConnected?'Completed this month · Supabase':'Production access not connected';
+ if(productionCard){productionCard.querySelector('small').textContent='Production Stock Deductions';productionCard.querySelector('.foot').textContent=ownerOps?'Cloud ledger runs this month · completion not tracked':'Cloud production summary unavailable';}
  const receivingCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Receiving Entries');
  if(receivingCard)receivingCard.querySelector('.foot').textContent=receivingConnected?'Recorded deliveries this month':'Receiving access not connected';
 
@@ -196,7 +198,7 @@ async function loadOwner(){
  updateSummary('Stock on hand',String(bal.filter(x=>Number(x.quantity_on_hand)>0).length)+' stocked ingredient balances');
  updateSummary('Low-stock ingredients',String(lows.length));
  updateSummary('Receiving requiring review',receivingConnected?String(received.filter(x=>Number(x.rejected_qty||0)>0).length)+' with rejected quantity':'Not connected');
- updateSummary('Production cost this month','Not available · No batch cost field');
+ updateSummary('Production cost this month',ownerOps?money(Number(ownerOps.production_cost_this_month||0))+' · stock usage':'Not available');
  // Purchase orders are currently stored only in this browser's localStorage.
  // Show these records explicitly as device-local; never describe them as group-wide live data.
  let localOrders=[];
@@ -219,12 +221,12 @@ async function loadOwner(){
 
  // Receipts are real spending evidence, but not a complete purchasing ledger.
 
- const notes=el('overview').querySelector('.note');if(notes)notes.textContent='Live inventory, recipes and low-stock alerts are connected. '+(receivingConnected?'Receiving entries are now read from saved deliveries. ':'Receiving entries need owner read permission. ')+'Purchasing is shown from this browser only (not shared between devices). Production and billing remain unconnected.';
+ const notes=el('overview').querySelector('.note');if(notes)notes.textContent='Live inventory, recipes and low-stock alerts are connected. '+(receivingConnected?'Receiving entries are now read from saved deliveries. ':'Receiving entries need owner read permission. ')+'Purchasing is shown from this browser only (not shared between devices). Production stock usage is read from the cloud ledger; final production completion and billing are not yet cloud-connected.';
 
  const prodSummaryId='ownerProductionSummary';
  let prodSummary=el(prodSummaryId);
  if(!prodSummary){prodSummary=document.createElement('div');prodSummary.id=prodSummaryId;prodSummary.className='formrow';const target=el('overview').querySelector('.summary-rows');if(target)target.appendChild(prodSummary);}
- if(prodSummary)prodSummary.innerHTML='<span>Production batches in progress / review (Supabase)</span><strong>'+(productionConnected?String(productionRows.filter(x=>x.status!=='completed').length):'Not connected')+'</strong>';
+ if(prodSummary)prodSummary.innerHTML='<span>Production completion / review status</span><strong>Not yet cloud-tracked</strong>';
  const receiptSummaryId='ownerReceivingTotal';
  let receiptSummary=el(receiptSummaryId);
  if(!receiptSummary){receiptSummary=document.createElement('div');receiptSummary.id=receiptSummaryId;receiptSummary.className='formrow';const target=el('overview').querySelector('.summary-rows');if(target)target.appendChild(receiptSummary);}
@@ -232,7 +234,7 @@ async function loadOwner(){
  const locSection=el('locations');
  if(locSection)renderLocations();
 
- const locRows=el('overview').querySelector('.overview-scroll tbody');if(locRows)locRows.innerHTML=branches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+money(bal.filter(y=>y.branch_id===x.id).reduce((s,y)=>s+Number(y.quantity_on_hand||0)*Number(y.indicative_unit_cost||0),0))+'</td><td>—</td><td>'+(productionConnected?String(completedProduction.filter(y=>y.branch_id===x.id).length):'—')+'</td><td>Active</td></tr>').join('')||'<tr><td colspan="5">No locations</td></tr>';
+ const locRows=el('overview').querySelector('.overview-scroll tbody');if(locRows)locRows.innerHTML=branches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+money(bal.filter(y=>y.branch_id===x.id).reduce((s,y)=>s+Number(y.quantity_on_hand||0)*Number(y.indicative_unit_cost||0),0))+'</td><td>—</td><td>'+'—'+'</td><td>Active</td></tr>').join('')||'<tr><td colspan="5">No locations</td></tr>';
  const title=el('officeApp').querySelector('.profile');if(title)title.setAttribute('title',(r.data?.name||'KITCH')+' · '+user.email);
  const logout=document.createElement('button');logout.className='officeLogout';logout.textContent='Sign out';logout.onclick=async()=>{logout.disabled=true;try{const {error}=await db.auth.signOut({scope:'local'});if(error)throw error;setVisible(false);officeRid=null;officeIngredients=[];window.parent.postMessage({type:'KITCH_OFFICE_SIGNED_OUT'},'*');}catch(e){say('Sign out failed: '+e.message);}finally{logout.disabled=false;}};if(title&&!title.querySelector('.officeLogout'))title.appendChild(logout);
 }
