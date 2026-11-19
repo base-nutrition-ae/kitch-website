@@ -157,10 +157,13 @@
 .kitchInventory{width:100%;min-width:0;max-width:none}
 .kitchInventory>.panel{width:100%;max-width:none;min-width:0}
 .kitchInventory .inventoryTableWrap{display:block;width:100%!important;max-width:100%!important;min-width:0;overflow-x:auto!important;-webkit-overflow-scrolling:touch}
-.kitchInventory .inventoryTableWrap>table{width:100%!important;min-width:1040px!important;max-width:none!important;table-layout:auto}
+#app .kitchInventory .inventoryTableWrap>table{display:table!important;width:100%!important;min-width:1200px!important;max-width:none!important;table-layout:auto!important;border-collapse:collapse!important;overflow:visible!important}
+#app .kitchInventory .inventoryTableWrap>table>tbody{display:table-row-group!important;width:100%}
+#app .kitchInventory .inventoryTableWrap>table tr{display:table-row!important}
+#app .kitchInventory .inventoryTableWrap>table th,#app .kitchInventory .inventoryTableWrap>table td{display:table-cell!important}
 .kitchInventory .inventoryTableWrap th,.kitchInventory .inventoryTableWrap td{white-space:nowrap}
 .kitchInventory .inventoryTableWrap td:nth-child(2),.kitchInventory .inventoryTableWrap th:nth-child(2){min-width:155px}
-@media(max-width:750px){.kitchInventory .inventoryTableWrap>table{min-width:1040px!important}}
+@media(max-width:750px){#app .kitchInventory .inventoryTableWrap>table{min-width:1200px!important}}
 </style>
 </head>
 <body>
