@@ -173,7 +173,7 @@ async function loadOwner(){
  const ownerOps=(!recipes.error&&recipes.data&&typeof recipes.data==='object')?recipes.data:null;
  setKpi('Active Recipes',ownerOps?String(Number(ownerOps.synced_recipe_count||0)):'—');
  const recipeCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Active Recipes');
- if(recipeCard){recipeCard.querySelector('small').textContent='Cloud-Synced Recipes';recipeCard.querySelector('.foot').textContent=ownerOps?'Saved in shared Supabase storage; local recipes may differ':'Cloud recipe summary unavailable';}
+ if(recipeCard)recipeCard.querySelector('.foot').textContent=ownerOps?'Cloud-synced recipes; local recipes may differ':'Cloud recipe summary unavailable';
  // Use actual receiving records, not the legacy movement source filter.
  // A denied table read is shown as unavailable, never as a misleading zero.
  const receivingConnected=!receipts.error;
@@ -185,7 +185,7 @@ async function loadOwner(){
  const completedProduction=[];
  setKpi('Production Batches',ownerOps?String(Number(ownerOps.production_runs_this_month||0)):'—');
  const productionCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Production Batches');
- if(productionCard){productionCard.querySelector('small').textContent='Production Stock Deductions';productionCard.querySelector('.foot').textContent=ownerOps?'Cloud ledger runs this month · completion not tracked':'Cloud production summary unavailable';}
+ if(productionCard)productionCard.querySelector('.foot').textContent=ownerOps?'Stock-deducted runs this month · completion not tracked':'Cloud production summary unavailable';
  const receivingCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Receiving Entries');
  if(receivingCard)receivingCard.querySelector('.foot').textContent=receivingConnected?'Recorded deliveries this month':'Receiving access not connected';
 
