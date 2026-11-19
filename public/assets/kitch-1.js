@@ -1081,11 +1081,11 @@ function kitchStockValue(x){
 }
 function inventoryPage(){
  if(window.__kitchInventoryLoadError)return `<div class="note"><b>Live inventory unavailable:</b> ${esc(window.__kitchInventoryLoadError)}. No stock has been changed. Please check the browser console or access policy.</div>`;
- const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager'&&(!hasCentralStore()||!teamCloudAuth?.pin),storeMaster=hasCentralStore()&&session==='store';
+ const a=ingredients().slice().sort((x,y)=>x.name.localeCompare(y.name,undefined,{sensitivity:'base'})),manage=session==='manager',storeMaster=hasCentralStore()&&session==='store';
  const emptyStoreNotice=window.__kitchInventoryEmptyLocation?'<div class="note"><b>No saved stock for this location.</b> Import opening quantities using Upload / Import Excel, or record a delivery in Receiving.</div>':'';
- const rows=a.map(x=>{const qty=contextStockCanonical(x);const status=qty<=0?'OUT / NOT ENTERED':fromCanonical(qty,x.base_unit)<Number(x.minimum||0)?'LOW':'OK';const latest=Number(x.latest_cost)>0?x.latest_cost:x.reference_cost;const edit=(manage||storeMaster)?'<button class="btn" onclick="openEditIngredient(&quot;'+esc(x.sku)+'&quot;)">Edit</button>':'—';return `<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${kitchQuantityLabel(qty,x.base_unit)}</td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(latest,x.base_unit)}</td><td>AED ${kitchStockValue(x).toFixed(2)}</td><td>${esc(status)}</td><td>${edit}</td></tr>`;}).join('');
- return `<div class="kitchInventory">${emptyStoreNotice}<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>fromCanonical(contextStockCanonical(x),x.base_unit)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
- <div class="panel"><h2>Unified Company Ingredient Master & Location Inventory</h2><p class="muted">One shared ingredient catalog per company. Every location sees the same SKUs, units and suppliers, while quantities remain separate by location. Import the Master only from Main Office / Central Store. <b><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
+ const rows=a.map(x=>{const qty=contextStockCanonical(x);const status=qty<=0?'OUT / NOT ENTERED':fromCanonical(qty,x.base_unit)<Number(x.minimum||0)?'LOW':'OK';const latest=Number(x.latest_cost)>0?x.latest_cost:x.reference_cost;const edit=(manage||storeMaster)?'<button class="btn" onclick="openEditIngredient(decodeURIComponent(&quot;'+encodeURIComponent(String(x.cloud_id||x.name))+'&quot;))">Edit</button>':'—';return `<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${kitchQuantityLabel(qty,x.base_unit)}</td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(latest,x.base_unit)}</td><td>AED ${kitchStockValue(x).toFixed(2)}</td><td>${esc(status)}</td><td>${edit}</td></tr>`;}).join('');
+ return `<div class="kitchInventory"><div style="font-size:11px;color:#28734b;padding:4px 0 10px;font-weight:700">KITCH MAIN KITCHEN CONTROLS • VERIFIED INSTALL</div>${emptyStoreNotice}<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>LOW / OUT</span><b>${a.filter(x=>fromCanonical(contextStockCanonical(x),x.base_unit)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
+ <div class="panel"><h2>Unified Company Ingredient Master & Location Inventory</h2><p class="muted">One shared ingredient catalog per company. Every location sees the same SKUs, units and suppliers, while quantities remain separate by location. Kitchen managers can manage ingredients here. Changes are company-wide; stock stays location-specific. <b><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
  <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster)?'<button class="btn" onclick="openImport()">Upload / Import Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
  <div class="inventoryTableWrap"><table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>REFERENCE COST</th><th>LATEST COST</th><th>STOCK VALUE</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="12" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div></div></div>`;
@@ -1097,12 +1097,20 @@ function openBranchOpeningStock(){
  const a=sortedIngredients();if(!a.length)return alert('Import Ingredient Master first.');
  kitchOpeningRows=a.map(x=>({x,qty:fromCanonical(contextStockCanonical(x),x.base_unit),cost:Number(x.latest_cost||x.reference_cost||x.cost||0)}));
  modal(`<div class="modalHead"><div><div class="sub">BRANCH STOCK · CLOUD SAVE</div><h2>Restaurant Opening Stock</h2></div><button class="close" onclick="closeModal()">×</button></div>
- <div class="note"><b>${esc(currentBranchName())}</b> · Enter the existing stock for each ingredient, or upload an Excel file. Quantities are absolute opening balances (not added to existing stock). Saving writes to Supabase.</div>
- <label class="filePick"><b>Import Opening Stock Excel</b><div class="muted">Ingredient Name + Opening Stock + Opening Unit Cost AED (optional)</div><input type="file" accept=".xlsx,.xls,.csv" onchange="kitchOpeningExcel(this.files[0])" style="margin-top:12px;max-width:100%"></label>
+ <div class="note"><b>${esc(currentBranchName())}</b> · Update your actual opening stock. Quantities replace existing balances, not add to them.</div>
+ <div style="padding:20px;border:1px dashed #cacaca;border-radius:16px;text-align:center;background:#fafafa;margin:14px 0">
+   <b style="display:block;font-size:16px;margin-bottom:5px">Upload Opening Stock</b>
+   <div class="muted" style="margin-bottom:14px">Excel / CSV · Ingredient Name · Opening Stock · Opening Unit Cost AED (optional)</div>
+   <input id="kitchOpeningUpload" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="document.getElementById('kitchOpeningUploadLabel').textContent=this.files&&this.files[0]?this.files[0].name:'No file selected';kitchOpeningExcel(this.files[0])">
+   <button class="btn black" type="button" onclick="document.getElementById('kitchOpeningUpload').click()" style="background:#111;color:white;border-radius:999px;padding:12px 24px;font-weight:750">Upload Excel / CSV</button>
+   <div id="kitchOpeningUploadLabel" class="muted" style="margin-top:10px" aria-live="polite">No file selected</div>
+ </div>
  <div style="max-height:46vh;overflow:auto"><table><thead><tr><th>INGREDIENT</th><th>UNIT</th><th>OPENING QTY</th><th>UNIT COST AED</th></tr></thead><tbody id="kitchOpeningTable"></tbody></table></div>
- <div id="kitchOpeningStatus" class="note">Review quantities before saving.</div><button id="kitchOpeningSave" class="primary" onclick="saveBranchOpeningStock()">Save All Opening Stock to Cloud</button>`);
+ <div id="kitchOpeningStatus" class="note">Review quantities before saving. An existing authorized Main Office owner session is required; no password is entered in this form.</div>
+ <button id="kitchOpeningSave" class="primary" onclick="saveBranchOpeningStock()">Save All Opening Stock to Cloud</button>`);
  kitchRenderOpeningRows();
 }
+
 function kitchRenderOpeningRows(){
  const body=document.getElementById('kitchOpeningTable');if(!body)return;
  body.innerHTML=kitchOpeningRows.map((r,i)=>`<tr><td><b>${esc(r.x.name)}</b></td><td>${esc(r.x.base_unit)}</td><td><input aria-label="Opening quantity ${esc(r.x.name)}" type="number" min="0" step="any" value="${r.qty}" oninput="kitchOpeningRows[${i}].qty=Number(this.value)" style="width:115px;padding:9px;border:1px solid #ddd;border-radius:9px"></td><td><input aria-label="Opening cost ${esc(r.x.name)}" type="number" min="0" step="any" value="${r.cost}" oninput="kitchOpeningRows[${i}].cost=Number(this.value)" style="width:115px;padding:9px;border:1px solid #ddd;border-radius:9px"></td></tr>`).join('');
@@ -1128,28 +1136,42 @@ async function kitchOpeningExcel(file){
 async function saveBranchOpeningStock(){
  const btn=document.getElementById('kitchOpeningSave'),status=document.getElementById('kitchOpeningStatus');
  if(!btn||btn.disabled)return;
- if(kitchOpeningRows.some(r=>!Number.isFinite(r.qty)||r.qty<0||!Number.isFinite(r.cost)||r.cost<0))return alert('Opening quantities and costs must be valid nonnegative numbers.');
- if(!confirm('Replace opening balances for '+currentBranchName()+' with '+kitchOpeningRows.length+' ingredient quantities?'))return;
+ const rows=kitchOpeningRows.map(r=>({ingredient_id:r.x.cloud_id,unit:r.x.base_unit,quantity:Number(r.qty),cost:Number(r.cost)}));
+ if(rows.some(r=>!r.ingredient_id||!Number.isFinite(r.quantity)||r.quantity<0||!Number.isFinite(r.cost)||r.cost<0)){
+  status.textContent='Missing ingredient ID or invalid quantity/cost. No stock was changed.';return;
+ }
+ const nonzero=rows.filter(r=>r.quantity>0).length;
+ if(!confirm('Replace '+rows.length+' opening balances for '+currentBranchName()+'? '+nonzero+' ingredients have quantities above zero. All others will be set to zero.'))return;
  btn.disabled=true;btn.textContent='Saving to cloud…';
  try{
-  if(teamCloudAuth?.pin)throw Error('Opening stock requires the authenticated Main Office owner login, not a staff PIN.');
-  if(!cloud.restaurant_id||!cloud.branch_id){if(!await ensureCloudWorkspace())throw Error('Sign in as the owner again.');}
-  const branchId=currentBranch()?.cloud_id||cloud.branch_id;
-  const rows=kitchOpeningRows.map(r=>{
-   if(!r.x.cloud_id)throw Error('Missing cloud ingredient ID: '+r.x.name);
-   return {ingredient_id:r.x.cloud_id,unit:r.x.base_unit,quantity:r.qty,cost:r.cost};
-  });
-  const {data,error}=await sb.rpc('kitch_save_opening_stock',{p_restaurant_id:cloud.restaurant_id,p_branch_id:branchId,p_rows:rows});
-  if(error)throw Error(error.message||'Opening stock save failed');
-  if(Number(data)!==rows.length)throw Error('Only '+data+' of '+rows.length+' balances were saved.');
-  await cloudLoadIngredients();
-  if(window.__kitchInventoryLoadError)throw Error('Saved, but reload failed: '+window.__kitchInventoryLoadError);
-  const {data:verified,error:verifyError}=await sb.from('inventory_balances').select('ingredient_id,quantity_on_hand').eq('restaurant_id',cloud.restaurant_id).eq('branch_id',branchId);
-  if(verifyError)throw Error('Saved but readback permission failed: '+verifyError.message);
-  const byId=new Map((verified||[]).map(x=>[String(x.ingredient_id),Number(x.quantity_on_hand)]));
-  for(const r of rows){if(Math.abs((byId.get(String(r.ingredient_id))??NaN)-r.quantity)>0.000001)throw Error('Cloud verification failed for '+r.ingredient_id);}
+  if(!sb)throw Error('Supabase is unavailable. Check your connection.');
+  let verify=[];
+  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+   const args={p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_rows:rows};
+   const result=await sb.rpc('kitch_team_save_opening_stock',args);
+   if(result.error)throw Error(result.error.message||'Staff opening stock save failed');
+   if(Number(result.data)!==rows.length)throw Error('Only '+result.data+' of '+rows.length+' rows were saved');
+   const read=await sb.rpc('kitch_team_inventory_read',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+   if(read.error)throw Error('Saved, but readback failed: '+read.error.message);
+   verify=read.data?.balances||[];
+  }else{
+   if(!cloud?.restaurant_id||!cloud?.branch_id){if(!await ensureCloudWorkspace())throw Error('Sign in as Main Office owner to save opening stock.');}
+   const branchId=currentBranch()?.cloud_id||cloud.branch_id;
+   const result=await sb.rpc('kitch_save_opening_stock',{p_restaurant_id:cloud.restaurant_id,p_branch_id:branchId,p_rows:rows});
+   if(result.error)throw Error(result.error.message||'Owner opening stock save failed');
+   if(Number(result.data)!==rows.length)throw Error('Only '+result.data+' of '+rows.length+' rows were saved');
+   const read=await sb.from('inventory_balances').select('ingredient_id,quantity_on_hand').eq('restaurant_id',cloud.restaurant_id).eq('branch_id',branchId);
+   if(read.error)throw Error('Saved, but readback failed: '+read.error.message);
+   verify=read.data||[];
+  }
+  const byId=new Map(verify.map(v=>[String(v.ingredient_id),Number(v.quantity_on_hand)]));
+  // The inventory_balances view omits an ingredient with no movements. Treat it as zero.
+  for(const r of rows){const actual=byId.get(String(r.ingredient_id))??0;
+   if(!Number.isFinite(actual)||Math.abs(actual-r.quantity)>0.000001)throw Error('Cloud quantity mismatch for '+r.ingredient_id+': expected '+r.quantity+', found '+actual);
+  }
+  try{await cloudLoadIngredients()}catch(e){console.warn('KITCH inventory refresh:',e)}
   closeModal();openPage('Inventory');alert('Opening stock saved and verified for '+rows.length+' ingredients.');
- }catch(e){status.textContent='Opening stock was not fully verified: '+e.message;console.error('Opening stock save',e)}
+ }catch(e){status.textContent='Opening stock save not verified: '+(e?.message||e);console.error('Opening stock save',e)}
  finally{btn.disabled=false;btn.textContent='Save All Opening Stock to Cloud';}
 }
 
@@ -1171,7 +1193,7 @@ function closeModal(){
  window.scrollTo(0,__kitchModalScrollY||0);
 }
 function openIngredient(){
- if(hasCentralStore()&&session==='manager'&&teamCloudAuth?.pin)return alert('Company Ingredient Master is managed from Main Office / Central Store. Branch teams can receive and request stock but cannot change the shared catalog.');
+ /* Authorized staff writes checked by Supabase RPC. */
  if(session!=='manager' && !(session==='store'&&hasCentralStore()))return;
  modal(`<div class="modalHead"><h2>Add Ingredient</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid">
  <div class="field"><label>INGREDIENT NAME</label><input id="iName"></div><div class="field"><label>CATEGORY</label><input id="iCat"></div><div class="field"><label>DEFAULT SUPPLIER</label><input id="iSupplier" placeholder="Supplier name"></div>
@@ -1182,17 +1204,29 @@ function openIngredient(){
  <div class="note">Current stock starts at 0. Stock will increase later through Receiving.</div><button class="primary" onclick="saveIngredient()">Create Ingredient</button>`);
 }
 async function saveIngredient(){
- if(hasCentralStore()&&teamCloudAuth?.pin&&session!=='store')return alert('Only Main Office / Central Store can change the shared Master.');
+ /* Authorized staff writes checked by Supabase RPC. */
  const name=iName.value.trim();if(!name)return alert('Enter ingredient name.');
  let a=ingredients();if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert('This ingredient already exists.');
  let x={sku:'ING-'+String(a.length+1).padStart(3,'0'),name,category:iCat.value.trim(),supplier:iSupplier.value.trim(),receiving_type:iReceivingType.value||'Room Temperature',base_unit:iUnit.value,cost:Number(iCost.value||0),reference_cost:Number(iCost.value||0),latest_cost:Number(iCost.value||0),par:Number(iPar.value||0),minimum:Number(iMin.value||0),stock:0,stock_canonical:0,stock_location:stockLocation()};
  try{await cloudUpsertIngredient(x);a.push(x);saveIngredients(a);await cloudLoadIngredients();closeModal();openPage('Inventory')}catch(e){alert('KITCH Cloud: '+e.message)}
 }
 function openEditIngredient(sku){
- const x=ingredients().find(i=>i.sku===sku);if(!x)return;
- modal(`<div class="modalHead"><h2>Edit Ingredient</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid"><div class="field"><label>INGREDIENT</label><input id="eiName" value="${esc(x.name)}"></div><div class="field"><label>DEFAULT SUPPLIER</label><input id="eiSupplier" value="${esc(x.supplier||'')}" placeholder="Supplier name"></div><div class="field"><label>RECEIVING TYPE</label><select id="eiReceivingType"><option ${receivingTypeLabel(x.receiving_type)==='Room Temperature'?'selected':''}>Room Temperature</option><option ${receivingTypeLabel(x.receiving_type)==='Chilled'?'selected':''}>Chilled</option><option ${receivingTypeLabel(x.receiving_type)==='Frozen'?'selected':''}>Frozen</option></select></div><div class="field"><label>REFERENCE COST AED</label><input id="eiCost" type="number" min="0" step=".01" value="${Number(x.reference_cost!=null?x.reference_cost:x.cost||0).toFixed(2)}"></div><div class="field"><label>PAR TARGET</label><input id="eiPar" type="number" min="0" step=".01" value="${Number(x.par||0)}"></div><div class="field"><label>MINIMUM STOCK</label><input id="eiMin" type="number" min="0" step=".01" value="${Number(x.minimum||0)}"></div></div><div class="note">Supplier and Receiving Type are editable at any time. Temperature can still be entered manually during Receiving for every item; it is mandatory only for Chilled and Frozen items.</div><button class="primary" onclick="saveEditIngredient('${esc(x.sku)}')">Save Changes</button>`);
+ const x=ingredients().find(i=>String(i.cloud_id||i.name)===String(sku));if(!x)return;
+ modal(`<div class="modalHead"><h2>Edit Ingredient</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid"><div class="field"><label>INGREDIENT</label><input id="eiName" value="${esc(x.name)}"></div><div class="field"><label>BASE UNIT</label><select id="eiBaseUnit">${['kg','g','ltr','ml','pcs'].map(u=>`<option value="${u}" ${unit(x.base_unit)===u?'selected':''}>${u}</option>`).join('')}</select></div><div class="field"><label>DEFAULT SUPPLIER</label><input id="eiSupplier" value="${esc(x.supplier||'')}" placeholder="Supplier name"></div><div class="field"><label>RECEIVING TYPE</label><select id="eiReceivingType"><option ${receivingTypeLabel(x.receiving_type)==='Room Temperature'?'selected':''}>Room Temperature</option><option ${receivingTypeLabel(x.receiving_type)==='Chilled'?'selected':''}>Chilled</option><option ${receivingTypeLabel(x.receiving_type)==='Frozen'?'selected':''}>Frozen</option></select></div><div class="field"><label>REFERENCE COST AED</label><input id="eiCost" type="number" min="0" step=".01" value="${Number(x.reference_cost!=null?x.reference_cost:x.cost||0).toFixed(2)}"></div><div class="field"><label>PAR TARGET</label><input id="eiPar" type="number" min="0" step=".01" value="${Number(x.par||0)}"></div><div class="field"><label>MINIMUM STOCK</label><input id="eiMin" type="number" min="0" step=".01" value="${Number(x.minimum||0)}"></div></div><div class="note">Supplier and Receiving Type are editable at any time. Temperature can still be entered manually during Receiving for every item; it is mandatory only for Chilled and Frozen items.</div><button class="primary" onclick="saveEditIngredient(decodeURIComponent('${encodeURIComponent(String(x.cloud_id||x.name))}'))">Save Changes</button>`);
 }
-async function saveEditIngredient(sku){if(hasCentralStore()&&teamCloudAuth?.pin&&session!=='store')return alert('Only Main Office / Central Store can edit the shared Master.');let a=ingredients(),x=a.find(i=>i.sku===sku);if(!x)return;const newName=eiName.value.trim();if(!newName)return alert('Enter ingredient name.');if(a.some(i=>i!==x&&i.name.toLowerCase()===newName.toLowerCase()))return alert('Ingredient already exists.');x.name=newName;x.supplier=eiSupplier.value.trim();x.receiving_type=eiReceivingType.value||'Room Temperature';x.reference_cost=Number(eiCost.value||0);x.par=Number(eiPar.value||0);x.minimum=Number(eiMin.value||0);try{await cloudUpsertIngredient(x)}catch(e){return alert('KITCH Cloud: '+e.message)}saveIngredients(a);await cloudLoadIngredients();closeModal();openPage('Inventory')}
+async function saveEditIngredient(sku){/* Authorized staff writes checked by Supabase RPC. */let a=ingredients(),x=a.find(i=>String(i.cloud_id||i.name)===String(sku));if(!x)return;const newName=eiName.value.trim();if(!newName)return alert('Enter ingredient name.');if(teamCloudAuth?.pin&&x.cloud_id&&newName!==x.name)return alert('Renaming existing cloud ingredients requires Main Office. Other fields can be edited here.');if(a.some(i=>i!==x&&i.name.toLowerCase()===newName.toLowerCase()))return alert('Ingredient already exists.');// KITCH SAFE BASE UNIT EDITOR v1: do not relabel historical stock.
+const desiredUnit=eiBaseUnit.value;
+if(desiredUnit!==unit(x.base_unit)){
+ if(!x.cloud_id)return alert('Refresh inventory first: this ingredient has no cloud ID.');
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('For unit corrections, sign into Main Kitchen using an authorized kitchen manager PIN.');
+ const {error:unitError}=await sb.rpc('kitch_team_correct_unused_ingredient_unit',{
+  p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+  p_ingredient_id:x.cloud_id,p_new_unit:desiredUnit
+ });
+ if(unitError)return alert('Unit change blocked: '+(unitError.message||'Cloud verification failed'));
+ x.base_unit=desiredUnit;
+}
+x.name=newName;x.supplier=eiSupplier.value.trim();x.receiving_type=eiReceivingType.value||'Room Temperature';x.reference_cost=Number(eiCost.value||0);x.par=Number(eiPar.value||0);x.minimum=Number(eiMin.value||0);try{await cloudUpsertIngredient(x)}catch(e){return alert('KITCH Cloud: '+e.message)}saveIngredients(a);await cloudLoadIngredients();closeModal();openPage('Inventory')}
 async function archiveIngredient(sku){
  if(session!=='manager'||teamCloudAuth?.staff_name)return alert('Only an authenticated Main Office manager can delete ingredients.');
  const a=ingredients(),x=a.find(i=>i.sku===sku);if(!x)return;
@@ -1206,7 +1240,7 @@ async function archiveIngredient(sku){
  }catch(e){alert('Could not archive ingredient: '+e.message)}
 }
 function openImport(){
- if(hasCentralStore()&&session==='manager'&&teamCloudAuth?.pin)return alert('Company Ingredient Master is shared. Import it once from Main Office / Central Store.');
+ /* Authorized staff writes checked by Supabase RPC. */
  if(session!=='manager' && session!=='store')return;
  modal(`<div class="modalHead"><h2>Import Ingredient Master</h2><button class="close" onclick="closeModal()">×</button></div><p class="muted">Choose the KITCH ingredient Excel. Nothing is imported until you confirm the preview.</p><label class="filePick"><b>Choose Excel file</b><br><small>.xlsx, .xls or .csv</small><input id="excelFile" type="file" accept=".xlsx,.xls,.csv" hidden onchange="readExcel(this.files[0])"></label><div id="preview"></div>`);
 }
@@ -1232,7 +1266,7 @@ async function readExcel(file){
 function kitchImportModeChanged(){const mode=document.getElementById('kitchImportMode')?.value;const warning=document.getElementById('kitchImportWarning');if(warning)warning.style.display=mode==='replace'?'block':'none';}
 let ingredientImportBusy=false;
 async function confirmImport(){
- if(hasCentralStore()&&teamCloudAuth?.pin&&session!=='store')return alert('Only Main Office / Central Store can import the unified Master.');
+ /* Authorized staff writes checked by Supabase RPC. */
  if(ingredientImportBusy)return;
  if(!importRows.length)return alert('Choose an Excel file first.');
  const replaceMode=document.getElementById('kitchImportMode')?.value==='replace';
@@ -1914,13 +1948,19 @@ async function kitchSaveSyncedRecipe(recipe){
 function normIngName(v){return String(v||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim()}
 function ingTokenKey(v){return normIngName(v).split(' ').filter(Boolean).sort().join(' ')}
 function editDistance(a,b){a=normIngName(a);b=normIngName(b);const dp=Array(b.length+1).fill(0).map((_,j)=>j);for(let i=1;i<=a.length;i++){let prev=dp[0];dp[0]=i;for(let j=1;j<=b.length;j++){const old=dp[j];dp[j]=Math.min(dp[j]+1,dp[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old}}return dp[b.length]}
+// KITCH PRODUCTION STOCK CHECK FIX v1: match unique exact names before potentially duplicated SKUs.
 function ingredientForRecipeItem(it,master=ingredients()){
- if(it.sku){const bySku=master.find(x=>x.sku===it.sku);if(bySku)return bySku}
  const n=normIngName(it.ingredient);
- let hits=master.filter(x=>normIngName(x.name)===n);if(hits.length===1)return hits[0];
- const tk=ingTokenKey(it.ingredient);hits=master.filter(x=>ingTokenKey(x.name)===tk);if(hits.length===1)return hits[0];
- hits=master.filter(x=>editDistance(x.name,it.ingredient)<=1);if(hits.length===1)return hits[0];
- return null
+ let hits=master.filter(x=>normIngName(x.name)===n);
+ if(hits.length===1)return hits[0];
+ if(hits.length>1)return null;
+ if(it.sku){hits=master.filter(x=>x.sku===it.sku);if(hits.length===1)return hits[0];}
+ const tk=ingTokenKey(it.ingredient);
+ hits=master.filter(x=>ingTokenKey(x.name)===tk);
+ if(hits.length===1)return hits[0];
+ hits=master.filter(x=>editDistance(x.name,it.ingredient)<=1);
+ if(hits.length===1)return hits[0];
+ return null;
 }
 function linkRecipeIngredients(){
  const a=recipes(),m=ingredients();let changed=false;
@@ -2198,37 +2238,37 @@ function openProduction(){
 }
 function previewProduction(){
  const r=recipes().find(x=>String(x.id)===String(document.getElementById('prRecipe')?.value)),
-       mult=Number(document.getElementById('prBatches')?.value||0),
-       m=ingredients();
- if(!r||mult<=0)return;
-
+       mult=Number(document.getElementById('prBatches')?.value||0),m=ingredients();
+ if(!r||!Number.isFinite(mult)||mult<=0)return;
  const method=document.getElementById('prMethod');
- if(method){
-   method.innerHTML=r.instructions
-     ? `<div class="productionMethod"><b>METHOD / RECIPE INSTRUCTIONS</b>${esc(r.instructions)}</div>`
-     : `<div class="productionMethod"><b>METHOD / RECIPE INSTRUCTIONS</b><span class="muted">No method added to this master recipe yet. Kitchen Manager / Executive Chef can add it to the recipe.</span></div>`;
- }
-
+ if(method)method.innerHTML=r.instructions
+  ? `<div class="productionMethod"><b>METHOD / RECIPE INSTRUCTIONS</b>${esc(r.instructions)}</div>`
+  : `<div class="productionMethod"><b>METHOD / RECIPE INSTRUCTIONS</b><span class="muted">No method added.</span></div>`;
  let ok=true;
+ const totals=new Map();
+ for(const it of r.items){
+   const ing=ingredientForRecipeItem(it,m);if(!ing)continue;
+   if(!compatibleUnits(it.unit,ing.base_unit))continue;
+   const key=String(ing.cloud_id||ing.name.toLowerCase());
+   totals.set(key,(totals.get(key)||0)+toCanonical(Number(it.qty)*mult,it.unit));
+ }
  const rows=r.items.map(it=>{
-   const ing=ingredientForRecipeItem(it,m);
-   if(!ing){
-     ok=false;
-     return `<tr><td><b>${esc(it.ingredient)}</b></td><td>—</td><td>—</td><td><span class="bad"><b>MISSING</b></span></td></tr>`;
-   }
-   const need=toCanonical(Number(it.qty)*mult,it.unit),
-         have=productionStockCanonical(ing),
-         good=have+1e-9>=r.items.filter(x=>ingredientForRecipeItem(x,m)?.sku===ing.sku).reduce((sum,x)=>sum+toCanonical(Number(x.qty)*mult,x.unit),0);
-   ok=ok&&good;
-   const required=cleanQty(Number(it.qty)*mult)+' '+unit(it.unit);
-   return `<tr><td><b>${esc(ing.name)}</b></td><td>${required}</td><td>${prettyCanonical(have,ing.base_unit)}</td><td><span class="${good?'ok':'bad'}"><b>${good?'READY':'SHORT '+prettyCanonical(need-have,ing.base_unit)}</b></span></td></tr>`;
+  const ing=ingredientForRecipeItem(it,m);
+  if(!ing){ok=false;return `<tr><td>${esc(it.ingredient)}</td><td>${cleanQty(Number(it.qty)*mult)} ${esc(unit(it.unit))}</td><td>—</td><td class="bad"><b>INGREDIENT NOT MATCHED</b></td></tr>`;}
+  const required=cleanQty(Number(it.qty)*mult)+' '+unit(it.unit);
+  const have=productionStockCanonical(ing);
+  if(!compatibleUnits(it.unit,ing.base_unit)){
+   ok=false;
+   return `<tr><td><b>${esc(ing.name)}</b></td><td>${required}</td><td>${prettyCanonical(have,ing.base_unit)}</td><td class="bad"><b>UNIT MISMATCH — correct master data</b></td></tr>`;
+  }
+  const key=String(ing.cloud_id||ing.name.toLowerCase());
+  const needed=totals.get(key)||0,good=have+1e-9>=needed;
+  if(!good)ok=false;
+  return `<tr><td><b>${esc(ing.name)}</b></td><td>${required}</td><td>${prettyCanonical(have,ing.base_unit)}</td><td><span class="${good?'ok':'bad'}"><b>${good?'READY':'SHORT '+prettyCanonical(Math.max(0,needed-have),ing.base_unit)}</b></span></td></tr>`;
  }).join('');
-
- document.getElementById('prPreview').innerHTML=
-   `<div class="productionTableWrap"><table class="productionTable"><tr><th>INGREDIENT</th><th>REQUIRED</th><th>RESTAURANT STOCK</th><th>CHECK</th></tr>${rows}</table></div>
-    <div class="note ${ok?'ok':'bad'}"><b>${ok?'Stock ready.':'Production blocked.'}</b> ${ok?'Starting production will deduct these ingredients from '+esc(currentBranchName())+' stock.':hasCentralStore()?'Use the branch stock first. Request only the missing quantities from Central Store.':'Receive the missing stock before starting production.'}</div>
-    ${!ok&&hasCentralStore()&&session==='manager'?'<button class="btn black" style="width:100%;height:46px;margin-bottom:8px" onclick="requestProductionShortages()">Request Missing Stock from Central Store</button>':''}
-    <button class="primary" ${ok?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="confirmProduction()">Start ${cleanQty(mult)} Batch${mult===1?'':'es'}</button>`;
+ document.getElementById('prPreview').innerHTML=`<div class="productionTableWrap"><table class="productionTable"><tr><th>INGREDIENT</th><th>REQUIRED</th><th>RESTAURANT STOCK</th><th>CHECK</th></tr>${rows}</table></div>
+ <div class="note ${ok?'ok':'bad'}"><b>${ok?'Stock ready.':'Production blocked.'}</b> ${ok?'Starting production will request a secure inventory deduction.':'Correct missing stock, ingredient mapping, or unit mismatches before starting.'}</div>
+ <button class="primary" ${ok?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="confirmProduction()">Start ${cleanQty(mult)} Batch${mult===1?'':'es'}</button>`;
 }
 
 async function requestProductionShortages(){
@@ -2274,12 +2314,15 @@ async function confirmProduction(){
  const r=recipes().find(x=>String(x.id)===String(prRecipe.value)),mult=Number(prBatches.value||0);
  if(!r||!Number.isFinite(mult)||mult<=0)return alert('Enter a valid number of batches.');
  if(recipeMissing(r).length)return alert('This recipe needs review. Link all ingredients before production.');
+ for(const it of r.items){const ing=ingredientForRecipeItem(it,ingredients());
+  if(!ing||!compatibleUnits(it.unit,ing.base_unit))return alert('Production blocked: fix the ingredient match or unit for '+it.ingredient+'.');}
+
  let a=ingredients(),requirements=[];
  for(const it of r.items){const ing=ingredientForRecipeItem(it,a);if(!ing)return alert('Recipe ingredient is not linked.');const need=toCanonical(Number(it.qty)*mult,it.unit),have=productionStockCanonical(ing);if(have+1e-9<need)return alert('Not enough Restaurant stock for '+ing.name+'.');requirements.push({sku:ing.sku,ingredient:ing.name,qty:Number(it.qty)*mult,unit:it.unit,canonical:need,unit_cost:Number(ing.cost||0),cost:(()=>{let q=Number(it.qty)*mult,iu=unit(it.unit),bu=unit(ing.base_unit);if(iu==='g'&&bu==='kg')q/=1000;else if(iu==='kg'&&bu==='g')q*=1000;else if(iu==='ml'&&bu==='ltr')q/=1000;else if(iu==='ltr'&&bu==='ml')q*=1000;return q*Number(ing.cost||0)})()})}
  // Confirm inventory again immediately before making any changes.
  const totals=new Map();
- for(const req of requirements)totals.set(req.sku,(totals.get(req.sku)||0)+req.canonical);
- for(const [sku,required] of totals){const ing=a.find(x=>x.sku===sku);if(!ing||productionStockCanonical(ing)+1e-9<required)return alert('Stock changed or insufficient for '+(ing?.name||sku)+'. Refresh and try again.');}
+ for(const req of requirements){const ing=a.find(x=>x.name===req.ingredient);if(!ing)return alert('Ingredient name no longer matches. Refresh.');const key=String(ing.cloud_id||ing.name.toLowerCase());totals.set(key,(totals.get(key)||0)+req.canonical);}
+ for(const [key,required] of totals){const ing=a.find(x=>String(x.cloud_id||x.name.toLowerCase())===key);if(!ing||productionStockCanonical(ing)+1e-9<required)return alert('Stock changed or insufficient for '+(ing?.name||key)+'. Refresh and try again.');}
  kitchProductionSubmitting=true;
  try{
   if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in with an authorized KITCH Team account to start cloud production.');
