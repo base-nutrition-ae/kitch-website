@@ -2213,6 +2213,7 @@ const PROD_KEY='kitch_demo_production_v1';
 // Complete production / QC sync is keyed to the original stock deduction request.
 // These methods NEVER write to inventory movements or the opening stock ledger.
 let kitchCloudProductionRecordLoading=false;
+let kitchCloudProductionRecords=null;
 async function kitchProofForCloud(value){
  if(!value||typeof value!=='string'||!value.startsWith('data:image/'))return '';
  if(value.length<130000)return value;
@@ -2259,6 +2260,7 @@ async function kitchLoadCloudProductionRecords(){
   const {data,error}=await sb.rpc('kitch_team_production_records',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
   if(error)throw Error(error.message);
   if(!Array.isArray(data))throw Error('Invalid cloud production response');
+  kitchCloudProductionRecords=data.filter(x=>x?.request_id&&x?.payload&&String(x.payload.cloud_request_id)===String(x.request_id));
   const local=getArr(PROD_KEY),byId=new Map(local.filter(x=>x.cloud_request_id).map(x=>[String(x.cloud_request_id),x]));
   let added=0,upgraded=0,conflicts=0;
   for(const row of data){
@@ -2315,8 +2317,10 @@ function productionPage(){
  const approved=recipes().filter(r=>!recipeNeedsReview(r)), runs=scopedRows(getArr(PROD_KEY)).slice().reverse();
  const history=kitchCloudProductionSummary?.history;
  const cloudHistory=Array.isArray(history)?history:[];
- const cloudRows=cloudHistory.map(h=>`<tr><td><b>${esc(h.request_id?.slice(0,8)||'—')}</b></td><td>${esc(h.occurred_at?new Date(h.occurred_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):'—')}</td><td>${Number(h.ingredient_lines||0)}</td>${session==='production'?'':`<td>${money(h.stock_usage_cost)}</td>`}<td><span style="color:#b45309">Stock deducted · completion not synced</span></td></tr>`).join('');
- return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${runs.filter(x=>x.status==='Completed'||x.status==='Label Pending').length}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
+ const syncedByRequest=new Map((kitchCloudProductionRecords||[]).map(row=>[String(row.request_id),row.payload]));
+ const completedRunCount=kitchCloudProductionRecords? kitchCloudProductionRecords.filter(row=>['Label Pending','Label Created','Label Rejected'].includes(row.payload?.status)).length : runs.filter(x=>['Completed','Label Pending','Label Created','Label Rejected'].includes(x.status)).length;
+ const cloudRows=cloudHistory.map(h=>`<tr><td><b>${esc(h.request_id?.slice(0,8)||'—')}</b></td><td>${esc(h.occurred_at?new Date(h.occurred_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):'—')}</td><td>${Number(h.ingredient_lines||0)}</td>${session==='production'?'':`<td>${money(h.stock_usage_cost)}</td>`}<td>${syncedByRequest.has(String(h.request_id))?`<span class="ok"><b>${esc(syncedByRequest.get(String(h.request_id)).status||'Synced')}</b></span>`:`<span style="color:#b45309">Stock deducted · completion not synced</span>`}</td></tr>`).join('');
+ return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${completedRunCount}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
  <div class="panel"><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
  <div class="actions"><button class="btn black" onclick="openProduction()">+ Start Production</button><button class="btn" onclick="kitchSyncLocalProductionRecords()">Sync Local Production to Cloud</button></div>
  <table><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production runs yet.</td></tr>'}</table><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
