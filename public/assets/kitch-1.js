@@ -1450,19 +1450,47 @@ function purchasingPage(){
 function viewSupplierProfile(id){
  const su=getArr(SUP_KEY),x=su.find(v=>String(v.id)===String(id));if(!x)return alert('Supplier not found.');
  const products=supplierProducts().filter(p=>String(p.supplier||'').toLowerCase()===String(x.name||'').toLowerCase());
- modal(`<div class="modalHead"><div><h2>${esc(x.name)}</h2><div class="muted">Supplier Profile</div></div><button class="close" onclick="closeModal()">×</button></div>
- <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:18px">
- <div class="card"><span>CONTACT PERSON</span><b style="font-size:15px">${esc(x.contact||'—')}</b></div>
- <div class="card"><span>PHONE</span><b style="font-size:15px">${esc(x.phone||'—')}</b></div>
- <div class="card"><span>EMAIL</span><b style="font-size:15px">${esc(x.email||'—')}</b></div>
- <div class="card"><span>TRN / VAT</span><b style="font-size:15px">${esc(x.trn||'—')}</b></div>
- <div class="card"><span>PAYMENT TERMS</span><b style="font-size:15px">${esc(x.terms||'—')}</b></div>
- <div class="card"><span>DELIVERY DAYS</span><b style="font-size:15px">${esc(x.days||'—')}</b></div>
- <div class="card"><span>MINIMUM ORDER</span><b style="font-size:15px">${x.min_order?money(x.min_order):'—'}</b></div>
- <div class="card"><span>LEAD TIME</span><b style="font-size:15px">${x.lead_time?esc(String(x.lead_time))+' days':'—'}</b></div>
- <div class="card"><span>PRODUCTS</span><b style="font-size:15px">${products.length}</b></div></div>
- <div class="panel"><h3>Address / Location</h3><div>${esc(x.address||'—')}</div>${x.notes?`<div class="note" style="margin-top:12px"><b>Notes:</b> ${esc(x.notes)}</div>`:''}</div>
- <div class="panel"><h3>Supplier Products & Agreed Prices</h3><div style="overflow-x:auto"><table><tr><th>PRODUCT</th><th>SKU</th><th>UNIT</th><th>AGREED PRICE</th><th>LEAD TIME</th><th>NOTES</th></tr>${products.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.sku||'—')}</td><td>${esc(p.unit||'—')}</td><td>${money(Number(p.price||0))}</td><td>${p.lead_time?esc(String(p.lead_time))+' days':'—'}</td><td>${esc(p.notes||'—')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No supplier products.</td></tr>'}</table></div></div>`);
+ const detail=(label,value,cls='')=>`<div class="kitchSupplierDetail ${cls}"><span>${label}</span><strong title="${esc(value)}">${esc(value)}</strong></div>`;
+ modal(`<style>
+ .kitchSupplierProfile{min-width:0;color:#191919}
+ .kitchSupplierProfile .kitchSupplierIntro{font-size:12px;color:#888;margin-top:2px}
+ .kitchSupplierProfile .kitchSupplierGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+ .kitchSupplierProfile .kitchSupplierDetail{min-width:0;min-height:83px;padding:16px;border:1px solid #e7e7e7;background:#fff;border-radius:16px;display:flex;flex-direction:column;gap:9px;justify-content:center}
+ .kitchSupplierProfile .kitchSupplierDetail span{color:#898989;text-transform:uppercase;font-size:10px;font-weight:800;letter-spacing:.09em}
+ .kitchSupplierProfile .kitchSupplierDetail strong{display:block;font-size:16px;line-height:1.4;font-weight:700;overflow-wrap:anywhere;word-break:normal;white-space:normal}
+ .kitchSupplierProfile .kitchSupplierDetail.email strong{font-size:13px;font-weight:650;letter-spacing:-.02em}
+ .kitchSupplierProfile .kitchSupplierDetail a{color:inherit;text-decoration:none}
+ .kitchSupplierProfile .kitchSupplierSection{margin-top:14px;border:1px solid #e8e8e8;border-radius:18px;background:#fff;padding:18px;min-width:0}
+ .kitchSupplierProfile .kitchSupplierSection h3{margin:0 0 13px;font-size:16px;letter-spacing:-.025em}
+ .kitchSupplierProfile .kitchSupplierAddress{font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+ .kitchSupplierProfile .kitchSupplierNotes{background:#f4f3f1;border-radius:12px;color:#676767;font-size:11px;line-height:1.55;padding:11px 13px;margin-top:14px;overflow-wrap:anywhere}
+ .kitchSupplierProfile .kitchSupplierTableWrap{max-height:370px;overflow:auto;border:1px solid #ececec;border-radius:12px}
+ .kitchSupplierProfile .kitchSupplierTable{width:100%;min-width:680px;border-collapse:separate;border-spacing:0;font-size:12px}
+ .kitchSupplierProfile .kitchSupplierTable thead th{position:sticky;top:0;background:#f5f5f5;color:#777;font-size:10px;letter-spacing:.065em;text-transform:uppercase;z-index:1;text-align:left}
+ .kitchSupplierProfile .kitchSupplierTable td,.kitchSupplierProfile .kitchSupplierTable th{padding:12px 10px;border-bottom:1px solid #ededed;vertical-align:top;line-height:1.4}
+ .kitchSupplierProfile .kitchSupplierTable td{overflow-wrap:anywhere}
+ .kitchSupplierProfile .kitchSupplierTable td:first-child{font-weight:700;min-width:128px}
+ .kitchSupplierProfile .kitchSupplierTable .kitchSupplierPrice{white-space:nowrap;font-weight:700}
+ .kitchSupplierProfile .kitchSupplierProductCount{font-size:12px;color:#777;margin-bottom:12px}
+ @media(max-width:740px){.kitchSupplierProfile .kitchSupplierGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.kitchSupplierProfile .kitchSupplierDetail{padding:12px;min-height:76px}.kitchSupplierProfile .kitchSupplierDetail strong{font-size:14px}.kitchSupplierProfile .kitchSupplierDetail.email strong{font-size:12px}.kitchSupplierProfile .kitchSupplierSection{padding:13px}}
+ @media(max-width:450px){.kitchSupplierProfile .kitchSupplierGrid{grid-template-columns:minmax(0,1fr)}}
+ </style><div class="kitchSupplierProfile">
+ <div class="modalHead"><div style="min-width:0"><h2 style="overflow-wrap:anywhere">${esc(x.name)}</h2><div class="kitchSupplierIntro">Supplier Profile</div></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="kitchSupplierGrid">
+ ${detail('CONTACT PERSON',x.contact||'—')}
+ ${detail('PHONE',x.phone||'—')}
+ ${detail('EMAIL',x.email||'—','email')}
+ ${detail('TRN / VAT',x.trn||'—')}
+ ${detail('PAYMENT TERMS',x.terms||'—')}
+ ${detail('DELIVERY DAYS',x.days||'—')}
+ ${detail('MINIMUM ORDER',x.min_order?money(x.min_order):'—')}
+ ${detail('LEAD TIME',x.lead_time?String(x.lead_time)+' days':'—')}
+ ${detail('PRODUCTS',String(products.length))}
+ </div>
+ <div class="kitchSupplierSection"><h3>Address / Location</h3><div class="kitchSupplierAddress">${esc(x.address||'—')}</div>${x.notes?`<div class="kitchSupplierNotes"><b>Notes:</b> ${esc(x.notes)}</div>`:''}</div>
+ <div class="kitchSupplierSection"><h3>Supplier Products &amp; Agreed Prices</h3><div class="kitchSupplierProductCount">${products.length} products linked to this supplier</div>
+ <div class="kitchSupplierTableWrap"><table class="kitchSupplierTable"><thead><tr><th>PRODUCT</th><th>SKU</th><th>UNIT</th><th>AGREED PRICE</th><th>LEAD TIME</th><th>NOTES</th></tr></thead><tbody>${products.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.sku||'—')}</td><td>${esc(p.unit||'—')}</td><td class="kitchSupplierPrice">${money(Number(p.price||0))}</td><td>${p.lead_time?esc(String(p.lead_time))+' days':'—'}</td><td>${esc(p.notes||'—')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No supplier products.</td></tr>'}</tbody></table></div></div>
+ </div>`);
 }
 function openSupplier(){modal(`<div class="modalHead"><h2>Add Supplier</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid"><div class="field"><label>SUPPLIER NAME</label><input id="sName"></div><div class="field"><label>CONTACT PERSON</label><input id="sContact"></div><div class="field"><label>PHONE NUMBER</label><input id="sPhone"></div><div class="field"><label>EMAIL</label><input id="sEmail" type="email"></div><div class="field"><label>TRN / VAT NUMBER</label><input id="sTrn"></div><div class="field"><label>PAYMENT TERMS</label><input id="sTerms" placeholder="e.g. 30 days"></div><div class="field"><label>DELIVERY DAYS</label><input id="sDays" placeholder="e.g. Sun, Tue, Thu"></div><div class="field"><label>MINIMUM ORDER AED</label><input id="sMin" type="number" min="0" step=".01"></div><div class="field"><label>ADDRESS / LOCATION</label><input id="sAddress"></div><div class="field"><label>LEAD TIME DAYS</label><input id="sLead" type="number" min="0"></div></div><div class="field"><label>NOTES</label><input id="sNotes"></div><button class="primary" onclick="saveSupplier()">Create Supplier</button>`) }
 function saveSupplier(){let name=sName.value.trim();if(!name)return alert('Enter supplier name.');let a=getArr(SUP_KEY);if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert('Supplier already exists.');a.push({id:Date.now(),name,contact:sContact.value.trim(),phone:sPhone.value.trim(),email:sEmail.value.trim(),trn:sTrn.value.trim(),terms:sTerms.value.trim(),days:sDays.value.trim(),min_order:Number(sMin.value||0),address:sAddress.value.trim(),lead_time:sLead.value.trim(),notes:sNotes.value.trim()});setArr(SUP_KEY,a);closeModal();openPage('Suppliers & Purchasing')}
