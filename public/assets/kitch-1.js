@@ -2093,6 +2093,42 @@ function recipeInput(r){
  if(totals.pcs)parts.push(totals.pcs+' pcs');
  return parts.concat(totals.other).join(' + ')||'—';
 }
+// EP is measured per ingredient in its original unit. Never silently treat
+// kilograms, litres or pieces as interchangeable finished-product mass.
+function recipeEpInput(r){
+ const totals={kg:0,ltr:0,pcs:0,other:[]};
+ (r.items||[]).forEach(it=>{
+  const q=Number(recipeUsableQty(it)||0),u=unit(it.unit);
+  if(u==='g')totals.kg+=q/1000;
+  else if(u==='kg')totals.kg+=q;
+  else if(u==='ml')totals.ltr+=q/1000;
+  else if(u==='ltr')totals.ltr+=q;
+  else if(u==='pcs')totals.pcs+=q;
+  else if(q)totals.other.push(cleanQty(q)+' '+u);
+ });
+ const parts=[];
+ if(totals.kg)parts.push(cleanQty(totals.kg)+' kg');
+ if(totals.ltr)parts.push(cleanQty(totals.ltr)+' L');
+ if(totals.pcs)parts.push(cleanQty(totals.pcs)+' pcs');
+ return parts.concat(totals.other).join(' + ')||'—';
+}
+function recipeExpectedYieldText(r){
+ return Number(r.yield)>0?cleanQty(r.yield)+' '+unit(r.yield_unit||'kg'):'Not recorded';
+}
+function recipeYieldReview(r){
+ if(!(Number(r.yield)>0))return '';
+ const u=unit(r.yield_unit||'kg');
+ if(u!=='kg'&&u!=='g')return '';
+ const expectedKg=u==='kg'?Number(r.yield):Number(r.yield)/1000;
+ const epKg=(r.items||[]).reduce((sum,it)=>{
+  const iu=unit(it.unit),q=Number(recipeUsableQty(it)||0);
+  return sum+(iu==='g'?q/1000:iu==='kg'?q:0);
+ },0);
+ // Screening flag only: cooking, hydration, evaporation and plating can change weight.
+ // Liquids and pcs are NOT converted to kg without verified conversion data.
+ if(epKg<=0||expectedKg>=epKg*0.7&&expectedKg<=epKg*1.3)return '';
+ return 'Expected finished weight needs verification against EP ingredients; liquid and piece weights are separate.';
+}
 function recipesPage(){
  linkRecipeIngredients();
  const a=recipes().slice().sort((x,y)=>x.name.localeCompare(y.name));
@@ -2108,8 +2144,8 @@ function recipesPage(){
  <div class="panel"><h2>Recipe Master</h2><p class="muted">Chef defines ingredient quantities in kg/g/ltr/ml/pcs for exactly 1 Batch. KITCH converts units automatically and Production will deduct from the production location stock.</p>
  <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button><button class="btn" onclick="showRecipeUnitAudit()">Review Unit Mismatches</button>':''}</div>
  <div class="note"><b>How to read:</b> Raw input = ingredients purchased for one batch. Raw food cost = amount spent on ingredients. Edible value = value after preparation yield. Click a recipe for its costing sheet.</div>
- <table><tr><th>RECIPE NAME</th><th>CATEGORY</th><th>INGREDIENTS</th><th>RAW INPUT / BATCH</th><th>FINISHED BATCH</th><th>PORTIONS</th><th>RAW COST / BATCH</th><th>EDIBLE VALUE</th><th>STATUS</th></tr>
- ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r),costInfo=recipeCostDetails(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${r.yield?cleanQty(r.yield)+' '+esc(r.yield_unit||'kg'):'<small class="muted">Not recorded</small>'}</td><td>${Number(r.portions||0)||'—'}</td><td><b>${recipeCostLabel(r)}</b><br><small>Supplier cost</small></td><td>${costInfo.complete?'AED '+recipeYieldValueDetails(r).usable.toFixed(2):'Price missing'}</td><td>${miss.length||costInfo.missingPrices.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length?miss.length+" unmatched":costInfo.missingPrices.length+" missing prices"} · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="9" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
+ <table><tr><th>RECIPE NAME</th><th>CATEGORY</th><th>INGREDIENTS</th><th>RAW INPUT / BATCH</th><th>EXPECTED FINISHED BATCH / EP INGREDIENTS</th><th>PORTIONS</th><th>RAW COST / BATCH</th><th>EDIBLE VALUE</th><th>STATUS</th></tr>
+ ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r),costInfo=recipeCostDetails(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td><b>${esc(recipeExpectedYieldText(r))}</b><br><small>EP ingredients: ${esc(recipeEpInput(r))}</small>${recipeYieldReview(r)?`<br><small class="warn">${esc(recipeYieldReview(r))}</small>`:''}</td><td>${Number(r.portions||0)||'—'}</td><td><b>${recipeCostLabel(r)}</b><br><small>Supplier cost</small></td><td>${costInfo.complete?'AED '+recipeYieldValueDetails(r).usable.toFixed(2):'Price missing'}</td><td>${recipeNeedsReview(r)?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${recipeUnitIssues(r).length?recipeUnitIssues(r).length+' unit mismatches':miss.length?miss.length+' unmatched':costInfo.missingPrices.length+' missing prices'} · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="9" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
 }
 function openRecipe(){
  if(session!=='manager')return;
@@ -2187,6 +2223,7 @@ function viewRecipe(id){
  modal(`<div class="modalHead"><div><h2>${esc(r.name)}</h2><div class="muted">Locked Master · Exactly 1 Batch</div></div><button class="close" onclick="closeModal()">×</button></div>
  <div class="grid" style="margin-top:18px"><div class="card"><span>1 BATCH RAW COST</span><b>${recipeCostLabel(r)}</b></div><div class="card"><span>AUTO INPUT QTY</span><b style="font-size:18px">${esc(recipeInput(r))}</b></div><div class="card"><span>PORTIONS</span><b>${r.portions||'—'}</b></div><div class="card"><span>STATUS</span><b style="font-size:16px">${recipeNeedsReview(r)?'Needs Review':'Approved'}</b></div></div>
  ${miss.length?`<div class="note bad"><b>Missing from Ingredient Master (${miss.length})</b><br>${miss.map(x=>esc(x)).join(' · ')}<br><small>KITCH links recipe ingredients to the Ingredient Master by SKU/ID. Only truly unmatched ingredients need review.</small></div>`:`<div class="note ok"><b>All ingredients matched.</b> Ingredient links are valid. Check that all ingredient prices are entered before Production.</div>`}
+ <div class="note"><b>Master expected finished yield:</b> ${esc(recipeExpectedYieldText(r))} · <b>Calculated EP ingredient quantities:</b> ${esc(recipeEpInput(r))}. These are different measures; the actual completed production yield is recorded separately.${recipeYieldReview(r)?`<br><span class="warn">${esc(recipeYieldReview(r))}</span>`:''} No stock or costing is adjusted by this comparison.</div>
  ${recipeYieldRows(r,true)}
  <div class="note"><b>Net usable value:</b> AED ${recipeYieldValueDetails(r).usable.toFixed(2)} · <b>Preparation loss value:</b> AED ${recipeYieldValueDetails(r).loss.toFixed(2)} · <b>Raw food cost:</b> AED ${recipeYieldValueDetails(r).raw.toFixed(2)}. Preparation loss is already included in raw cost.</div>
  ${session==='manager'||session==='owner'?`<div class="actions"><button class="btn black" onclick="openRecipeYieldEdit(${r.id})">Edit Recipe &amp; Yield</button></div>`:''}
