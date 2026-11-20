@@ -534,16 +534,33 @@ function renderNav(){
  const u=document.getElementById('upgradeNav');if(u)u.innerHTML=(session==='owner'&&packageType()==='restaurant')?'<button onclick="openPage(\'Subscription Setup\')">Upgrade Subscription</button>':''
 }
 document.addEventListener('click',e=>{const m=document.getElementById('kitchMoreMenu');if(m&&!m.contains(e.target)&&!e.target.closest('.kitchMoreTrigger'))m.remove()});
-function invoiceMatchingPage(){
- const po=getArr(PO_KEY);
- const received=po.filter(x=>['Received','Closed'].includes(purchaseStatus(x))||x.accepted!=null||x.invoice_price!=null);
- const matched=received.filter(x=>x.invoice_match_status==='Approved').length;
- const held=received.filter(x=>x.invoice_match_status==='Hold').length;
- const variance=received.filter(x=>x.invoice_price!=null&&Math.abs(Number(x.invoice_price||0)-Number(x.reference_price??x.price??0))>0.009).length;
- const rows=received.map(x=>{const ref=Number(x.reference_price??x.price??0),inv=Number(x.invoice_price??ref),diff=inv-ref,pct=ref?diff/ref*100:0,status=x.invoice_match_status||'Pending Review';return `<tr><td><b>${esc(x.po||'—')}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(x.ingredient||'—')}</td><td>${cleanQty(x.qty||0)} ${esc(x.unit||'')}</td><td>${cleanQty(x.accepted??x.delivered??x.qty??0)} ${esc(x.unit||'')}</td><td>${money(ref)}</td><td>${money(inv)}</td><td class="${Math.abs(diff)>.009?'bad':'ok'}">${diff>=0?'+':''}${money(diff)}${ref?` (${pct>=0?'+':''}${pct.toFixed(1)}%)`:''}</td><td><span class="alertBadge ${status==='Approved'?'alertInfo':status==='Hold'?'alertCritical':'alertWarning'}">${esc(status)}</span></td><td>${status==='Approved'?'—':`<button class="btn black" onclick="setInvoiceMatch(${x.id},'Approved')">Approve</button> <button class="btn" onclick="setInvoiceMatch(${x.id},'Hold')">Hold</button>`}</td></tr>`}).join('');
- return `<div class="grid"><div class="card"><span>RECEIVED LINES</span><b>${received.length}</b></div><div class="card"><span>PENDING REVIEW</span><b>${received.filter(x=>!x.invoice_match_status).length}</b></div><div class="card"><span>PRICE VARIANCES</span><b>${variance}</b></div><div class="card"><span>ON HOLD</span><b>${held}</b></div></div><div class="panel"><h2>Invoice Matching</h2><p class="muted">Three-way control: Purchase Order → Receiving → Supplier Invoice. Review quantity and price differences before approving the invoice.</p><div style="overflow-x:auto"><table style="min-width:1120px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>ITEM</th><th>PO QTY</th><th>RECEIVED</th><th>PO PRICE</th><th>INVOICE PRICE</th><th>VARIANCE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>${rows||`<tr><td colspan="10" class="empty">No received supplier deliveries are waiting for invoice matching.</td></tr>`}</tbody></table></div></div>`;
+function kitchInvoiceReceiptVerified(line){
+ // Browser-local purchase orders do not yet have a verified, same-PO cloud receipt link.
+ // A nonzero accepted number in local storage alone is NOT sufficient evidence of a three-way match.
+ return Boolean(line?.cloud_receipt_verified && line?.cloud_receipt_id && Number(line?.accepted)>0
+    && String(line?.cloud_receipt_po||'')===String(line?.po||''));
 }
-function setInvoiceMatch(id,status){const po=getArr(PO_KEY),row=po.find(x=>String(x.id)===String(id));if(!row)return alert('Purchase line not found.');const group=po.filter(x=>x.po===row.po);group.forEach(x=>x.invoice_match_status=status);setArr(PO_KEY,po);openPage('Invoice Matching')}
+function invoiceMatchingPage(){
+ const po=getArr(PO_KEY),candidates=po.filter(x=>!['Rejected'].includes(purchaseStatus(x)));
+ const verified=candidates.filter(kitchInvoiceReceiptVerified);
+ const blocked=candidates.filter(x=>!kitchInvoiceReceiptVerified(x));
+ const held=candidates.filter(x=>x.invoice_match_status==='Hold').length;
+ const variance=verified.filter(x=>x.invoice_price!=null&&Math.abs(Number(x.invoice_price)-Number(x.reference_price??x.price??0))>0.009).length;
+ const rows=candidates.map(x=>{
+   const ref=Number(x.reference_price??x.price??0),inv=Number(x.invoice_price??ref),diff=inv-ref,pct=ref?diff/ref*100:0,valid=kitchInvoiceReceiptVerified(x);
+   const status=valid?(x.invoice_match_status||'Pending Review'):'Receipt not linked';
+   return `<tr><td><b>${esc(x.po||'—')}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(x.ingredient||'—')}</td><td>${cleanQty(x.qty||0)} ${esc(x.unit||'')}</td><td>${valid?cleanQty(x.accepted)+' '+esc(x.unit||''):'Not verified'}</td><td>${money(ref)}</td><td>${x.invoice_price!=null?money(inv):'Not entered'}</td><td class="${Math.abs(diff)>.009?'bad':'ok'}">${x.invoice_price!=null?((diff>=0?'+':'')+money(diff)+(ref?` (${pct>=0?'+':''}${pct.toFixed(1)}%)`:'')):'—'}</td><td><span class="alertBadge ${valid&&status==='Approved'?'alertInfo':status==='Hold'?'alertCritical':'alertWarning'}">${esc(status)}</span>${!valid&&x.invoice_match_status==='Approved'?'<br><small class="bad">Earlier approval requires review</small>':''}</td><td>${valid?(status==='Approved'?'—':`<button class="btn black" onclick="setInvoiceMatch(${x.id},'Approved')">Approve</button> <button class="btn" onclick="setInvoiceMatch(${x.id},'Hold')">Hold</button>`):'<span class="muted">Approval locked</span>'}</td></tr>`;
+ }).join('');
+ return `<div class="grid"><div class="card"><span>VERIFIED RECEIVED LINES</span><b>${verified.length}</b></div><div class="card"><span>RECEIPT LINK REQUIRED</span><b>${blocked.length}</b></div><div class="card"><span>PRICE VARIANCES</span><b>${variance}</b></div><div class="card"><span>ON HOLD</span><b>${held}</b></div></div>
+ <div class="panel"><h2>Invoice Matching</h2><div class="note warn">Purchase orders are currently stored in this browser; cloud Receiving records are separate. Invoice approval is disabled until a matching purchase order, accepted receipt quantity and supplier invoice can be verified. No stock changes are made by this review.</div><div style="overflow-x:auto"><table style="min-width:1120px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>ITEM</th><th>PO QTY</th><th>RECEIVED</th><th>PO PRICE</th><th>INVOICE PRICE</th><th>VARIANCE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>${rows||'<tr><td colspan="10" class="empty">No purchase orders to review.</td></tr>'}</tbody></table></div></div>`;
+}
+function setInvoiceMatch(id,status){
+ const po=getArr(PO_KEY),row=po.find(x=>String(x.id)===String(id));if(!row)return alert('Purchase line not found.');
+ const group=po.filter(x=>x.po===row.po);
+ if(status==='Approved'&&group.some(x=>!kitchInvoiceReceiptVerified(x)))return alert('Approval blocked: a verified cloud receiving record linked to this PO is required. A different ingredient or invoice cannot be matched.');
+ group.forEach(x=>x.invoice_match_status=status);
+ setArr(PO_KEY,po);openPage('Invoice Matching');
+}
 function supplierPerformancePage(){
  const clean=normalizeSupplierData(),suppliers=clean.su,products=clean.sp,pos=getArr(PO_KEY);
  const rows=suppliers.map(s=>{const sp=products.filter(p=>String(p.supplier||'').toLowerCase()===String(s.name||'').toLowerCase()),orders=pos.filter(p=>String(p.supplier||'').toLowerCase()===String(s.name||'').toLowerCase()),received=orders.filter(p=>['Received','Closed'].includes(purchaseStatus(p))||p.accepted!=null),onTime=received.filter(p=>!p.delivery_date||!p.received_date||new Date(p.received_date)<=new Date(p.delivery_date)).length,quality=received.filter(p=>p.receiving_condition_status==='Failed'||Number(p.rejected||0)>0).length,priceIssues=received.filter(p=>p.invoice_price!=null&&Math.abs(Number(p.invoice_price)-Number(p.reference_price??p.price??0))>.009).length,rate=received.length?Math.round(onTime/received.length*100):null,score=received.length?Math.max(0,100-quality*10-priceIssues*8-(received.length-onTime)*8):null;return `<tr><td><b>${esc(s.name)}</b></td><td>${sp.length}</td><td>${orders.length}</td><td>${received.length}</td><td>${rate==null?'—':rate+'%'}</td><td>${quality}</td><td>${priceIssues}</td><td><span class="alertBadge ${score==null?'alertInfo':score>=85?'alertInfo':score>=70?'alertWarning':'alertCritical'}">${score==null?'No history':score+'/100'}</span></td></tr>`}).join('');
@@ -1965,7 +1982,39 @@ function batchStatus(x){
  if(days<=3)return {label:'EXPIRING SOON',cls:'warn',days};
  return {label:'OK',cls:'ok',days};
 }
+let kitchCloudExpiryReceipts=[];
+let kitchCloudExpiryLoading=false;
+function kitchCloudExpiryStatus(expiry){
+ if(!expiry)return {label:'Expiry missing',cls:'warn'};
+ const t=new Date(String(expiry).slice(0,10)+'T00:00:00'),today=new Date();today.setHours(0,0,0,0);
+ if(!Number.isFinite(t.getTime()))return {label:'Invalid expiry',cls:'bad'};
+ const days=Math.round((t-today)/86400000);
+ return days<0?{label:'Expired',cls:'bad'}:days<=3?{label:'Expiring soon',cls:'warn'}:{label:'Recorded expiry',cls:'ok'};
+}
+function kitchRenderCloudExpiryReceipts(){
+ const el=document.getElementById('kitchCloudExpirySection');if(!el)return;
+ const records=kitchCloudExpiryReceipts.filter(x=>Number(x.accepted)>0).sort((a,b)=>String(a.expiry||'9999').localeCompare(String(b.expiry||'9999')));
+ const expiring=records.filter(x=>kitchCloudExpiryStatus(x.expiry).label==='Expiring soon').length;
+ const expired=records.filter(x=>kitchCloudExpiryStatus(x.expiry).label==='Expired').length;
+ el.innerHTML=`<h3>Cloud Receiving Lots</h3><p class="muted">Read-only accepted deliveries from Supabase. The receiving date and expiry are recorded, but remaining quantity, batch deductions and FEFO allocation are not yet tracked by this view. Do not treat these as available stock lots.</p>
+ <div class="grid"><div class="card"><span>CLOUD RECEIPTS</span><b>${records.length}</b></div><div class="card"><span>EXPIRING SOON (RECORDED)</span><b>${expiring}</b></div><div class="card"><span>EXPIRED (RECORDED)</span><b>${expired}</b></div></div>
+ <div style="max-width:100%;overflow:auto;margin-top:14px"><table style="min-width:790px"><tr><th>INGREDIENT</th><th>SUPPLIER</th><th>INVOICE / LOT REFERENCE</th><th>ACCEPTED</th><th>REMAINING</th><th>RECEIVED</th><th>EXPIRY</th><th>EXPIRY STATUS</th></tr>
+ ${records.map(x=>{const st=kitchCloudExpiryStatus(x.expiry);return `<tr><td><b>${esc(x.ingredient||'—')}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(x.invoice||'—')}</td><td>${cleanQty(x.accepted)} ${esc(x.unit||'')}</td><td class="warn">Not tracked</td><td>${esc(String(x.date||'').slice(0,10))}</td><td>${esc(x.expiry||'—')}</td><td class="${st.cls}"><b>${st.label}</b></td></tr>`}).join('')||'<tr><td colspan="8" class="empty">No cloud receiving lots recorded.</td></tr>'}</table></div>`;
+}
+async function kitchLoadCloudExpiryReceipts(){
+ const el=document.getElementById('kitchCloudExpirySection');if(!el||kitchCloudExpiryLoading)return;
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin){el.innerHTML='<h3>Cloud Receiving Lots</h3><p class="muted">Sign in as KITCH staff to view the cloud receiving lot history.</p>';return;}
+ kitchCloudExpiryLoading=true;
+ try{
+  const {data,error}=await sb.rpc('kitch_team_receiving_history',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  if(error)throw error;
+  kitchCloudExpiryReceipts=Array.isArray(data)?data:[];
+  kitchRenderCloudExpiryReceipts();
+ }catch(e){el.innerHTML='<h3>Cloud Receiving Lots</h3><p class="bad">Cloud receiving history could not be loaded: '+esc(e.message||'Unknown error')+'</p>';}
+ finally{kitchCloudExpiryLoading=false;}
+}
 function batchesPage(){
+ setTimeout(kitchLoadCloudExpiryReceipts,80);
  const a=getArr(BATCH_KEY).slice().sort((x,y)=>String(x.expiry_date).localeCompare(String(y.expiry_date)));
  const expired=a.filter(x=>batchStatus(x).label==='EXPIRED').length;
  const soon=a.filter(x=>batchStatus(x).label==='EXPIRING SOON').length;
@@ -1976,14 +2025,14 @@ function batchesPage(){
  <td>${Number(x.remaining_qty).toFixed(2)} ${esc(x.unit)}</td>
  <td>${esc(x.received_date)}</td><td>${esc(x.expiry_date)}</td>
  <td><span class="${st.cls}"><b>${st.label}</b></span>${st.days>=0?`<br><small>${st.days} day${st.days===1?'':'s'} left</small>`:''}</td></tr>`}).join('');
- return `<div class="grid"><div class="card"><span>ACTIVE BATCHES</span><b>${a.filter(x=>Number(x.remaining_qty)>0).length}</b></div>
- <div class="card"><span>EXPIRING SOON</span><b>${soon}</b></div><div class="card"><span>EXPIRED</span><b>${expired}</b></div>
- <div class="card"><span>FEFO</span><b>${a.length?'ON':'—'}</b></div></div>
- <div class="panel"><h2>Expiry & Batches</h2><p class="muted">Accepted deliveries create batches automatically. Closest expiry is listed first for FEFO control.</p>
- <table><tr><th>INGREDIENT</th><th>SUPPLIER</th><th>PO</th><th>BATCH / LOT</th><th>RECEIVED</th><th>REMAINING</th><th>RECEIVED DATE</th><th>EXPIRY</th><th>STATUS</th></tr>
- ${rows||'<tr><td colspan="11" class="empty">No batches yet. Receive an ingredient delivery to create the first batch.</td></tr>'}</table></div>`;
+ return `<div class="grid"><div class="card"><span>LOCAL TRACKED BATCHES</span><b>${a.filter(x=>Number(x.remaining_qty)>0).length}</b></div>
+ <div class="card"><span>LOCAL EXPIRING SOON</span><b>${soon}</b></div><div class="card"><span>LOCAL EXPIRED</span><b>${expired}</b></div>
+ <div class="card"><span>LOCAL FEFO TRACKING</span><b>${a.length?'ON':'—'}</b></div></div>
+ <div class="panel"><h2>Expiry & Batches</h2><p class="muted">Browser-local batches and cloud Receiving records are shown separately to avoid claiming cloud stock is linked to FEFO when it is not.</p>
+ <div id="kitchCloudExpirySection"><h3>Cloud Receiving Lots</h3><p class="muted">Loading cloud receiving history…</p></div>
+ <h3 style="margin-top:24px">Local Tracked Batches</h3><div style="overflow-x:auto"><table style="min-width:850px"><tr><th>INGREDIENT</th><th>SUPPLIER</th><th>PO</th><th>BATCH / LOT</th><th>RECEIVED</th><th>REMAINING</th><th>RECEIVED DATE</th><th>EXPIRY</th><th>STATUS</th></tr>
+ ${rows||'<tr><td colspan="9" class="empty">No browser-local tracked batches. Cloud receipts, if any, are listed above.</td></tr>'}</table></div></div>`;
 }
-
 
 function filterIngredients(){
  const q=(document.getElementById('ingredientSearch')?.value||'').trim().toLowerCase();
