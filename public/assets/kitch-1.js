@@ -213,7 +213,16 @@ async function cloudLoadIngredients(){
    // Render stock from this snapshot directly rather than depending on legacy
    // Starter/Business browser package flags or branch aliases.
    if(teamCloudAuth?.staff_name){
-     window.__kitchTeamLiveStock=new Map(matchingBalances.map(b=>[String(b.ingredient_id),{qty:toCanonical(Number(b.quantity_on_hand||0),b.unit),value:Number(b.quantity_on_hand||0)*Number(b.indicative_unit_cost||0)}]));
+     // Balance rows are per movement/source; aggregate all rows of the same ingredient.
+     // Map([...]) discarded earlier duplicate-key rows and underreported stock by AED 70.
+     const teamTotals=new Map();
+     matchingBalances.forEach(b=>{
+       const key=String(b.ingredient_id),prior=teamTotals.get(key)||{qty:0,value:0};
+       prior.qty+=toCanonical(Number(b.quantity_on_hand||0),b.unit);
+       prior.value+=Number(b.quantity_on_hand||0)*Number(b.indicative_unit_cost||0);
+       teamTotals.set(key,prior);
+     });
+     window.__kitchTeamLiveStock=teamTotals;
    }
    matchingBalances.forEach(b=>{
      const key=String(b.ingredient_id);
@@ -596,7 +605,7 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+function openPage(name){if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();if((name==='Dashboard'||name==='Production')&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchRefreshProductionDashboard();if((name==='Production'||name==='Label')&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchLoadCloudProductionRecords();if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -2008,7 +2017,25 @@ function recipeYieldRows(r,showCost){
 }
 function recipeCost(r){return recipeCostDetails(r).total}
 function recipeCostLabel(r){const d=recipeCostDetails(r);return d.complete?'AED '+d.total.toFixed(2):'Price missing'}
-function recipeNeedsReview(r){const d=recipeCostDetails(r);return !d.complete}
+function recipeUnitIssues(r,master=ingredients()){
+ return (r.items||[]).flatMap(it=>{
+   const ing=ingredientForRecipeItem(it,master);
+   if(!ing)return [];
+   if(compatibleUnits(it.unit,ing.base_unit))return [];
+   return [{ingredient:ing.name,recipe_unit:unit(it.unit),master_unit:unit(ing.base_unit)}];
+ });
+}
+function recipeNeedsReview(r){
+ const d=recipeCostDetails(r);
+ return !d.complete||recipeUnitIssues(r).length>0;
+}
+function showRecipeUnitAudit(){
+ const affected=recipes().map(r=>({r,issues:recipeUnitIssues(r)})).filter(x=>x.issues.length);
+ const rows=affected.flatMap(({r,issues})=>issues.map(i=>'<tr><td><b>'+esc(r.name)+'</b></td><td>'+esc(i.ingredient)+'</td><td>'+esc(i.recipe_unit)+'</td><td>'+esc(i.master_unit)+'</td></tr>')).join('');
+ modal('<div class="modalHead"><div><div class="sub">RECIPE / MASTER UNIT AUDIT</div><h2>Unit compatibility review</h2></div><button class="close" onclick="closeModal()">×</button></div>'
+ +'<div class="note"><b>'+affected.length+' recipes need unit review.</b> '+affected.reduce((n,x)=>n+x.issues.length,0)+' mismatched ingredient lines. No inventory, recipe quantities, or costs were changed. Confirm conversion and historical stock before correcting master units.</div>'
+ +'<div style="overflow:auto;max-height:60vh"><table><tr><th>RECIPE</th><th>INGREDIENT</th><th>RECIPE UNIT</th><th>MASTER UNIT</th></tr>'+rows+'</table></div>');
+}
 
 function recipeMissing(r){
  const m=ingredients();return r.items.filter(it=>!ingredientForRecipeItem(it,m)).map(x=>x.ingredient)
@@ -2044,7 +2071,7 @@ function recipesPage(){
  }
  return `<div class="grid"><div class="card"><span>RECIPES</span><b>${a.length}</b></div><div class="card"><span>APPROVED</span><b>${a.filter(x=>!recipeNeedsReview(x)).length}</b></div><div class="card"><span>NEEDS REVIEW</span><b>${a.filter(x=>recipeNeedsReview(x)).length}</b></div><div class="card"><span>1 BATCH RULE</span><b>ON</b></div></div>
  <div class="panel"><h2>Recipe Master</h2><p class="muted">Chef defines ingredient quantities in kg/g/ltr/ml/pcs for exactly 1 Batch. KITCH converts units automatically and Production will deduct from the production location stock.</p>
- <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button>':''}</div>
+ <div class="actions">${manage?'<button class="btn black" onclick="openRecipe()">+ Recipe</button><button class="btn" onclick="openRecipeImport()">Import Excel</button><button class="btn" onclick="showRecipeUnitAudit()">Review Unit Mismatches</button>':''}</div>
  <div class="note"><b>How to read:</b> Raw input = ingredients purchased for one batch. Raw food cost = amount spent on ingredients. Edible value = value after preparation yield. Click a recipe for its costing sheet.</div>
  <table><tr><th>RECIPE NAME</th><th>CATEGORY</th><th>INGREDIENTS</th><th>RAW INPUT / BATCH</th><th>FINISHED BATCH</th><th>PORTIONS</th><th>RAW COST / BATCH</th><th>EDIBLE VALUE</th><th>STATUS</th></tr>
  ${a.map(r=>{let miss=recipeMissing(r),cost=recipeCost(r),costInfo=recipeCostDetails(r);return `<tr onclick="viewRecipe(${r.id})" style="cursor:pointer"><td><b>${esc(r.name)}</b><br><small>1 Batch</small></td><td>${esc(r.category||'—')}</td><td>${r.items.length}</td><td>${recipeInput(r)}</td><td>${r.yield?cleanQty(r.yield)+' '+esc(r.yield_unit||'kg'):'<small class="muted">Not recorded</small>'}</td><td>${Number(r.portions||0)||'—'}</td><td><b>${recipeCostLabel(r)}</b><br><small>Supplier cost</small></td><td>${costInfo.complete?'AED '+recipeYieldValueDetails(r).usable.toFixed(2):'Price missing'}</td><td>${miss.length||costInfo.missingPrices.length?`<span class="warn"><b>NEEDS REVIEW</b></span><br><small>${miss.length?miss.length+" unmatched":costInfo.missingPrices.length+" missing prices"} · click recipe</small>`:'<span class="ok"><b>APPROVED</b></span>'}</td></tr>`}).join('')||'<tr><td colspan="9" class="empty">No recipes yet. Add a recipe or import the sample Excel.</td></tr>'}</table></div>`;
@@ -2183,6 +2210,97 @@ async function saveYieldEdit(){
 
 // PRODUCTION ENGINE — recipe execution, stock check, FEFO deduction and QC handoff
 const PROD_KEY='kitch_demo_production_v1';
+// Complete production / QC sync is keyed to the original stock deduction request.
+// These methods NEVER write to inventory movements or the opening stock ledger.
+let kitchCloudProductionRecordLoading=false;
+let kitchCloudProductionRecords=null;
+async function kitchProofForCloud(value){
+ if(!value||typeof value!=='string'||!value.startsWith('data:image/'))return '';
+ if(value.length<130000)return value;
+ return await new Promise((resolve,reject)=>{
+  const img=new Image();
+  img.onload=()=>{
+   try{
+    const ratio=Math.min(1,700/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*ratio));
+    canvas.height=Math.max(1,Math.round(img.naturalHeight*ratio));
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    const shrunk=canvas.toDataURL('image/jpeg',0.65);
+    if(shrunk.length>170000)reject(Error('Image proof is too large. Please select a smaller photo.'));
+    else resolve(shrunk);
+   }catch(e){reject(e)}
+  };
+  img.onerror=()=>reject(Error('Cannot read image proof.'));
+  img.src=value;
+ });
+}
+async function kitchCloudSaveRun(run){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in with your authorized KITCH staff account.');
+ if(!run?.cloud_request_id||!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(String(run.cloud_request_id)))throw Error('This local run has no verified cloud deduction ID. No stock was changed.');
+ if(!sb)throw Error('Cloud unavailable');
+ const payload={id:run.id,cloud_request_id:run.cloud_request_id,code:run.code,recipe_id:run.recipe_id,recipe:run.recipe,batches:run.batches,
+  requirements:run.requirements,production_cost:run.production_cost,location:run.location,status:run.status,created_by:run.created_by,staff_name:run.staff_name,
+  created_at:run.created_at,actual_yield:run.actual_yield||0,yield_unit:run.yield_unit||'kg',actual_unit_cost:run.actual_unit_cost||0,
+  production_date:run.production_date||'',expiry_date:run.expiry_date||'',production_temp_c:run.production_temp_c??null,
+  completed_at:run.completed_at||'',qc_temp_c:run.qc_temp_c??null,qc_note:run.qc_note||'',qc_serial:run.qc_serial||'',qc_at:run.qc_at||'',
+  production_proof:await kitchProofForCloud(run.production_proof),qc_photo:await kitchProofForCloud(run.qc_photo)};
+ const {data,error}=await sb.rpc('kitch_team_save_production_record',{
+  p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_request_id:run.cloud_request_id,p_payload:payload,
+  p_expected_revision:Number(run.cloud_sync_revision||0)
+ });
+ if(error)throw Error(error.message||'Cloud save failed');
+ if(!data?.saved)throw Error('Cloud did not confirm saved production');
+ return Number(data.revision);
+}
+async function kitchLoadCloudProductionRecords(){
+ if(kitchCloudProductionRecordLoading||!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!sb)return;
+ kitchCloudProductionRecordLoading=true;
+ try{
+  const {data,error}=await sb.rpc('kitch_team_production_records',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  if(error)throw Error(error.message);
+  if(!Array.isArray(data))throw Error('Invalid cloud production response');
+  kitchCloudProductionRecords=data.filter(x=>x?.request_id&&x?.payload&&String(x.payload.cloud_request_id)===String(x.request_id));
+  const local=getArr(PROD_KEY),byId=new Map(local.filter(x=>x.cloud_request_id).map(x=>[String(x.cloud_request_id),x]));
+  let added=0,upgraded=0,conflicts=0;
+  for(const row of data){
+   const payload=row?.payload;if(!payload||String(payload.cloud_request_id)!==String(row.request_id))continue;
+   const old=byId.get(String(row.request_id));
+   if(!old){
+    const copy={...payload,cloud_sync_revision:Number(row.revision||1)};
+    if(local.some(x=>String(x.id)===String(copy.id)))copy.id=Date.now()+Math.floor(Math.random()*100000);
+    local.push(copy);byId.set(String(row.request_id),copy);added++;
+   }else if(Number(old.cloud_sync_revision||0)>0&&Number(row.revision)>Number(old.cloud_sync_revision)){
+    // Never erase a local record that may have unsynced changes.
+    if(old.status!==payload.status||Number(old.actual_yield||0)!==Number(payload.actual_yield||0)){
+     conflicts++;
+    }else{Object.assign(old,payload,{cloud_sync_revision:Number(row.revision)});upgraded++;}
+   }else if(Number(old.cloud_sync_revision||0)===0){conflicts++;}
+  }
+  if(added||upgraded)setArr(PROD_KEY,local);
+  if(conflicts)console.warn('Local production differs from cloud. Use explicit sync/review before overwriting.',conflicts);
+  if(['Production','Label'].includes(pageTitle?.textContent))content.innerHTML=page(pageTitle.textContent);
+ }catch(e){console.warn('Production cloud records unavailable',e.message||e)}
+ finally{kitchCloudProductionRecordLoading=false}
+}
+async function kitchSyncLocalProductionRecords(){
+ const local=getArr(PROD_KEY).filter(r=>r.cloud_request_id&&['In Production','Label Pending','Label Created','Label Rejected'].includes(r.status)&&!r.cloud_sync_revision);
+ if(!local.length)return alert('No unsynced local production records found on this browser.');
+ const review=local.slice(0,10).map(r=>(r.code||'Unknown')+' · '+(r.recipe||'Recipe')+' · '+(r.actual_yield||'?')+' '+(r.yield_unit||'')+' · Expires '+(r.expiry_date||'not entered')+' · '+r.status).join('\n');
+ if(!confirm('Review the local production details before saving them to Supabase:\n\n'+review+'\n\nThese values become cloud records. No stock will be deducted. If the yield, dates or QC status are wrong, cancel and correct them first.\n\nConfirm sync?'))return;
+ let synced=0,errors=[];
+ for(const run of local){
+  try{
+   const revision=await kitchCloudSaveRun(run);
+   const records=getArr(PROD_KEY),current=records.find(x=>x.id===run.id);
+   if(current){current.cloud_sync_revision=revision;setArr(PROD_KEY,records)}
+   synced++;
+  }catch(e){errors.push((run.code||'Unknown')+': '+(e.message||e))}
+ }
+ await kitchLoadCloudProductionRecords();
+ alert('Cloud sync: '+synced+' saved, '+errors.length+' unresolved.'+(errors.length?'\n'+errors.slice(0,4).join('\n'):''));
+}
+
 function productionStockCanonical(ing){
  if(teamCloudAuth?.staff_name&&window.__kitchTeamLiveStock instanceof Map)return Number(window.__kitchTeamLiveStock.get(String(ing.cloud_id))?.qty||0);
  if(hasCentralStore())return branchStockCanonical(ing);
@@ -2197,10 +2315,16 @@ function prettyCanonical(q,u){return cleanQty(fromCanonical(Number(q||0),u))+' '
 function productionPage(){
  linkRecipeIngredients();
  const approved=recipes().filter(r=>!recipeNeedsReview(r)), runs=scopedRows(getArr(PROD_KEY)).slice().reverse();
- return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${runs.filter(x=>x.status==='Completed'||x.status==='Label Pending').length}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
+ const history=kitchCloudProductionSummary?.history;
+ const cloudHistory=Array.isArray(history)?history:[];
+ const syncedByRequest=new Map((kitchCloudProductionRecords||[]).map(row=>[String(row.request_id),row.payload]));
+ const completedRunCount=kitchCloudProductionRecords? kitchCloudProductionRecords.filter(row=>['Label Pending','Label Created','Label Rejected'].includes(row.payload?.status)).length : runs.filter(x=>['Completed','Label Pending','Label Created','Label Rejected'].includes(x.status)).length;
+ const cloudRows=cloudHistory.map(h=>`<tr><td><b>${esc(h.request_id?.slice(0,8)||'—')}</b></td><td>${esc(h.occurred_at?new Date(h.occurred_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):'—')}</td><td>${Number(h.ingredient_lines||0)}</td>${session==='production'?'':`<td>${money(h.stock_usage_cost)}</td>`}<td>${syncedByRequest.has(String(h.request_id))?`<span class="ok"><b>${esc(syncedByRequest.get(String(h.request_id)).status||'Synced')}</b></span>`:`<span style="color:#b45309">Stock deducted · completion not synced</span>`}</td></tr>`).join('');
+ return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${completedRunCount}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
  <div class="panel"><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
- <div class="actions"><button class="btn black" onclick="openProduction()">+ Start Production</button></div>
- <table><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production runs yet.</td></tr>'}</table><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>`;
+ <div class="actions"><button class="btn black" onclick="openProduction()">+ Start Production</button><button class="btn" onclick="kitchSyncLocalProductionRecords()">Sync Local Production to Cloud</button></div>
+ <table><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production runs yet.</td></tr>'}</table><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
+ <div class="panel"><h2>Cloud Stock-Deduction History</h2><p class="muted">Read-only production inventory deductions. These entries do not establish that final yield, QC, or labels were completed. No inventory is changed by viewing them.</p><div style="overflow-x:auto"><table><tr><th>REQUEST ID</th><th>DATE (DUBAI)</th><th>INGREDIENT LINES</th>${session==='production'?'':'<th>STOCK USAGE COST</th>'}<th>STATUS</th></tr>${history?cloudRows||'<tr><td colspan="5">No cloud stock-deduction runs recorded.</td></tr>':'<tr><td colspan="5">Cloud history not loaded. Open this page again or check the connection.</td></tr>'}</table></div></div>`;
 }
 
 function viewProductionDetails(id){
@@ -2230,7 +2354,7 @@ function openQCProof(id){
 }
 
 function openProduction(){
- const a=recipes().filter(r=>!recipeMissing(r).length);if(!a.length)return alert('No approved recipes available.');
+ const a=recipes().filter(r=>!recipeNeedsReview(r));if(!a.length)return alert('No recipes pass ingredient and unit validation. Review the Recipe Master first.');
  modal(`<div class="modalHead"><h2>Start Production</h2><button class="close" onclick="closeModal()">×</button></div>
  <div class="formGrid"><div class="field"><label>APPROVED RECIPE</label><select id="prRecipe" onchange="previewProduction()">${a.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>NUMBER OF BATCHES</label><input id="prBatches" type="number" min="0.001" step="0.001" value="1" oninput="previewProduction()"></div></div>
  <div class="note"><b>Production Location:</b> ${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())} · Recipe quantities are multiplied by the number of batches.</div>
@@ -2340,6 +2464,8 @@ async function confirmProduction(){
    status:'In Production',created_by:currentActor(),staff_name:currentActor(),created_at:new Date().toISOString(),
    actual_yield:'',yield_unit:r.yield_unit||'kg'});
   setArr(PROD_KEY,runs);
+  // Stock was already deducted by the cloud. If metadata sync fails, keep the local recovery record.
+  try{const last=runs[runs.length-1];last.cloud_sync_revision=await kitchCloudSaveRun(last);setArr(PROD_KEY,runs)}catch(syncError){console.warn('Production stock deducted but completion metadata not yet synced',syncError.message||syncError)}
   await cloudLoadIngredients();
   closeModal();openActualYield(runs[runs.length-1].id);
  }catch(err){alert('Production not started: '+err.message+'\\nStock was not deducted by this failed request.');}
@@ -2357,7 +2483,7 @@ function openActualYield(id){
 }
 let productionProofData='';
 function previewProductionProof(file){if(!file){productionProofData='';return}const reader=new FileReader();reader.onload=e=>{productionProofData=e.target.result;const box=document.getElementById('prProofPreview');if(box)box.innerHTML=`<img src="${productionProofData}" alt="Production proof">`};reader.readAsDataURL(file)}
-function completeProduction(id){const y=Number(prYield.value||0),productionDate=(prProductionDate.value||'').trim(),expiry=(prExpiry.value||'').trim(),temp=(prTemp.value||'').trim();if(y<=0)return alert('Enter actual finished yield.');if(!productionDate)return alert('Enter production date.');if(!expiry)return alert('Enter expiry date.');if(productionDate>expiry)return alert('Production date cannot be after expiry date.');if(temp==='')return alert('Enter finished product temperature.');if(!productionProofData)return alert('Add production proof image.');let a=getArr(PROD_KEY),x=a.find(p=>p.id===id);x.actual_yield=y;x.yield_unit=prYieldUnit.value;x.actual_unit_cost=Number(x.production_cost||0)/y;x.production_date=productionDate;x.expiry_date=expiry;x.production_temp_c=Number(temp);x.production_proof=productionProofData;x.status='Label Pending';x.completed_at=new Date().toISOString();setArr(PROD_KEY,a);productionProofData='';closeModal();openPage('Label')}
+async function completeProduction(id){const y=Number(prYield.value||0),productionDate=(prProductionDate.value||'').trim(),expiry=(prExpiry.value||'').trim(),temp=(prTemp.value||'').trim();if(y<=0)return alert('Enter actual finished yield.');if(!productionDate)return alert('Enter production date.');if(!expiry)return alert('Enter expiry date.');if(productionDate>expiry)return alert('Production date cannot be after expiry date.');if(temp==='')return alert('Enter finished product temperature.');if(!productionProofData)return alert('Add production proof image.');let a=getArr(PROD_KEY),x=a.find(p=>p.id===id);if(!x)return alert('Production record not found.');const updated={...x,actual_yield:y,yield_unit:prYieldUnit.value,actual_unit_cost:Number(x.production_cost||0)/y,production_date:productionDate,expiry_date:expiry,production_temp_c:Number(temp),production_proof:productionProofData,status:'Label Pending',completed_at:new Date().toISOString()};try{updated.cloud_sync_revision=await kitchCloudSaveRun(updated)}catch(e){return alert('Cloud save failed. Production completion was NOT saved: '+(e.message||e))}Object.assign(x,updated);setArr(PROD_KEY,a);productionProofData='';closeModal();openPage('Label')}
 function qcPage(){const a=getArr(PROD_KEY).filter(x=>x.status==='Label Pending'||x.status==='Completed').slice().reverse();return `<div class="panel"><h2>QC</h2><p class="muted">Check completed production before release. No cost or purchasing information is shown to Chef Production.</p><table><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>STATUS</th><th>ACTION</th></tr>${a.map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.recipe)}</td><td>${x.batches}</td><td>${esc(x.actual_yield)} ${esc(x.yield_unit)}</td><td>${esc(x.status)}</td><td>${x.status==='Label Pending'?`<button class="btn black" onclick="passQC(${x.id})">Create Label</button>`:'<span class="ok"><b>RELEASED</b></span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production waiting for Label.</td></tr>'}</table></div>`}
 function passQC(id){let a=getArr(PROD_KEY),x=a.find(p=>p.id===id);if(!x)return;x.status='Completed';x.qc_at=new Date().toISOString();setArr(PROD_KEY,a);openPage('Label')}
 
@@ -2365,7 +2491,7 @@ function passQC(id){let a=getArr(PROD_KEY),x=a.find(p=>p.id===id);if(!x)return;x
 function qcPage(){
  const runs=getArr(PROD_KEY).slice().reverse(), pending=runs.filter(x=>x.status==='Label Pending'), passed=runs.filter(x=>x.status==='Label Created'), rejected=runs.filter(x=>x.status==='Label Rejected');
  return `<div class="grid"><div class="card"><span>PENDING LABEL</span><b>${pending.length}</b></div><div class="card"><span>PASSED</span><b>${passed.length}</b></div><div class="card"><span>REJECTED</span><b>${rejected.length}</b></div><div class="card"><span>CONTROL</span><b style="font-size:18px">LABEL</b></div></div>
- <div class="panel"><h2>Labels</h2><p class="muted">Check completed production before release. Chef Production does not see costs or prices.</p>
+ <div class="panel"><h2>Labels</h2><p class="muted">Check completed production before release. Chef Production does not see costs or prices.</p><div class="actions"><button class="btn" onclick="kitchSyncLocalProductionRecords()">Sync Existing Labels to Cloud</button></div>
  <table><tr><th>PRODUCTION</th><th>RECIPE</th><th>YIELD</th><th>EXPIRY</th><th>TEMP</th><th>STATUS</th><th>ACTION</th></tr>
  ${runs.filter(x=>['Label Pending','Label Created','Label Rejected'].includes(x.status)).map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.actual_yield)} ${esc(x.yield_unit||'')}</td><td>${esc(x.expiry_date||'—')}</td><td>${x.qc_temp_c!==undefined?cleanQty(x.qc_temp_c)+' °C':'—'}</td><td><span class="${x.status==='Label Created'?'ok':x.status==='Label Rejected'?'bad':'warn'}"><b>${esc(x.status)}</b></span></td><td>${x.status==='Label Pending'?`<button class="btn black" onclick="openQC(${x.id})">Label Details</button>`:x.status==='Label Created'?`<button class="btn" onclick="printQCLabel(${x.id})">Print Label</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No production waiting for Label.</td></tr>'}</table></div>`;
 }
@@ -2395,7 +2521,7 @@ function previewQCPhoto(file){
  reader.onload=e=>{qcPhotoData=e.target.result;document.getElementById('qcPhotoPreview').innerHTML=`<img src="${qcPhotoData}" alt="Label proof">`};
  reader.readAsDataURL(file);
 }
-function finishQC(id,pass){
+async function finishQC(id,pass){
  let a=getArr(PROD_KEY),run=a.find(x=>x.id===id);if(!run)return;
  const productionDate=(document.getElementById('qcProductionDate')?.value||'').trim();
  const expiry=(document.getElementById('qcExpiry')?.value||'').trim();
@@ -2406,15 +2532,17 @@ function finishQC(id,pass){
  if(pass && productionDate>expiry)return alert('Production date cannot be after the expiry date.');
  if(pass && temp==='')return alert('Enter the product temperature in °C.');
  if(pass && !qcPhotoData)return alert('Add image proof before passing QC.');
- run.status=pass?'Label Created':'Label Rejected';
- run.qc_note=(document.getElementById('qcNote')?.value||'').trim();
- run.production_date=productionDate||run.production_date||'';
- run.expiry_date=expiry||run.expiry_date||'';
- run.qc_temp_c=temp===''?'':Number(temp);
- run.qc_photo=qcPhotoData||run.qc_photo||'';
- run.qc_at=new Date().toISOString();
- if(pass)run.qc_serial=run.qc_serial||('QC-'+String(id).slice(-6));
- setArr(PROD_KEY,a);closeModal();openPage('Label');
+ const updated={...run};
+ updated.status=pass?'Label Created':'Label Rejected';
+ updated.qc_note=(document.getElementById('qcNote')?.value||'').trim();
+ updated.production_date=productionDate||run.production_date||'';
+ updated.expiry_date=expiry||run.expiry_date||'';
+ updated.qc_temp_c=temp===''?'':Number(temp);
+ updated.qc_photo=qcPhotoData||run.qc_photo||'';
+ updated.qc_at=new Date().toISOString();
+ if(pass)updated.qc_serial=updated.qc_serial||('QC-'+String(id).slice(-6));
+ try{updated.cloud_sync_revision=await kitchCloudSaveRun(updated)}catch(e){return alert('Cloud QC save failed. Label status was NOT changed: '+(e.message||e))}
+ Object.assign(run,updated);setArr(PROD_KEY,a);closeModal();openPage('Label');
  if(pass && confirm('Label created. Print the label now?'))printQCLabel(id);
 }
 function printQCLabel(id){
@@ -2813,28 +2941,46 @@ function setKitchDashboardWasteDate(value){
  kitchDashboardWasteDate=value;
  if(pageTitle?.textContent==='Dashboard')openPage('Dashboard');
 }
+// Read-only branch production summary; never mutate inventory while refreshing a dashboard.
+let kitchCloudProductionSummary=null;
+let kitchCloudProductionFetchPending=false;
+async function kitchRefreshProductionDashboard(){
+ if(kitchCloudProductionFetchPending||!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!sb)return;
+ kitchCloudProductionFetchPending=true;
+ try{
+  const {data,error}=await sb.rpc('kitch_team_production_dashboard',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  if(error)throw error;
+  if(!data||!Number.isFinite(Number(data.stock_deducted_runs))||!Number.isFinite(Number(data.stock_usage_cost)))throw Error('Invalid cloud production summary');
+  kitchCloudProductionSummary={count:Number(data.stock_deducted_runs),cost:Number(data.stock_usage_cost),branch_id:data.branch_id,history:Array.isArray(data.history)?data.history:[]};
+  if(['Dashboard','Production'].includes(pageTitle?.textContent)&&session!=='owner')content.innerHTML=page(pageTitle.textContent);
+ }catch(err){
+  kitchCloudProductionSummary=null;
+  console.warn('Cloud production dashboard unavailable',err?.message||err);
+ }finally{kitchCloudProductionFetchPending=false;}
+}
 function managerDashboard(){
  const loc=assignedLocationName(),ings=ingredients();
- const inv=ings.reduce((t,x)=>t+(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))*Number(x.cost||0),0);
+ // Use the same branch-scoped, cloud-valued stock calculation as Inventory.
+ const inv=ings.reduce((t,x)=>t+kitchStockValue(x),0);
  const wasteDate=kitchDashboardWasteDate,wr=scopedRows(wasteRecords()).filter(x=>x.type!=='Stock Adjustment'&&kitchDubaiDay(x.created_at)===wasteDate),w=wr.filter(x=>x.type!=='Preparation Yield Loss').reduce((t,x)=>t+Number(x.cost||0),0),prepLossValue=wr.filter(x=>x.type==='Preparation Yield Loss').reduce((t,x)=>t+Math.max(0,Number(x.value_impact||0)),0);
  const counts=scopedRows(stockCounts()).filter(x=>x.status==='Completed');
  const varianceRows=counts.flatMap(c=>(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).map(i=>({...i,location:c.location})));
  let shortage=0,overage=0;varianceRows.forEach(i=>{const v=Number(i.variance_canonical||0),val=Math.abs(fromCanonical(v,i.unit)*Number(i.cost||0));if(v<0)shortage+=val;else overage+=val});
- const runs=scopedRows(getArr(PROD_KEY)),productionValue=runs.reduce((total,run)=>total+Math.max(0,Number(run.production_cost||0)),0),low=ings.filter(x=>(hasCentralStore()?fromCanonical(session==='store'?centralStockCanonical(x):branchStockCanonical(x,currentStaff?.location_id||currentBranchId()),x.base_unit):displayStock(x))<=Number(x.minimum||0)).length;
+ const runs=scopedRows(getArr(PROD_KEY)),cloudProduction=kitchCloudProductionSummary,displayProductionRuns=cloudProduction?String(cloudProduction.count):'—',productionValue=cloudProduction?money(cloudProduction.cost):'—',low=ings.filter(x=>displayStock(x)<=Number(x.minimum||0)).length;
  const openReq=session==='manager'?getArr(STOCK_REQUEST_KEY).filter(x=>x.branch===loc&&!['Received','Completed'].includes(x.status)).length:0;
  return `<div class="kitch2026-dashboard">
  <div class="k26-heading"><div><div class="k26-eyebrow">KITCH / OPERATIONS / ${esc(loc).toUpperCase()}</div><h2>Kitchen command center<span class="k26-orange">.</span></h2><p>Live stock, production and operational controls for your location.</p></div><div class="k26-date"><span class="k26-pulse"></span> LIVE WORKSPACE</div></div>
  <div class="k26-metrics">
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">▦</span><small>INVENTORY VALUE</small><strong>${window.__kitchInventoryLoadError?'Unavailable':money(inv)}</strong><em>View current stock <span>↗</span></em></button>
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">◉</span><small>LOW / OUT OF STOCK</small><strong>${window.__kitchInventoryLoadError?'—':low}</strong><em>${window.__kitchInventoryLoadError?'Check inventory connection':(low?'Items need attention':'Stock levels healthy')} <span>↗</span></em></button>
- <button class="k26-metric" onclick="openPage('Production')"><span class="k26-metric-icon">▤</span><small>PRODUCTION RUNS</small><strong>${runs.length}</strong><div style="font-size:12px;margin-top:5px;font-weight:700">PRODUCTION VALUE: ${money(productionValue)}</div><em>Open production <span>↗</span></em></button>
+ <button class="k26-metric" onclick="openPage('Production')"><span class="k26-metric-icon">▤</span><small>STOCK-DEDUCTED RUNS</small><strong>${displayProductionRuns}</strong><div style="font-size:12px;margin-top:5px;font-weight:700">STOCK USAGE COST: ${productionValue}</div><em>Open production <span>↗</span></em></button>
  <div class="k26-metric" style="cursor:default;display:flex;flex-direction:column;align-items:stretch;gap:3px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="k26-metric-icon">↘</span><label style="font-size:10px;font-weight:800;display:flex;align-items:center;gap:4px">DATE <input aria-label="Select waste report date" type="date" value="${esc(wasteDate)}" onchange="setKitchDashboardWasteDate(this.value)" style="width:126px;max-width:100%;font-size:12px;padding:5px;border:1px solid #ddd;border-radius:8px;background:white"></label></div><small>ACTUAL WASTE COST · SELECTED DAY</small><strong>${money(w)}</strong><div style="font-size:12px;margin-top:4px">Preparation yield loss: <b>${money(prepLossValue)}</b></div><div style="font-size:11px;color:#777">${wr.length} recorded events · No double stock deduction</div><button onclick="openPage('Waste & Adjustments')" style="align-self:flex-start;border:0;padding:5px 0;background:transparent;font-size:12px;cursor:pointer;color:inherit;font-weight:700">View Wastage ↗</button></div></div>
  <div class="k26-body">
  <section class="k26-panel k26-priority"><div class="k26-panel-top"><div><div class="k26-eyebrow">TODAY'S FOCUS</div><h3>Operations at a glance</h3></div><span class="k26-status">${window.__kitchInventoryLoadError?'STOCK DATA UNAVAILABLE':(low?'ATTENTION NEEDED':'ON TRACK')}</span></div>
  <div class="k26-priority-list">
  <button onclick="openPage('Inventory')"><span class="k26-number">01</span><span><b>Stock availability</b><small>${low} ingredients at or below minimum</small></span><span>↗</span></button>
  <button onclick="openPage('Stock Count')"><span class="k26-number">02</span><span><b>Stock reconciliation</b><small>${counts.length} completed counts · ${money(shortage+overage)} variance</small></span><span>↗</span></button>
- <button onclick="openPage('Production')"><span class="k26-number">03</span><span><b>Production tracking</b><small>${runs.length} production runs recorded</small></span><span>↗</span></button>
+ <button onclick="openPage('Production')"><span class="k26-number">03</span><span><b>Production tracking</b><small>${cloudProduction?displayProductionRuns+' cloud stock-deducted runs':'Cloud production count unavailable'}</small></span><span>↗</span></button>
  </div></section>
  <section class="k26-panel k26-control"><div class="k26-panel-top"><div><div class="k26-eyebrow">CONTROL CENTER</div><h3>Key indicators</h3></div></div>
  <div class="k26-indicator"><span>Stock variance</span><strong>${money(shortage+overage)}</strong></div>
