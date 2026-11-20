@@ -2284,7 +2284,8 @@ async function kitchLoadCloudProductionRecords(){
 async function kitchSyncLocalProductionRecords(){
  const local=getArr(PROD_KEY).filter(r=>r.cloud_request_id&&['In Production','Label Pending','Label Created','Label Rejected'].includes(r.status)&&!r.cloud_sync_revision);
  if(!local.length)return alert('No unsynced local production records found on this browser.');
- if(!confirm('Sync '+local.length+' local production record(s) to cloud? Only records with verified stock-deduction IDs will be accepted. Existing cloud records will not be overwritten. Check actual yields and expiry dates before continuing.'))return;
+ const review=local.slice(0,10).map(r=>(r.code||'Unknown')+' · '+(r.recipe||'Recipe')+' · '+(r.actual_yield||'?')+' '+(r.yield_unit||'')+' · Expires '+(r.expiry_date||'not entered')+' · '+r.status).join('\n');
+ if(!confirm('Review the local production details before saving them to Supabase:\n\n'+review+'\n\nThese values become cloud records. No stock will be deducted. If the yield, dates or QC status are wrong, cancel and correct them first.\n\nConfirm sync?'))return;
  let synced=0,errors=[];
  for(const run of local){
   try{
