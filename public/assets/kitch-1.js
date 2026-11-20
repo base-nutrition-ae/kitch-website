@@ -605,7 +605,42 @@ async function refreshKitchTrialStatus(){
   target.innerHTML='Trial information could not be loaded. <button type="button" class="btn" onclick="refreshKitchTrialStatus()">Retry</button><small style="display:block;margin-top:6px">'+esc(String(err?.message||err||'Connection error'))+'</small>';
  }
 }
-function openPage(name){if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();if((name==='Dashboard'||name==='Production')&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchRefreshProductionDashboard();if((name==='Production'||name==='Label')&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchLoadCloudProductionRecords();if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}void refreshKitchTrialStatus();pageTitle.textContent=name;[...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));content.innerHTML=page(name);if(window.innerWidth<=850)toggleAppMobileMenu(false)}
+// Production is a shared cloud workflow: load recipes, history and completion records
+// whenever entering it, not only when the Recipes tab is visited.
+let kitchProductionLoadStatus='idle';
+let kitchProductionLoadError='';
+let kitchProductionLoadSeq=0;
+async function kitchRefreshProductionPageData(){
+ const seq=++kitchProductionLoadSeq;
+ kitchProductionLoadStatus='loading';
+ kitchProductionLoadError='';
+ if(pageTitle?.textContent==='Production')content.innerHTML=page('Production');
+ const errors=[];
+ const tasks=[
+   ['recipes',()=>kitchLoadSyncedRecipes()],
+   ['completion records',()=>kitchLoadCloudProductionRecords()],
+   ['stock-deduction history',()=>kitchRefreshProductionDashboard()]
+ ];
+ const results=await Promise.allSettled(tasks.map(async ([name,fn])=>{await fn();return name;}));
+ results.forEach((r,i)=>{if(r.status==='rejected')errors.push(tasks[i][0]+': '+String(r.reason?.message||r.reason));});
+ if(seq!==kitchProductionLoadSeq)return;
+ kitchProductionLoadError=errors.join(' | ');
+ kitchProductionLoadStatus=errors.length?'error':'ready';
+ if(pageTitle?.textContent==='Production')content.innerHTML=page('Production');
+}
+function openPage(name){
+ if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}
+ if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();
+ if(name==='Dashboard'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchRefreshProductionDashboard();
+ if(name==='Label'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchLoadCloudProductionRecords();
+ if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}
+ void refreshKitchTrialStatus();
+ pageTitle.textContent=name;
+ [...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));
+ content.innerHTML=page(name);
+ if(window.innerWidth<=850)toggleAppMobileMenu(false);
+ if(name==='Production')void kitchRefreshProductionPageData();
+}
 function page(n){
  if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
  if(n==='Subscription Setup')return subscriptionPage();
@@ -1921,17 +1956,17 @@ function recipes(){return getArr(RECIPE_KEY)}
 
 const KITCH_RECIPE_SYNC_TABLE='kitch_recipe_sync';
 async function kitchLoadSyncedRecipes(){
- if(!sb)return;
+ if(!sb)throw Error('Cloud connection unavailable');
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
   const {data,error}=await sb.rpc('kitch_team_recipe_sync',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
-  if(error){console.warn('Team recipe load failed',error.message);return;}
+  if(error){console.warn('Team recipe load failed',error.message);throw Error(error.message);}
   const local=recipes(),map=new Map(local.map(r=>[String(r.id),r]));
   for(const row of data||[]){if(row.payload&&Array.isArray(row.payload.items)){const v=row.payload;const prior=map.get(String(v.id));if(!prior||String(v.updated_at||'')>String(prior.updated_at||''))map.set(String(v.id),v)}}
   setArr(RECIPE_KEY,[...map.values()]);return;
  }
- if(!cloud?.restaurant_id||!cloud?.user?.id)return;
+ if(!cloud?.restaurant_id||!cloud?.user?.id)throw Error('Workspace not authenticated for shared recipes');
  const {data,error}=await sb.from(KITCH_RECIPE_SYNC_TABLE).select('recipe_key,payload,updated_at').eq('restaurant_id',cloud.restaurant_id);
- if(error){console.warn('KITCH recipe cloud read failed',error.message);return;}
+ if(error){console.warn('KITCH recipe cloud read failed',error.message);throw Error(error.message);}
  if(!Array.isArray(data)||!data.length)return;
  const local=recipes(),byId=new Map(local.map(r=>[String(r.id),r]));
  for(const row of data){
@@ -2254,10 +2289,14 @@ async function kitchCloudSaveRun(run){
  return Number(data.revision);
 }
 async function kitchLoadCloudProductionRecords(){
- if(kitchCloudProductionRecordLoading||!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!sb)return;
+ if(kitchCloudProductionRecordLoading)return;
+ if(!sb)throw Error('Cloud connection unavailable');
+ if(!teamCloudAuth?.staff_name&&!cloud?.restaurant_id)throw Error('Workspace not authenticated for production records');
  kitchCloudProductionRecordLoading=true;
  try{
-  const {data,error}=await sb.rpc('kitch_team_production_records',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  const {data,error}=teamCloudAuth?.staff_name&&teamCloudAuth?.pin
+   ? await sb.rpc('kitch_team_production_records',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin})
+   : await sb.from('kitch_production_completion_sync').select('request_id,payload,revision').eq('restaurant_id',cloud.restaurant_id);
   if(error)throw Error(error.message);
   if(!Array.isArray(data))throw Error('Invalid cloud production response');
   kitchCloudProductionRecords=data.filter(x=>x?.request_id&&x?.payload&&String(x.payload.cloud_request_id)===String(x.request_id));
@@ -2280,7 +2319,7 @@ async function kitchLoadCloudProductionRecords(){
   if(added||upgraded)setArr(PROD_KEY,local);
   if(conflicts)console.warn('Local production differs from cloud. Use explicit sync/review before overwriting.',conflicts);
   if(['Production','Label'].includes(pageTitle?.textContent))content.innerHTML=page(pageTitle.textContent);
- }catch(e){console.warn('Production cloud records unavailable',e.message||e)}
+ }catch(e){console.warn('Production cloud records unavailable',e.message||e);throw e}
  finally{kitchCloudProductionRecordLoading=false}
 }
 async function kitchSyncLocalProductionRecords(){
@@ -2321,7 +2360,7 @@ function productionPage(){
  const completedRunCount=kitchCloudProductionRecords? kitchCloudProductionRecords.filter(row=>['Label Pending','Label Created','Label Rejected'].includes(row.payload?.status)).length : runs.filter(x=>['Completed','Label Pending','Label Created','Label Rejected'].includes(x.status)).length;
  const cloudRows=cloudHistory.map(h=>`<tr><td><b>${esc(h.request_id?.slice(0,8)||'—')}</b></td><td>${esc(h.occurred_at?new Date(h.occurred_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):'—')}</td><td>${Number(h.ingredient_lines||0)}</td>${session==='production'?'':`<td>${money(h.stock_usage_cost)}</td>`}<td>${syncedByRequest.has(String(h.request_id))?`<span class="ok"><b>${esc(syncedByRequest.get(String(h.request_id)).status||'Synced')}</b></span>`:`<span style="color:#b45309">Stock deducted · completion not synced</span>`}</td></tr>`).join('');
  return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${completedRunCount}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
- <div class="panel"><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
+ <div class="panel"><div role="status" style="padding:8px 0 12px;font-size:13px">${kitchProductionLoadStatus==='loading'?'Loading shared recipes and production history…':kitchProductionLoadStatus==='error'?`<span class="bad">Cloud data could not be fully loaded: ${esc(kitchProductionLoadError)}</span> <button class="btn" onclick="kitchRefreshProductionPageData()">Retry Cloud Load</button>`:kitchProductionLoadStatus==='ready'?'<span class="ok">Cloud data refreshed.</span>':''}</div><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
  <div class="actions"><button class="btn black" onclick="openProduction()">+ Start Production</button><button class="btn" onclick="kitchSyncLocalProductionRecords()">Sync Local Production to Cloud</button></div>
  <table><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production runs yet.</td></tr>'}</table><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
  <div class="panel"><h2>Cloud Stock-Deduction History</h2><p class="muted">Read-only production inventory deductions. These entries do not establish that final yield, QC, or labels were completed. No inventory is changed by viewing them.</p><div style="overflow-x:auto"><table><tr><th>REQUEST ID</th><th>DATE (DUBAI)</th><th>INGREDIENT LINES</th>${session==='production'?'':'<th>STOCK USAGE COST</th>'}<th>STATUS</th></tr>${history?cloudRows||'<tr><td colspan="5">No cloud stock-deduction runs recorded.</td></tr>':'<tr><td colspan="5">Cloud history not loaded. Open this page again or check the connection.</td></tr>'}</table></div></div>`;
@@ -2945,7 +2984,9 @@ function setKitchDashboardWasteDate(value){
 let kitchCloudProductionSummary=null;
 let kitchCloudProductionFetchPending=false;
 async function kitchRefreshProductionDashboard(){
- if(kitchCloudProductionFetchPending||!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!sb)return;
+ if(kitchCloudProductionFetchPending)return;
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return;
+ if(!sb)throw Error('Cloud connection unavailable');
  kitchCloudProductionFetchPending=true;
  try{
   const {data,error}=await sb.rpc('kitch_team_production_dashboard',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
@@ -2956,6 +2997,7 @@ async function kitchRefreshProductionDashboard(){
  }catch(err){
   kitchCloudProductionSummary=null;
   console.warn('Cloud production dashboard unavailable',err?.message||err);
+  throw err;
  }finally{kitchCloudProductionFetchPending=false;}
 }
 function managerDashboard(){
