@@ -1,0 +1,32 @@
+name: KITCH static release checks
+
+on:
+  push:
+    branches:
+      - kitch-final-stabilization
+  pull_request:
+    paths:
+      - 'public/**'
+      - 'scripts/**'
+      - 'docs/staged-kitch-cloud-*.sql'
+      - 'package.json'
+      - '.github/workflows/kitch-static-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-check:
+    name: Check KITCH assets and stock safety guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run read-only KITCH checks
+        run: npm run check
