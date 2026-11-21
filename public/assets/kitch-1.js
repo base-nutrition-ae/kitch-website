@@ -3014,13 +3014,102 @@ function countLocation(){
 
 function stockCounts(){return getArr(COUNT_KEY)}
 function activeCount(){return stockCounts().find(x=>x.status==='In Progress'&&x.location===countLocation())}
+// Cloud stock counting uses live Supabase snapshots, never the browser-local stock cache.
+// Requires docs/staged-kitch-cloud-stock-count.sql before enabling for customers.
+let kitchCloudCountDraft=null;
+async function kitchCloudCountRpc(action,extra={}){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud?.branch_id)throw Error('Staff cloud login is required.');
+ const {data,error}=await sb.rpc('kitch_team_stock_count_cloud',{
+  p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_action:action,...extra
+ });
+ if(error)throw Error(error.message);
+ return data;
+}
+async function kitchStartCloudStockCount(){
+ if(kitchCloudCountDraft?.lines?.length)return kitchOpenCloudCountDraft();
+ try{
+  const response=await kitchCloudCountRpc('snapshot');
+  if(String(response?.branch_id)!==String(cloud.branch_id))throw Error('Count snapshot belongs to another location');
+  const rows=Array.isArray(response?.ingredients)?response.ingredients:[];
+  if(!rows.length)throw Error('Cloud ingredient snapshot is empty');
+  if(!window.crypto?.randomUUID)throw Error('Secure transaction ID is unavailable');
+  kitchCloudCountDraft={id:window.crypto.randomUUID(),branch_id:cloud.branch_id,lines:rows.map(x=>({
+   ingredient_id:x.ingredient_id,name:x.name,sku:x.sku,unit:x.unit,expected_qty:Number(x.system_qty||0),
+   unit_cost:Number(x.unit_cost||0),physical_qty:null
+  }))};
+  kitchOpenCloudCountDraft();
+ }catch(e){alert('Cloud Stock Count is not ready: '+e.message+'. No inventory was changed.')}
+}
+function kitchOpenCloudCountDraft(){
+ const d=kitchCloudCountDraft;if(!d?.lines?.length)return;
+ modal(`<div class="modalHead"><div><div class="sub">CLOUD PHYSICAL STOCK COUNT</div><h2>Physical Count</h2><div class="muted">${esc(assignedLocationName())} · Cloud draft</div></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note">Enter what you physically counted. System values are from a fresh Supabase snapshot. If stock changes before finalizing, KITCH rejects the stale count rather than overwriting newer transactions.</div>
+ <div style="max-height:54vh;overflow:auto"><table style="width:100%"><thead><tr><th>INGREDIENT</th><th>SYSTEM</th><th>PHYSICAL</th><th>VARIANCE</th></tr></thead><tbody>
+ ${d.lines.map((x,i)=>`<tr><td><b>${esc(x.name)}</b></td><td>${cleanQty(x.expected_qty)} ${esc(x.unit)}</td><td><input type="number" min="0" step="any" data-cloud-count-index="${i}" value="${x.physical_qty==null?'':esc(String(x.physical_qty))}" placeholder="Count" oninput="kitchCloudCountPreview(this)" style="width:115px;min-height:40px;border:1px solid #ddd;border-radius:10px;padding:6px"/></td><td id="cloudCountVar${i}">${x.physical_qty==null?'—':cleanQty(x.physical_qty-x.expected_qty)+' '+esc(x.unit)}</td></tr>`).join('')}</tbody></table></div>
+ <div class="actions"><button class="btn" onclick="kitchFillCloudCountUncounted()">Use System Qty for Uncounted Items</button></div>
+ <div class="note" id="kitchCloudCountMessage">Draft only. Finalization writes verified stock adjustments in Supabase. Never use estimated quantities.</div>
+ <button class="primary" id="kitchCloudCountSubmit" onclick="kitchFinalizeCloudStockCount()">Finalize Verified Cloud Stock Count</button>`);
+}
+function kitchCloudCountPreview(input){
+ const d=kitchCloudCountDraft;if(!d)return;
+ const idx=Number(input.dataset.cloudCountIndex),row=d.lines[idx];
+ if(!row)return;
+ const val=input.value===''?null:Number(input.value);
+ row.physical_qty=val!=null&&Number.isFinite(val)&&val>=0?val:null;
+ const cell=document.getElementById('cloudCountVar'+idx);
+ if(cell)cell.textContent=row.physical_qty==null?'—':cleanQty(row.physical_qty-row.expected_qty)+' '+row.unit;
+}
+function kitchFillCloudCountUncounted(){
+ const d=kitchCloudCountDraft;if(!d)return;
+ document.querySelectorAll('[data-cloud-count-index]').forEach(input=>{
+  if(input.value===''){
+   const row=d.lines[Number(input.dataset.cloudCountIndex)];
+   input.value=String(row.expected_qty);kitchCloudCountPreview(input);
+  }
+ });
+}
+async function kitchFinalizeCloudStockCount(){
+ const d=kitchCloudCountDraft;if(!d)return;
+ if(d.branch_id!==cloud.branch_id)return alert('Cloud location changed. Restart the count.');
+ const msg=document.getElementById('kitchCloudCountMessage'),btn=document.getElementById('kitchCloudCountSubmit');
+ if(d.lines.some(x=>x.physical_qty==null||!Number.isFinite(x.physical_qty)||x.physical_qty<0)){
+  if(msg)msg.innerHTML='<b class="bad">Count every ingredient before finalizing.</b>';return;
+ }
+ const variance=d.lines.filter(x=>Math.abs(x.physical_qty-x.expected_qty)>.000001).length;
+ if(!confirm('Finalize physical stock count for '+d.lines.length+' ingredients? '+variance+' quantities differ. This will reconcile the actual cloud inventory.'))return;
+ if(btn)btn.disabled=true;if(msg)msg.textContent='Validating and saving the cloud stock count…';
+ try{
+  const lines=d.lines.map(x=>({ingredient_id:x.ingredient_id,unit:x.unit,
+   expected_qty:x.expected_qty,physical_qty:x.physical_qty}));
+  const result=await kitchCloudCountRpc('finalize',{p_count_id:d.id,p_lines:lines});
+  if(!result?.saved)throw Error('Cloud did not confirm save');
+  kitchCloudCountDraft=null;closeModal();
+  await cloudLoadIngredients();openPage('Stock Count');
+  alert('Cloud Stock Count saved. Total variance: '+money(result.total_variance_cost)+'. '+(result.already_recorded?'Already processed; no duplicate changes.':'Stock reconciled once.'));
+ }catch(e){
+  if(msg)msg.textContent='Not confirmed: '+e.message+'. The count reference is preserved for a safe retry. Do not start a new count until this status is verified.';
+ }finally{if(btn)btn.disabled=false}
+}
+async function kitchLoadCloudStockCountHistory(){
+ const el=document.getElementById('kitchCloudCountHistory');if(!el)return;
+ try{
+  const data=await kitchCloudCountRpc('history');
+  const rows=Array.isArray(data)?data:[];
+  el.innerHTML=`<h3>Completed Cloud Stock Counts</h3><div style="overflow:auto"><table style="width:100%;min-width:560px"><thead><tr><th>DATE</th><th>ITEMS</th><th>VARIANCE VALUE</th><th>STATUS</th></tr></thead><tbody>
+  ${rows.map(x=>`<tr><td>${esc(String(x.date||'').slice(0,10))}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${money(x.total_variance_cost||0)}</td><td>Completed (cloud)</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No completed cloud counts.</td></tr>'}</tbody></table></div>`;
+ }catch(e){el.innerHTML='<div class="note warn">Cloud count history unavailable: '+esc(e.message)+'</div>';}
+}
 function stockCountPage(){
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id)setTimeout(kitchLoadCloudStockCountHistory,90);
  const loc=countLocation(),all=stockCounts().filter(x=>x.location===loc).slice().reverse(),active=activeCount(),completed=all.filter(x=>x.status==='Completed');
  const last=completed[0],varianceValue=completed.reduce((t,c)=>t+Number(c.variance_cost||0),0);
  return `<div class="grid"><div class="card"><span>COUNT LOCATION</span><b style="font-size:17px">${esc(loc)}</b></div><div class="card"><span>COMPLETED COUNTS</span><b>${completed.length}</b></div><div class="card"><span>LAST COUNT</span><b style="font-size:17px">${last?esc(String(last.completed_at).slice(0,10)):'—'}</b></div><div class="card"><span>TOTAL VARIANCE</span><b>AED ${varianceValue.toFixed(2)}</b></div></div>
  <div class="panel"><h2>Stock Count</h2><p class="muted">Count the physical stock at <b>${esc(loc)}</b>. The current draft uses browser-local stock snapshots; final cloud reconciliation is not yet connected.</p>
  ${teamCloudAuth?.staff_name&&cloud?.branch_id?'<div class="note warn"><b>Cloud stock protection:</b> Finalize Stock Count is temporarily blocked on this development build because it would reconcile browser-local quantities rather than live cloud inventory. Physical count drafts remain local.</div>':''}
- <div class="actions">${active?`<button class="btn black" onclick="openStockCount('${active.id}')">Continue Count</button>`:`<button class="btn black" onclick="startStockCount()">+ Start Stock Count</button>`}</div>
+ <div class="actions">${teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id
+ ?`<button class="btn black" onclick="kitchStartCloudStockCount()">${kitchCloudCountDraft?'Continue Cloud Count':'+ Start Cloud Stock Count'}</button>`
+ :(active?`<button class="btn black" onclick="openStockCount('${active.id}')">Continue Count</button>`:`<button class="btn black" onclick="startStockCount()">+ Start Stock Count</button>`)}</div>
+ ${teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id?'<div id="kitchCloudCountHistory" class="panel" style="margin:14px 0"><h3>Cloud Stock Counts</h3><p class="muted">Loading cloud history…</p></div>':''}
  <table><tr><th>COUNT</th><th>LOCATION</th><th>ITEMS</th><th>VARIANCE ITEMS</th><th>VARIANCE VALUE</th><th>DATE</th><th>STATUS</th><th>ACTION</th></tr>${all.map(c=>`<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.location)}</td><td>${(c.items||[]).length}</td><td>${(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).length}</td><td>${c.status==='Completed'?'AED '+Number(c.variance_cost||0).toFixed(2):'—'}</td><td>${esc(String(c.completed_at||c.created_at||'').slice(0,16).replace('T',' '))}</td><td class="${c.status==='Completed'?'ok':'warn'}"><b>${esc(c.status)}</b></td><td><button class="btn" onclick="openStockCount('${c.id}')">${c.status==='Completed'?'View':'Open'}</button></td></tr>`).join('')||'<tr><td colspan="11" class="empty">No stock counts yet. Start the first physical count.</td></tr>'}</table></div>`;
 }
 function startStockCount(){
