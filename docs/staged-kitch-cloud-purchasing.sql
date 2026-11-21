@@ -21,7 +21,7 @@ create or replace function public.kitch_team_purchase_cloud(
  p_notes text default null,p_receipt_id uuid default null,p_line_key text default null)
 returns jsonb language plpgsql security definer set search_path='' as $fn$
 declare a public.staff_access%rowtype;o public.kitch_cloud_purchase_orders%rowtype;
- r public.kitch_receiving_entries%rowtype;l jsonb;i public.ingredients%rowtype;q numeric;v_id uuid;
+ r public.kitch_receiving_entries%rowtype;l jsonb;i public.ingredients%rowtype;q numeric;v_id uuid;v_linked_qty numeric;v_paid numeric;v_existing integer;
 begin
  if p_pin !~ '^[0-9]{4}$' or nullif(trim(coalesce(p_staff_name,'')),'') is null then raise exception 'Invalid staff credentials';end if;
  if (select count(*) from public.staff_access x where x.is_active and lower(trim(x.staff_name))=lower(trim(p_staff_name)) and x.pin_hash=encode(extensions.digest(trim(p_pin),'sha256'),'hex'))<>1 then raise exception 'Invalid staff credentials';end if;
@@ -30,7 +30,14 @@ begin
  if p_action='list' then
  return (select coalesce(jsonb_agg(jsonb_build_object('id',x.id,'order_ref',x.order_ref,'supplier',x.supplier_name,
   'lines',x.lines,'delivery_date',x.delivery_date,'notes',x.notes,'status',x.status,'branch_id',x.branch_id,
-  'updated_at',x.updated_at) order by x.created_at desc),'[]'::jsonb)
+  'updated_at',x.updated_at,'receipt_links',(
+   select coalesce(jsonb_agg(jsonb_build_object('receipt_id',rl.receipt_id,'line_key',rl.line_key,
+      'accepted',rr.delivered_qty-rr.rejected_qty,'unit_price',rr.unit_price,'invoice',rr.invoice_number,
+      'supplier',rr.supplier,'ingredient_id',rr.ingredient_id,'received_at',rr.received_at)
+      order by rr.received_at),'[]'::jsonb)
+   from public.kitch_cloud_purchase_receipt_links rl
+   join public.kitch_receiving_entries rr on rr.id=rl.receipt_id where rl.order_id=x.id
+  )) order by x.created_at desc),'[]'::jsonb)
  from public.kitch_cloud_purchase_orders x where x.restaurant_id=a.restaurant_id
  and (x.branch_id=a.branch_id or a.role::text in('owner','operations_manager')));
  end if;
@@ -68,7 +75,14 @@ begin
   if not found or lower(trim(r.supplier))<>lower(trim(o.supplier_name)) then raise exception 'Receipt or supplier mismatch';end if;
   select value into l from jsonb_array_elements(o.lines) where value->>'line_key'=p_line_key limit 1;
   if l is null or (l->>'ingredient_id')::uuid<>r.ingredient_id or l->>'unit'<>r.unit then raise exception 'Receipt item mismatch';end if;
-  if r.delivered_qty-r.rejected_qty<=0 or r.delivered_qty-r.rejected_qty>(l->>'qty')::numeric then raise exception 'Receipt accepted quantity invalid';end if;
+  if r.delivered_qty-r.rejected_qty<=0 then raise exception 'Receipt accepted quantity invalid';end if;
+  if nullif(trim(coalesce(r.invoice_number,'')),'') is null then raise exception 'Receipt invoice number is missing';end if;
+  if exists(select 1 from public.kitch_cloud_purchase_receipt_links where receipt_id=r.id) then raise exception 'Receipt already linked to an order';end if;
+  select coalesce(sum(rr.delivered_qty-rr.rejected_qty),0) into v_linked_qty
+   from public.kitch_cloud_purchase_receipt_links rl
+   join public.kitch_receiving_entries rr on rr.id=rl.receipt_id
+   where rl.order_id=o.id and rl.line_key=p_line_key;
+  if v_linked_qty+(r.delivered_qty-r.rejected_qty)>(l->>'qty')::numeric then raise exception 'Linked receipts exceed ordered quantity';end if;
   insert into public.kitch_cloud_purchase_receipt_links(order_id,receipt_id,line_key) values(o.id,r.id,p_line_key);
  else raise exception 'Unknown action';end if;
  return jsonb_build_object('saved',true,'order_id',o.id);
