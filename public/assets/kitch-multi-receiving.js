@@ -1,6 +1,40 @@
 /* KITCH multi-ingredient receiving. Production uses secure Supabase invoice transactions. */
 (() => {
  'use strict';
+ // Apply the intended Open-style pill to freshly rendered report actions.
+ // Inline important properties win against stale module-specific CSS rules.
+ function fixKitchReportButtons(){
+   document.querySelectorAll('button').forEach(button=>{
+     const label=(button.textContent||'').trim();
+     if(label!=='PDF' && label!=='Invoice')return;
+     if(!button.closest('table'))return;
+     const style={
+       appearance:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',
+       boxSizing:'border-box',width:'auto',minWidth:'56px',height:'32px',
+       minHeight:'32px',padding:'0 13px',margin:'1px 3px 1px 0',
+       border:'1px solid #dcdde1',borderRadius:'999px',
+       background:'#f3f3f5',color:'#38383b',fontSize:'11px',
+       fontWeight:'800',lineHeight:'1',whiteSpace:'nowrap',
+       boxShadow:'none',verticalAlign:'middle',cursor:'pointer'
+     };
+     for(const [key,value] of Object.entries(style))
+       button.style.setProperty(key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase()),value,'important');
+     button.dataset.kitchReportPill='fixed';
+   });
+ }
+ let scheduled=false;
+ function scheduleKitchPills(){
+   if(scheduled)return;
+   scheduled=true;
+   requestAnimationFrame(()=>{scheduled=false;fixKitchReportButtons()});
+ }
+ if(document.readyState==='loading')
+   document.addEventListener('DOMContentLoaded',scheduleKitchPills,{once:true});
+ else scheduleKitchPills();
+ const reportObserver=new MutationObserver(scheduleKitchPills);
+ reportObserver.observe(document.documentElement,{subtree:true,childList:true});
+ window.kitchFixReportButtonStyle=fixKitchReportButtons;
+
  const actionStyleId='kitch-table-action-pill-v2';
  if(!document.getElementById(actionStyleId)){
    const node=document.createElement('style');
