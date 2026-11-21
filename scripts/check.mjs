@@ -32,4 +32,29 @@ for(const [name,pattern] of releaseChecks){
 }
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
 
+
+const sourceFiles=[
+ 'docs/KITCH_PRE_RELEASE_CHECK_2026-11-21.md',
+ 'docs/staged-kitch-cloud-purchasing.sql',
+ 'docs/staged-kitch-cloud-lots-fefo.sql',
+ 'docs/staged-kitch-cloud-stock-controls.sql',
+ 'docs/staged-kitch-cloud-stock-count.sql'
+];
+for(const filename of sourceFiles){
+ if(!fs.existsSync(filename)) throw new Error('Missing staged release document: '+filename);
+}
+const safetyChecks=[
+ ['cloud count snapshot', "kitchCloudCountRpc('snapshot')"],
+ ['cloud count finalize', "kitchCloudCountRpc('finalize'"],
+ ['cloud count requires staff auth', "Staff cloud login is required."],
+ ['legacy local count blocked in cloud session', "Cloud stock protection: this Stock Count still reconciles only browser-local inventory"],
+ ['local counts explicitly distinguished from cloud', 'Browser-local count history is shown below.'],
+ ['unreconciled FEFO warning', 'FEFO allocation'],
+ ['report export cloud/local separation', 'Cloud Receiving is displayed separately from browser-local purchase order totals.']
+];
+for(const [name,pattern] of safetyChecks){
+ if(!app.includes(pattern))throw new Error('Missing release safety guard: '+name);
+}
+console.log('PASS: Staged SQL files and cloud/local stock safety guards present (static verification only).');
+
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} local asset references, and Main Office embed.`);
