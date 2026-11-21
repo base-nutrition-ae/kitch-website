@@ -6,6 +6,7 @@ create table if not exists public.kitch_cloud_purchase_orders(
  delivery_date date, notes text, status text not null default 'Pending Approval'
  check(status in('Pending Approval','Approved','Open','Rejected','Closed')),
  created_by uuid references public.staff_access(id), approved_by uuid references public.staff_access(id),
+ invoice_status text not null default 'Pending Review' check(invoice_status in('Pending Review','Approved','Hold')), invoice_approved_by uuid references public.staff_access(id), invoice_approved_at timestamptz,
  created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
  unique(restaurant_id,order_ref));
 alter table public.kitch_cloud_purchase_orders enable row level security;
@@ -21,7 +22,7 @@ create or replace function public.kitch_team_purchase_cloud(
  p_notes text default null,p_receipt_id uuid default null,p_line_key text default null)
 returns jsonb language plpgsql security definer set search_path='' as $fn$
 declare a public.staff_access%rowtype;o public.kitch_cloud_purchase_orders%rowtype;
- r public.kitch_receiving_entries%rowtype;l jsonb;i public.ingredients%rowtype;q numeric;v_id uuid;v_linked_qty numeric;v_paid numeric;v_existing integer;
+ r public.kitch_receiving_entries%rowtype;l jsonb;i public.ingredients%rowtype;q numeric;v_id uuid;v_linked_qty numeric;v_paid numeric;v_existing integer;v_item jsonb;v_ordered numeric;v_received numeric;v_mismatches integer;
 begin
  if p_pin !~ '^[0-9]{4}$' or nullif(trim(coalesce(p_staff_name,'')),'') is null then raise exception 'Invalid staff credentials';end if;
  if (select count(*) from public.staff_access x where x.is_active and lower(trim(x.staff_name))=lower(trim(p_staff_name)) and x.pin_hash=encode(extensions.digest(trim(p_pin),'sha256'),'hex'))<>1 then raise exception 'Invalid staff credentials';end if;
@@ -30,7 +31,7 @@ begin
  if p_action='list' then
  return (select coalesce(jsonb_agg(jsonb_build_object('id',x.id,'order_ref',x.order_ref,'supplier',x.supplier_name,
   'lines',x.lines,'delivery_date',x.delivery_date,'notes',x.notes,'status',x.status,'branch_id',x.branch_id,
-  'updated_at',x.updated_at,'receipt_links',(
+  'updated_at',x.updated_at,'invoice_status',x.invoice_status,'receipt_links',(
    select coalesce(jsonb_agg(jsonb_build_object('receipt_id',rl.receipt_id,'line_key',rl.line_key,
       'accepted',rr.delivered_qty-rr.rejected_qty,'unit_price',rr.unit_price,'invoice',rr.invoice_number,
       'supplier',rr.supplier,'ingredient_id',rr.ingredient_id,'received_at',rr.received_at)
@@ -84,6 +85,33 @@ begin
    where rl.order_id=o.id and rl.line_key=p_line_key;
   if v_linked_qty+(r.delivered_qty-r.rejected_qty)>(l->>'qty')::numeric then raise exception 'Linked receipts exceed ordered quantity';end if;
   insert into public.kitch_cloud_purchase_receipt_links(order_id,receipt_id,line_key) values(o.id,r.id,p_line_key);
+ elsif p_action='approve_invoice' then
+  if a.role::text not in('owner','operations_manager','kitchen_manager','executive_chef') or o.status not in('Approved','Open','Closed')
+    or o.invoice_status='Approved' then raise exception 'Invoice approval not permitted';end if;
+  for v_item in select value from jsonb_array_elements(o.lines) loop
+   v_ordered:=(v_item->>'qty')::numeric;
+   select coalesce(sum(r2.delivered_qty-r2.rejected_qty),0),count(*)
+   into v_received,v_existing
+   from public.kitch_cloud_purchase_receipt_links rl
+   join public.kitch_receiving_entries r2 on r2.id=rl.receipt_id
+   where rl.order_id=o.id and rl.line_key=v_item->>'line_key'
+    and r2.ingredient_id=(v_item->>'ingredient_id')::uuid and r2.unit=v_item->>'unit'
+    and lower(trim(r2.supplier))=lower(trim(o.supplier_name))
+    and nullif(trim(r2.invoice_number),'') is not null;
+   if v_received<v_ordered or v_received>v_ordered or v_existing=0 then raise exception 'Invoice approval requires exact fully received PO quantity for every line';end if;
+  end loop;
+  -- Price variance must be deliberately reviewed; mismatch is blocked, not silently approved.
+  select count(*) into v_mismatches from public.kitch_cloud_purchase_receipt_links rl
+   join public.kitch_receiving_entries r3 on r3.id=rl.receipt_id
+   cross join lateral jsonb_array_elements(o.lines) ll
+   where rl.order_id=o.id and ll->>'line_key'=rl.line_key
+     and abs(r3.unit_price-(ll->>'price')::numeric)>0.01;
+  if v_mismatches>0 then raise exception 'Invoice price differs from PO; put on hold and review variance';end if;
+  update public.kitch_cloud_purchase_orders set invoice_status='Approved',invoice_approved_by=a.id,
+   invoice_approved_at=now(),updated_at=now() where id=o.id;
+ elsif p_action='hold_invoice' then
+  if a.role::text not in('owner','operations_manager','kitchen_manager','executive_chef') or o.invoice_status='Approved' then raise exception 'Invoice hold not permitted';end if;
+  update public.kitch_cloud_purchase_orders set invoice_status='Hold',updated_at=now() where id=o.id;
  else raise exception 'Unknown action';end if;
  return jsonb_build_object('saved',true,'order_id',o.id);
 end $fn$;
