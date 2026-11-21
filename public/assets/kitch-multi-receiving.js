@@ -127,9 +127,28 @@
    const root=document.getElementById('modal');
    root.querySelector('#kmrAdd').addEventListener('click',()=>{if(lines.length>=100)return alert('Maximum 100 items');lines.push(newLine());draw()});
    root.querySelector('#kmrSubmit').addEventListener('click',submit);
-   root.querySelector('#kmrLines').addEventListener('click',e=>{
-     const button=e.target.closest('[data-action=remove]');if(!button)return;
-     lines=lines.filter(x=>x.key!==Number(button.dataset.key));draw();
+   root.querySelector('#kmrLines').addEventListener('click',async e=>{
+     const button=e.target.closest('[data-action]');if(!button)return;
+     const line=lines.find(x=>x.key===Number(button.dataset.key));
+     if(button.dataset.action==='remove'){lines=lines.filter(x=>x!==line);draw();return;}
+     if(button.dataset.action!=='saveDefault'||!line)return;
+     const ing=findIngredient(line.id),status=document.getElementById('kmrMessage');
+     if(!ing||!['pcs','pkt','box'].includes(line.unit)||!(Number(line.packSize)>0)||factor(line,ing.base_unit)==null||line.price===''||!Number.isFinite(Number(line.price))||Number(line.price)<0){
+       status.style.color='#b42318';status.textContent='Enter a valid package quantity, size unit, and price first.';return;
+     }
+     button.disabled=true;status.textContent='Saving package to Ingredient Master...';
+     try{
+       const result=await sb.rpc('kitch_team_local_save_package',{
+         p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ing.cloud_id,
+         p_purchase_unit:line.unit,p_pack_size:Number(line.packSize),p_pack_unit:line.packUnit,
+         p_unit_price:Number(line.price)});
+       if(result.error)throw result.error;
+       packageDefaults.set(String(ing.cloud_id),{
+         purchase_unit:line.unit,pack_size:Number(line.packSize),pack_unit:line.packUnit,unit_price:Number(line.price)});
+       status.style.color='#28734b';status.textContent='Package and price saved for '+ing.name+'. Future receiving auto-fills them.';
+       button.textContent='Saved to Master';
+     }catch(ex){status.style.color='#b42318';status.textContent='Could not save master package: '+(ex.message||ex)}
+     finally{button.disabled=false}
    });
    function change(e){
      const target=e.target,field=target.dataset.field,key=Number(target.dataset.key);
