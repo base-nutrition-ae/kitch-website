@@ -1462,7 +1462,7 @@ function purchasingPage(){
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
  <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn black" onclick="openUnifiedMasterImport()">Import Unified Master</button><button class="btn" onclick="openSupplierExcel()">Import Supplier Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
- <div class="note" style="margin:14px 0"><b>${['127.0.0.1','localhost'].includes(location.hostname)?'Local Demo Purchasing':'Cloud Purchasing (development)'}</b> · A separate, staff-authenticated order ledger is being prepared. Existing browser orders are not migrated automatically, and none of the cloud actions change inventory.</div><div class="actions"><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Load Cloud Purchase Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
+ <div class="note" style="margin:14px 0"><b id="kitchCloudPurchaseRole">Cloud Purchasing</b> · Requests require Main Office approval before purchase orders. Existing browser-only orders remain separate; cloud purchase orders do not deduct or receive stock.</div><div class="actions"><button id="kitchCloudRequestCreate" class="btn black" hidden onclick="kitchNewCloudPurchaseRequest()">+ Cloud Purchase Request</button><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Refresh Cloud Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
  <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
 }
 
@@ -1524,42 +1524,145 @@ function normalizeSupplierData(){
 }
 function importSupplierExcel(file){if(!file)return;const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let base=normalizeSupplierData(),su=base.su,sp=base.sp,addedS=0,updatedS=0,addedP=0,updatedP=0;rows.forEach(row=>{const supplier=String(row.Supplier||row.supplier||'').trim();if(!supplier)return;let sx=su.find(x=>String(x.name||'').toLowerCase()===supplier.toLowerCase());const details={contact:String(row['Contact Person']||row.Contact||'').trim(),phone:String(row['Phone Number']||row.Phone||'').trim(),email:String(row.Email||'').trim(),trn:String(row['TRN / VAT Number']||row.TRN||'').trim(),terms:String(row['Payment Terms']||'').trim(),days:String(row['Delivery Days']||'').trim(),min_order:Number(row['Minimum Order AED']||row['Minimum Order']||0),address:String(row['Address / Location']||row.Address||'').trim(),lead_time:String(row['Lead Time Days']||'').trim(),notes:String(row.Notes||'').trim()};if(!sx){sx={id:Date.now()+Math.random(),name:supplier,...details};su.push(sx);addedS++}else{Object.keys(details).forEach(k=>{if(details[k]!==''&&details[k]!==0)sx[k]=details[k]});updatedS++}const product=String(row.Product||row.Ingredient||'').trim();if(product){const sku=String(row['Supplier SKU']||row.SKU||'').trim(),unit=String(row.Unit||'kg').trim(),price=Number(row['Agreed Price AED']||row.Price||0),lead=String(row['Lead Time Days']||'').trim(),notes=String(row.Notes||'').trim();let px=sp.find(x=>String(x.supplier||'').toLowerCase()===supplier.toLowerCase()&&((sku&&String(x.sku||'').toLowerCase()===sku.toLowerCase())||(!sku&&String(x.name||'').toLowerCase()===product.toLowerCase())));if(px){if(price!==Number(px.price||0))px.previous_price=Number(px.price||0);Object.assign(px,{supplier,name:product,sku,unit,price,lead_time:lead,notes,updated_at:new Date().toISOString()});updatedP++}else{sp.push({id:Date.now()+Math.random(),supplier,name:product,sku,unit,price,previous_price:price,lead_time:lead,notes,updated_at:new Date().toISOString()});addedP++}}});setArr(SUP_KEY,su);setSupplierProducts(sp);normalizeSupplierData();closeModal();openPage('Suppliers & Purchasing');alert(`Import complete. ${addedS} new suppliers, ${updatedS} supplier rows updated, ${addedP} new products, ${updatedP} products updated. Existing duplicates were cleaned.`)}catch(err){console.error(err);alert('Could not read this Excel file. Check the column names.')}};r.readAsArrayBuffer(file)}
 
-// KITCH cloud purchasing staged adapter; distinct from existing browser-only order records.
-// Requires docs/staged-kitch-cloud-purchasing.sql before any live use.
+// KITCH shared Purchasing workflow. Changes are made only through the
+// existing, permission-checked kitch_purchase_workflow cloud RPC.
 let kitchCloudPurchaseRows=[];
+let kitchCloudPurchaseCatalog={role:'',ingredients:[],suppliers:[],requests:[],orders:[]};
+let kitchCloudPurchaseBusy=false;
 async function kitchCloudPurchaseRpc(action,extra={}){
- if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in as KITCH staff to use cloud purchasing.');
- // The production database has kitch_purchase_workflow, not the staged kitch_team_purchase_cloud ledger.
- // Allow authenticated, read-only cloud history; do not simulate approvals or create another ledger.
- if(action!=='list')throw Error('Cloud purchasing changes require the approved production workflow. No order or inventory was changed.');
- const {data,error}=await sb.rpc('kitch_purchase_workflow',{
-   p_action:'list',p_restaurant_id:cloud?.restaurant_id||null,
-   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin
- });
- if(error)throw Error(error.message);
- const requests=Array.isArray(data?.requests)?data.requests:[];
- const orders=Array.isArray(data?.orders)?data.orders:[];
- const grouped=new Map();
- for(const o of orders){
-  const key=String(o.id||o.po_no||'');
-  if(!grouped.has(key))grouped.set(key,{id:o.id,order_ref:o.po_no||'PO',supplier:o.supplier||'—',status:o.status||'—',lines:[],source:'approved-cloud-ledger'});
-  grouped.get(key).lines.push(o);
+ if(!cloud?.restaurant_id)throw Error('Sign in to a KITCH company workspace.');
+ const args={p_action:action,p_restaurant_id:cloud.restaurant_id,...extra};
+ if(teamCloudAuth?.staff_name && teamCloudAuth?.pin){
+  args.p_staff_name=teamCloudAuth.staff_name;
+  args.p_pin=teamCloudAuth.pin;
  }
- return [...grouped.values(),...requests.map(r=>({id:r.id,order_ref:r.request_no||'PR',supplier:r.ingredient||'Request',status:r.status||'Pending Approval',lines:[r],source:'approved-cloud-ledger'}))];
+ const {data,error}=await sb.rpc('kitch_purchase_workflow',args);
+ if(error)throw Error(error.message);
+ return data;
 }
 function kitchCloudPurchaseActionButtons(x){
- return '<span class="muted" title="Read-only display. Order actions require the approved Main Office workflow">View only</span>';
+ const owner=kitchCloudPurchaseCatalog.role==='owner',manager=['owner','store_manager'].includes(kitchCloudPurchaseCatalog.role);
+ const status=String(x.status||'').toLowerCase();
+ if(x.kind==='request'&&status==='pending_approval'&&owner)
+  return `<button type="button" class="btn" onclick="kitchReviewCloudRequest('${esc(x.id)}','approve')">Approve</button> <button type="button" class="btn" onclick="kitchReviewCloudRequest('${esc(x.id)}','reject')">Reject</button>`;
+ if(x.kind==='request'&&status==='approved'&&manager && !kitchCloudPurchaseCatalog.orders.some(o=>o.request_id===x.id && String(o.status).toLowerCase()!=='cancelled'))
+  return `<button type="button" class="btn" onclick="kitchCreateCloudOrder('${esc(x.id)}')">Create PO</button>`;
+ return '<span class="muted">—</span>';
 }
 async function kitchRefreshCloudPurchases(){
  const body=document.getElementById('kitchCloudPOBody');if(!body)return;
- body.innerHTML='<tr><td colspan="5" class="empty">Loading shared orders…</td></tr>';
+ body.innerHTML='<tr><td colspan="5" class="empty">Loading shared purchase records…</td></tr>';
  try{
   const data=await kitchCloudPurchaseRpc('list');
-  kitchCloudPurchaseRows=Array.isArray(data)?data:[];
-  body.innerHTML=kitchCloudPurchaseRows.map(x=>`<tr><td><b>${esc(x.order_ref)}</b></td><td>${esc(x.supplier)}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${esc(x.status)}</td><td>${kitchCloudPurchaseActionButtons(x)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No cloud purchase orders yet. Legacy browser orders are not synced automatically.</td></tr>';
+  kitchCloudPurchaseCatalog={
+    role:String(data?.role||''),
+    ingredients:Array.isArray(data?.ingredients)?data.ingredients:[],
+    suppliers:Array.isArray(data?.suppliers)?data.suppliers:[],
+    requests:Array.isArray(data?.requests)?data.requests:[],
+    orders:Array.isArray(data?.orders)?data.orders:[]
+  };
+  const grouped=new Map();
+  for(const o of kitchCloudPurchaseCatalog.orders){
+   const key=String(o.id||'');
+   if(!grouped.has(key))grouped.set(key,{kind:'order',id:o.id,order_ref:o.po_no||'PO',
+    supplier:o.supplier||'—',status:o.status||'—',lines:[],source:'cloud'});
+   grouped.get(key).lines.push(o);
+  }
+  const requests=kitchCloudPurchaseCatalog.requests.map(r=>({kind:'request',id:r.id,
+   order_ref:r.request_no||'PR',supplier:r.ingredient||'Ingredient request',
+   status:r.status||'pending_approval',lines:[r],source:'cloud'}));
+  kitchCloudPurchaseRows=[...grouped.values(),...requests];
+  body.innerHTML=kitchCloudPurchaseRows.map(x=>`<tr><td><b>${esc(x.order_ref)}</b></td><td>${esc(x.supplier)}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${esc(x.status)}</td><td>${kitchCloudPurchaseActionButtons(x)}</td></tr>`).join('')||
+   '<tr><td colspan="5" class="empty">No cloud purchase records yet.</td></tr>';
+  const label=document.getElementById('kitchCloudPurchaseRole');
+  if(label)label.textContent='Cloud workspace · '+(data?.role||'staff')+' · '+requests.length+' requests · '+grouped.size+' purchase orders';
+  const create=document.getElementById('kitchCloudRequestCreate');
+  if(create)create.hidden=!['owner','kitchen_manager','executive_chef','production_staff'].includes(kitchCloudPurchaseCatalog.role);
  }catch(e){
-  body.innerHTML='<tr><td colspan="5" class="bad">Purchasing ledger unavailable: '+esc(e.message)+'. No orders were changed.</td></tr>';
+  body.innerHTML='<tr><td colspan="5" class="bad">Could not load cloud Purchasing: '+esc(e.message)+'. No orders changed.</td></tr>';
  }
+}
+function kitchNewCloudPurchaseRequest(){
+ const data=kitchCloudPurchaseCatalog;
+ if(!['owner','kitchen_manager','executive_chef','production_staff'].includes(data.role))
+  return alert('Your staff role cannot request purchases.');
+ if(!data.ingredients.length)return alert('No cloud ingredients found. Load the cloud Ingredient Master first.');
+ if(data.role==='owner'&&!cloud?.branch_id)return alert('Choose an assigned kitchen location before submitting an owner request.');
+ const list=data.ingredients.map(i=>`<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.unit)})</option>`).join('');
+ modal(`<div class="modalHead"><h2>Cloud Purchase Request</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note">This request goes to Main Office for approval. It does not change stock.</div>
+ <div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="kitchPrIngredient">${list}</select></div>
+ <div class="field"><label>QUANTITY (IN INGREDIENT MASTER UNIT)</label><input id="kitchPrQty" type="number" min="0.0001" step="any" placeholder="Quantity"></div></div>
+ <div class="field"><label>NOTES (OPTIONAL)</label><input id="kitchPrNotes" placeholder="Reason or delivery requirement"></div>
+ <div class="actions"><button type="button" class="btn black" id="kitchPrSave" onclick="kitchSubmitCloudRequest()">Submit Request</button></div>
+ <p id="kitchPrError" role="status" style="font-size:12px;color:#b42318"></p>`);
+}
+async function kitchSubmitCloudRequest(){
+ if(kitchCloudPurchaseBusy)return;
+ const selected=document.getElementById('kitchPrIngredient')?.value;
+ const ing=kitchCloudPurchaseCatalog.ingredients.find(x=>x.id===selected);
+ const qty=Number(document.getElementById('kitchPrQty')?.value);
+ const notes=document.getElementById('kitchPrNotes')?.value||'';
+ const error=document.getElementById('kitchPrError');
+ if(!ing||!Number.isFinite(qty)||qty<=0||qty>100000){
+  if(error)error.textContent='Choose an ingredient and valid quantity.';
+  return;
+ }
+ if(!confirm('Submit '+qty+' '+ing.unit+' of '+ing.name+' for Main Office approval?'))return;
+ kitchCloudPurchaseBusy=true;
+ const button=document.getElementById('kitchPrSave');if(button)button.disabled=true;
+ try{
+  await kitchCloudPurchaseRpc('create',{
+   p_ingredient_id:ing.id,p_qty:qty,p_unit:ing.unit,p_notes:notes,
+   ...(kitchCloudPurchaseCatalog.role==='owner'?{p_branch_id:cloud.branch_id}:{})
+  });
+  closeModal();await kitchRefreshCloudPurchases();
+  alert('Purchase request submitted for approval. No inventory was changed.');
+ }catch(e){if(error)error.textContent=e.message}
+ finally{kitchCloudPurchaseBusy=false;if(button)button.disabled=false}
+}
+async function kitchReviewCloudRequest(id,action){
+ if(!['approve','reject'].includes(action)||kitchCloudPurchaseBusy)return;
+ const req=kitchCloudPurchaseCatalog.requests.find(r=>r.id===id);
+ if(!req||req.status!=='pending_approval')return alert('Refresh purchase requests first.');
+ if(!confirm((action==='approve'?'Approve':'Reject')+' request '+(req.request_no||id)+'?'))return;
+ kitchCloudPurchaseBusy=true;
+ try{
+  await kitchCloudPurchaseRpc(action,{p_request_id:id});
+  await kitchRefreshCloudPurchases();
+ }catch(e){alert('No change made: '+e.message)}
+ finally{kitchCloudPurchaseBusy=false}
+}
+function kitchCreateCloudOrder(id){
+ const req=kitchCloudPurchaseCatalog.requests.find(x=>x.id===id);
+ if(!req||req.status!=='approved')return alert('Only approved requests can become purchase orders.');
+ const opts=kitchCloudPurchaseCatalog.suppliers.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('');
+ if(!opts)return alert('Main Office must register an approved cloud supplier first.');
+ modal(`<div class="modalHead"><h2>Create Cloud Purchase Order</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note">Approved request ${esc(req.request_no||id)} · ${esc(req.ingredient)} · ${esc(req.quantity)} ${esc(req.unit)}</div>
+ <div class="formGrid"><div class="field"><label>APPROVED SUPPLIER</label><select id="kitchPoSupplier">${opts}</select></div>
+ <div class="field"><label>UNIT PRICE (AED)</label><input id="kitchPoPrice" type="number" step="any" min="0" placeholder="Invoice unit price"></div></div>
+ <div class="actions"><button type="button" class="btn black" id="kitchPoSave" onclick="kitchSubmitCloudOrder('${esc(id)}')">Create Purchase Order</button></div>
+ <p id="kitchPoError" role="status" style="font-size:12px;color:#b42318"></p>`);
+}
+async function kitchSubmitCloudOrder(id){
+ if(kitchCloudPurchaseBusy)return;
+ const supplier=document.getElementById('kitchPoSupplier')?.value;
+ const raw=document.getElementById('kitchPoPrice')?.value;
+ const price=Number(raw);
+ const error=document.getElementById('kitchPoError');
+ if(!supplier||raw===''||!Number.isFinite(price)||price<0){
+  if(error)error.textContent='Select a supplier and valid unit price.';return;
+ }
+ if(!confirm('Create an approved purchase order at AED '+price.toFixed(2)+' per unit?'))return;
+ kitchCloudPurchaseBusy=true;
+ const button=document.getElementById('kitchPoSave');if(button)button.disabled=true;
+ try{
+  await kitchCloudPurchaseRpc('create_order',{p_request_id:id,p_supplier_id:supplier,p_price:price});
+  closeModal();await kitchRefreshCloudPurchases();
+  alert('Purchase order created. Stock will update only when Receiving is confirmed.');
+ }catch(e){if(error)error.textContent=e.message}
+ finally{kitchCloudPurchaseBusy=false;if(button)button.disabled=false}
 }
 
 function kitchCloudPurchaseMatchSummary(x){
