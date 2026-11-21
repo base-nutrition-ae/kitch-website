@@ -541,6 +541,7 @@ function kitchInvoiceReceiptVerified(line){
     && String(line?.cloud_receipt_po||'')===String(line?.po||''));
 }
 function invoiceMatchingPage(){
+ setTimeout(kitchRefreshCloudInvoices,80);
  const po=getArr(PO_KEY),candidates=po.filter(x=>!['Rejected'].includes(purchaseStatus(x)));
  const verified=candidates.filter(kitchInvoiceReceiptVerified);
  const blocked=candidates.filter(x=>!kitchInvoiceReceiptVerified(x));
@@ -552,7 +553,7 @@ function invoiceMatchingPage(){
    return `<tr><td><b>${esc(x.po||'—')}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(x.ingredient||'—')}</td><td>${cleanQty(x.qty||0)} ${esc(x.unit||'')}</td><td>${valid?cleanQty(x.accepted)+' '+esc(x.unit||''):'Not verified'}</td><td>${money(ref)}</td><td>${x.invoice_price!=null?money(inv):'Not entered'}</td><td class="${Math.abs(diff)>.009?'bad':'ok'}">${x.invoice_price!=null?((diff>=0?'+':'')+money(diff)+(ref?` (${pct>=0?'+':''}${pct.toFixed(1)}%)`:'')):'—'}</td><td><span class="alertBadge ${valid&&status==='Approved'?'alertInfo':status==='Hold'?'alertCritical':'alertWarning'}">${esc(status)}</span>${!valid&&x.invoice_match_status==='Approved'?'<br><small class="bad">Earlier approval requires review</small>':''}</td><td>${valid?(status==='Approved'?'—':`<button class="btn black" onclick="setInvoiceMatch(${x.id},'Approved')">Approve</button> <button class="btn" onclick="setInvoiceMatch(${x.id},'Hold')">Hold</button>`):'<span class="muted">Approval locked</span>'}</td></tr>`;
  }).join('');
  return `<div class="grid"><div class="card"><span>VERIFIED RECEIVED LINES</span><b>${verified.length}</b></div><div class="card"><span>RECEIPT LINK REQUIRED</span><b>${blocked.length}</b></div><div class="card"><span>PRICE VARIANCES</span><b>${variance}</b></div><div class="card"><span>ON HOLD</span><b>${held}</b></div></div>
- <div class="panel"><h2>Invoice Matching</h2><div class="note warn">Purchase orders are currently stored in this browser; cloud Receiving records are separate. Invoice approval is disabled until a matching purchase order, accepted receipt quantity and supplier invoice can be verified. No stock changes are made by this review.</div><div style="overflow-x:auto"><table style="min-width:1120px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>ITEM</th><th>PO QTY</th><th>RECEIVED</th><th>PO PRICE</th><th>INVOICE PRICE</th><th>VARIANCE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>${rows||'<tr><td colspan="10" class="empty">No purchase orders to review.</td></tr>'}</tbody></table></div></div>`;
+ <div class="panel"><h2>Invoice Matching</h2><div id="kitchCloudInvoicePanel"><p class="muted">Loading cloud invoice matching…</p></div><div class="note warn">Purchase orders are currently stored in this browser; cloud Receiving records are separate. Invoice approval is disabled until a matching purchase order, accepted receipt quantity and supplier invoice can be verified. No stock changes are made by this review.</div><div style="overflow-x:auto"><table style="min-width:1120px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>ITEM</th><th>PO QTY</th><th>RECEIVED</th><th>PO PRICE</th><th>INVOICE PRICE</th><th>VARIANCE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>${rows||'<tr><td colspan="10" class="empty">No purchase orders to review.</td></tr>'}</tbody></table></div></div>`;
 }
 function setInvoiceMatch(id,status){
  const po=getArr(PO_KEY),row=po.find(x=>String(x.id)===String(id));if(!row)return alert('Purchase line not found.');
@@ -1537,7 +1538,7 @@ async function kitchCloudPurchaseRpc(action,extra={}){
 function kitchCloudPurchaseActionButtons(x){
  if(session!=='manager')return 'Manager approval required';
  let action=x.status==='Pending Approval'?'approve':x.status==='Approved'?'mark_sent':null;
- return action?`<button class="btn" onclick="kitchUpdateCloudPurchase('${esc(x.id)}','${action}')">${action==='approve'?'Approve':'Mark Sent'}</button>`:'—';
+ return action?`<button class="btn" onclick="kitchUpdateCloudPurchase('${esc(x.id)}','${action}')">${action==='approve'?'Approve':'Mark Sent'}</button>`:(x.status==='Open'?`<button class="btn" onclick="kitchOpenReceiptLink('${esc(x.id)}')">Link Receipt</button>`:'—');
 }
 async function kitchRefreshCloudPurchases(){
  const body=document.getElementById('kitchCloudPOBody');if(!body)return;
@@ -1550,6 +1551,82 @@ async function kitchRefreshCloudPurchases(){
   body.innerHTML='<tr><td colspan="5" class="bad">Cloud Purchasing unavailable: '+esc(e.message)+'. No orders were changed.</td></tr>';
  }
 }
+
+function kitchCloudPurchaseMatchSummary(x){
+ const lines=Array.isArray(x.lines)?x.lines:[],links=Array.isArray(x.receipt_links)?x.receipt_links:[];
+ const sums=lines.map(l=>{
+  const rec=links.filter(r=>r.line_key===l.line_key);
+  const qty=rec.reduce((n,r)=>n+Number(r.accepted||0),0);
+  const mismatch=rec.some(r=>Math.abs(Number(r.unit_price)-Number(l.price))>.01);
+  return {name:l.name,unit:l.unit,ordered:Number(l.qty),received:qty,invoiceCount:rec.length,mismatch};
+ });
+ return {lines:sums,fullyReceived:sums.length>0&&sums.every(l=>l.received===l.ordered&&l.invoiceCount>0),hasVariance:sums.some(l=>l.mismatch)};
+}
+async function kitchOpenReceiptLink(id){
+ const order=kitchCloudPurchaseRows.find(x=>x.id===id);if(!order)return alert('Refresh cloud purchase orders first.');
+ if(order.status!=='Open')return alert('Only sent/open purchase orders can link receipts.');
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Sign in with staff credentials.');
+ try{
+  const {data,error}=await sb.rpc('kitch_team_receiving_history',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  if(error)throw error;
+  const receipts=Array.isArray(data)?data:[];
+  const usedIds=new Set((order.receipt_links||[]).map(x=>x.receipt_id));
+  const opts=[];
+  for(const line of order.lines||[]){
+   const existing=(order.receipt_links||[]).filter(x=>x.line_key===line.line_key).reduce((n,x)=>n+Number(x.accepted||0),0);
+   const remaining=Number(line.qty)-existing;
+   for(const rec of receipts){
+    if(usedIds.has(rec.id)||String(rec.supplier||'').trim().toLowerCase()!==String(order.supplier||'').trim().toLowerCase()
+      ||String(rec.ingredient||'').trim().toLowerCase()!==String(line.name||'').trim().toLowerCase()
+      ||rec.unit!==line.unit||!(Number(rec.accepted)>0&&Number(rec.accepted)<=remaining)||!rec.invoice)continue;
+    opts.push({line_key:line.line_key,receipt_id:rec.id,label:line.name+' — '+rec.accepted+' '+rec.unit+' — Invoice '+rec.invoice});
+   }
+  }
+  if(!opts.length)return alert('No eligible cloud receipt matches this PO, supplier, ingredient and outstanding quantity. Existing receipts remain unchanged.');
+  window.__kitchReceiptLinkOptions=opts;
+  modal(`<div class="modalHead"><h2>Link Existing Cloud Receipt</h2><button class="close" onclick="closeModal()">×</button></div>
+  <div class="note">Order ${esc(order.order_ref)} · ${esc(order.supplier)}. This links a previously saved receipt for invoice review. <b>No new stock movement is made.</b></div>
+  <div class="field"><label>VERIFIED RECEIVING RECORD</label><select id="kitchPOReceiptLink">${opts.map((x,i)=>`<option value="${i}">${esc(x.label)}</option>`).join('')}</select></div>
+  <button class="primary" onclick="kitchLinkSelectedReceipt('${esc(order.id)}')">Link Receipt (No Stock Change)</button>`);
+ }catch(e){alert('Could not load cloud receiving history: '+e.message)}
+}
+async function kitchLinkSelectedReceipt(orderId){
+ const ix=Number(document.getElementById('kitchPOReceiptLink')?.value);
+ const match=window.__kitchReceiptLinkOptions?.[ix];
+ if(!match)return alert('Select an eligible receipt.');
+ try{
+  await kitchCloudPurchaseRpc('link_receipt',{p_order_id:orderId,p_receipt_id:match.receipt_id,p_line_key:match.line_key});
+  closeModal();await kitchRefreshCloudPurchases();
+  alert('Existing receipt linked. No stock was added or deducted.');
+ }catch(e){alert('Receipt not linked: '+e.message)}
+}
+async function kitchRefreshCloudInvoices(){
+ const el=document.getElementById('kitchCloudInvoicePanel');if(!el)return;
+ try{
+  const data=await kitchCloudPurchaseRpc('list'),orders=Array.isArray(data)?data:[];
+  const active=orders.filter(x=>['Approved','Open','Closed'].includes(x.status));
+  el.innerHTML=`<h3>Cloud PO / Receiving / Invoice Verification</h3>
+  <p class="muted">Actual receipts linked to the same cloud PO. Approval requires full accepted quantity, valid supplier invoices and exact PO pricing. This review never changes inventory.</p>
+  <div style="overflow:auto"><table style="min-width:940px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>RECEIVING VERIFICATION</th><th>PRICE CHECK</th><th>INVOICE STATUS</th><th>ACTION</th></tr></thead><tbody>
+  ${active.map(x=>{
+   const check=kitchCloudPurchaseMatchSummary(x);
+   const detail=check.lines.map(l=>`${esc(l.name)}: ${cleanQty(l.received)} / ${cleanQty(l.ordered)} ${esc(l.unit)}`).join('<br>');
+   const possible=check.fullyReceived&&!check.hasVariance;
+   const approved=x.invoice_status==='Approved';
+   return `<tr><td><b>${esc(x.order_ref)}</b></td><td>${esc(x.supplier)}</td><td>${detail||'No items'}</td>
+   <td>${check.hasVariance?'<span class="bad">Price mismatch</span>':'No price mismatch recorded'}</td>
+   <td>${esc(x.invoice_status||'Pending Review')}</td>
+   <td>${approved?'Approved':(possible?`<button class="btn black" onclick="kitchCloudInvoiceAction('${esc(x.id)}','approve_invoice')">Approve</button>`:'<span class="muted">Approval locked</span>')}${!approved?` <button class="btn" onclick="kitchCloudInvoiceAction('${esc(x.id)}','hold_invoice')">Hold</button>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="empty">No shared purchase orders available for matching.</td></tr>'}</tbody></table></div>`;
+ }catch(e){el.innerHTML='<p class="bad">Cloud invoice verification unavailable: '+esc(e.message)+'. No approval actions enabled.</p>';}
+}
+async function kitchCloudInvoiceAction(id,action){
+ if(!['approve_invoice','hold_invoice'].includes(action))return;
+ if(session!=='manager')return alert('Manager approval required.');
+ try{await kitchCloudPurchaseRpc(action,{p_order_id:id});await kitchRefreshCloudInvoices()}
+ catch(e){alert('Cloud invoice action blocked: '+e.message)}
+}
+
 async function kitchUpdateCloudPurchase(id,action){
  if(!['approve','mark_sent','reject'].includes(action))return;
  try{await kitchCloudPurchaseRpc(action,{p_order_id:id});await kitchRefreshCloudPurchases()}
