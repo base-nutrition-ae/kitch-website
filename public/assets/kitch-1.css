@@ -1414,3 +1414,21 @@ html, body {
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .kitchInventory .grid{gap:14px}.kitchInventory .grid .card{padding:22px 24px;border-radius:20px;min-height:106px}.kitchInventory .grid .card b{font-size:27px}.kitchInventory .panel{padding:28px;border-radius:22px}.kitchInventory .actions{margin:20px 0}.kitchInventory .actions .btn{min-height:40px;padding:10px 17px}.kitchInventory .inventoryTableWrap{width:100%;overflow-x:auto;margin-top:20px;border:1px solid #ececec;border-radius:14px}.kitchInventory .inventoryTableWrap table{margin:0;min-width:1200px}.kitchInventory .inventoryTableWrap th{background:#fafafa;white-space:nowrap;font-size:10px;letter-spacing:.035em}.kitchInventory .inventoryTableWrap td{padding:14px 12px;vertical-align:middle}.kitchInventory .inventoryTableWrap tr:hover td{background:#fafaf9}.kitchInventory .inventoryTableWrap small{color:#888}.kitchInventory #ingredientSearch{background:white}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}input[type=number]{-moz-appearance:textfield;appearance:textfield}
+
+/* KITCH public dialogs: keep close control on top right at all viewport sizes. */
+#publicModal .publicBox {
+  position: relative !important;
+}
+#publicModal .publicBox > .closePublic {
+  position: absolute !important;
+  top: 20px !important;
+  right: 20px !important;
+  left: auto !important;
+  float: none !important;
+  display: grid !important;
+  place-items: center !important;
+  z-index: 5 !important;
+}
+#publicModal .publicBox > .publicBrand {
+  padding-right: 52px;
+}
