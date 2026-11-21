@@ -2250,10 +2250,29 @@ function batchesPage(){
 }
 
 function filterIngredients(){
- const q=(document.getElementById('ingredientSearch')?.value||'').trim().toLowerCase();
- document.querySelectorAll('.ingredientRow').forEach(row=>{
-   row.style.display=(!q||row.dataset.name.includes(q)||row.dataset.category.includes(q))?'':'none';
+ const input=document.getElementById('ingredientSearch');
+ const container=input?.closest('.kitchInventory');
+ if(!input||!container)return;
+ const q=input.value.trim().toLocaleLowerCase();
+ let shown=0;
+ container.querySelectorAll('tr.ingredientRow').forEach(row=>{
+  const name=(row.dataset.name||'').toLocaleLowerCase();
+  const category=(row.dataset.category||'').toLocaleLowerCase();
+  const sku=(row.cells?.[0]?.textContent||'').toLocaleLowerCase();
+  const match=!q||name.includes(q)||category.includes(q)||sku.includes(q);
+  row.hidden=!match;
+  row.style.setProperty('display',match?'table-row':'none','important');
+  if(match)shown++;
  });
+ let empty=container.querySelector('#kitchIngredientSearchEmpty');
+ if(!empty){
+  empty=document.createElement('div');
+  empty.id='kitchIngredientSearchEmpty';
+  empty.style.cssText='padding:16px;color:#777;font-size:13px;';
+  container.querySelector('.inventoryTableWrap')?.appendChild(empty);
+ }
+ empty.textContent=q&&!shown?'No ingredients match "'+input.value.trim()+'".':'';
+ empty.hidden=!(q&&!shown);
 }
 
 
