@@ -136,7 +136,7 @@
        const ing=findIngredient(line.id),f=factor(line,ing?.base_unit||'g');
        if(f!=null)line.price=String(Number((Number(ing?.reference_cost||0)*f).toFixed(6)));
      }
-     if(['id','unit','packSize','packUnit'].includes(field))draw();
+     if(['id','unit','packUnit'].includes(field))draw();
      else{
        // Update preview without replacing the focused input during typing.
        const block=target.closest('.kmrLine'),base=findIngredient(line.id)?.base_unit||'g',f=factor(line,base);
