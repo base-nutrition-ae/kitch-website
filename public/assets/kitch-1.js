@@ -1724,7 +1724,47 @@ function receivingPage(){setTimeout(kitchLoadReceivingHistory,80);return `<style
 </style><div class="panel kitchReceivingPage"><h2>Receiving</h2><p class="muted">Receive supplier deliveries into your assigned location. Confirmed quantities update live inventory.</p><div class="kitchReceivingButtons"><button class="kitchReceivingBtn isPrimary" onclick="openKitchNewReceiving()">+ New Receiving</button><button class="kitchReceivingBtn" onclick="kitchLoadReceivingHistory()">↻ Refresh History</button></div><div class="kitchReceivingTableWrap"><table class="kitchReceivingTable"><thead><tr><th>DATE</th><th>INVOICE</th><th>SUPPLIER</th><th>INGREDIENT</th><th>ACCEPTED</th><th>TOTAL</th><th>EXPIRY</th><th>FILE</th><th>REPORT</th></tr></thead><tbody id="kitchReceivingRows"><tr><td colspan="9">Loading cloud history…</td></tr></tbody></table></div><p id="kitchReceivingMessage" class="muted" style="font-size:12px;margin-top:12px">History is saved in Supabase and available across devices for your assigned location. PDF uses your browser's Print → Save as PDF.</p></div>`;}
 async function kitchDownloadInvoice(id){try{const {data,error}=await sb.rpc('kitch_team_receiving_download',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_receipt_id:id});if(error)throw error;const bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([bytes],{type:data.mime}));const a=document.createElement('a');a.href=url;a.download=data.filename||'invoice';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){alert('Cannot download invoice: '+e.message)}}
 function kitchPrintReceipt(id){const x=kitchReceivingHistory.find(r=>r.id===id);if(!x)return;const w=window.open('','_blank');if(!w)return alert('Allow pop-ups to export PDF.');w.document.write(`<!doctype html><html><head><title>KITCH Receiving ${esc(x.invoice)}</title><style>body{font:15px Arial,sans-serif;color:#222;padding:38px;max-width:760px;margin:auto}header{border-bottom:2px solid #222;padding-bottom:16px;margin-bottom:32px}h1{font-size:30px;margin:0}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{text-align:left;padding:12px;border-bottom:1px solid #ddd}.muted{color:#777}footer{margin-top:65px;color:#888;font-size:12px}@media print{button{display:none}}</style></head><body><header><h1>KITCH</h1><div class="muted">Receiving Report · ${esc(currentBranchName())}</div></header><h2>Invoice ${esc(x.invoice)}</h2><p>Supplier: ${esc(x.supplier)}<br>Received: ${esc(new Date(x.date).toLocaleDateString())}</p><table><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th></tr><tr><td>${esc(x.ingredient)}</td><td>${esc(x.accepted)} ${esc(x.unit)}</td><td>${money(x.price)}</td><td>${money(x.total)}</td></tr></table><p>Rejected: ${esc(x.rejected)} ${esc(x.unit)}<br>Production: ${esc(x.production_date||'—')}<br>Expiry: ${esc(x.expiry||'—')}<br>Temperature: ${x.temperature==null?'—':esc(x.temperature)+' °C'}</p><footer>Powered by KITCH · Generated ${new Date().toLocaleString()}</footer><button onclick="window.print()">Print / Save as PDF</button></body></html>`);w.document.close();}
-function kitchReceiveUpdateTotal(){const qty=Number(document.getElementById('knrQty')?.value||0),rej=Number(document.getElementById('knrRejected')?.value||0),price=Number(document.getElementById('knrPrice')?.value||0),el=document.getElementById('knrTotal');if(el)el.textContent=money(Math.max(0,qty-rej)*Math.max(0,price));}
+function kitchReceivingConversion(){
+ const ingredient=ingredients().find(x=>String(x.cloud_id)===String(document.getElementById('knrIng')?.value));
+ const base=String(ingredient?.base_unit||'').toLowerCase();
+ const selected=String(document.getElementById('knrReceivingUnit')?.value||base).toLowerCase();
+ let factor=null;
+ if(selected===base)factor=1;
+ else if(base==='g'&&selected==='kg')factor=1000;
+ else if(base==='kg'&&selected==='g')factor=.001;
+ else if(base==='ml'&&['ltr','l'].includes(selected))factor=1000;
+ else if(['ltr','l'].includes(base)&&selected==='ml')factor=.001;
+ else if(['ltr','l'].includes(base)&&['ltr','l'].includes(selected))factor=1;
+ else if(['pkt','box'].includes(selected)){
+  const v=Number(document.getElementById('knrPackSize')?.value);
+  if(Number.isFinite(v)&&v>0)factor=v;
+ }
+ return {ingredient,base,selected,factor};
+}
+function kitchReceiveUpdateTotal(){
+ const {base,selected,factor}=kitchReceivingConversion();
+ const qty=Number(document.getElementById('knrQty')?.value||0),
+ rej=Number(document.getElementById('knrRejected')?.value||0),
+ price=Number(document.getElementById('knrPrice')?.value||0);
+ const el=document.getElementById('knrTotal'),preview=document.getElementById('knrConversionPreview');
+ if(el)el.textContent=money(Math.max(0,qty-rej)*Math.max(0,price));
+ if(preview)preview.textContent=factor!=null&&Number.isFinite(factor)?
+  'Accepted inventory: '+Number((Math.max(0,qty-rej)*factor).toFixed(6))+' '+base+
+  ' · 1 '+selected+' = '+factor+' '+base:
+  'Enter a valid pack size to convert to '+base+'; stock cannot be saved without it.';
+}
+function kitchReceivingUnitChanged(){
+ const {ingredient,base,selected}=kitchReceivingConversion();
+ const pack=document.getElementById('knrPackField');
+ if(pack)pack.style.display=['pkt','box'].includes(selected)?'block':'none';
+ const price=document.getElementById('knrPrice'),label=document.getElementById('knrPriceLabel'),help=document.getElementById('knrUnitHelp');
+ const {factor}=kitchReceivingConversion();
+ const ref=Number(ingredient?.reference_cost??ingredient?.cost??0);
+ if(price)price.value=factor!=null?String(Number((ref*factor).toFixed(6))):'';
+ if(label)label.textContent='INVOICE UNIT PRICE (AED / '+selected+') *';
+ if(help)help.textContent='Inventory is stored in '+base+'; receiving units are converted automatically.';
+ kitchReceiveUpdateTotal();
+}
 async function kitchFileToBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('Unable to read invoice'));reader.readAsDataURL(file)})}
 function openKitchNewReceiving(){
  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud.branch_id)return alert('Please sign in with your Team account to receive stock for your assigned location.');
@@ -1735,6 +1775,8 @@ function openKitchNewReceiving(){
  <div class="formGrid">
  <div class="field"><label>SUPPLIER *</label><input id="knrSupplier" required placeholder="Auto-filled from Master List"><small class="muted">Auto-selected; editable to match the invoice.</small></div>
  <div class="field"><label>INGREDIENT *</label><select id="knrIng" onchange="kitchReceiveIngredientChanged()">${ing.map(x=>`<option value="${esc(x.cloud_id)}">${esc(x.name)} (${esc(x.base_unit)})</option>`).join('')}</select></div>
+ <div class="field"><label>RECEIVING UNIT *</label><select id="knrReceivingUnit" onchange="kitchReceivingUnitChanged()"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="ltr">ltr</option><option value="pcs">pcs</option><option value="pkt">pkt (packet)</option><option value="box">box</option></select><small class="muted">Auto-selected from Ingredient Master; change to match supplier invoice.</small></div>
+ <div class="field" id="knrPackField" style="display:none"><label>QUANTITY PER PACK / BOX *</label><input id="knrPackSize" type="number" min="0.000001" step="any" placeholder="Amount in stock units" oninput="kitchReceivingUnitChanged()"><small class="muted">Example: 1 box = 500 g. Enter 500 if the stock unit is g.</small></div>
  <div class="field"><label id="knrQtyLabel">DELIVERED QUANTITY *</label><input id="knrQty" type="number" min="0.001" step="any" placeholder="Quantity" oninput="kitchReceiveUpdateTotal()"><small class="muted" id="knrUnitHelp">Unit selected from Ingredient Master.</small></div>
  <div class="field"><label>REJECTED QUANTITY</label><input id="knrRejected" type="number" min="0" step="any" value="0" oninput="kitchReceiveUpdateTotal()"></div>
  <div class="field"><label id="knrPriceLabel">UNIT PRICE (AED) *</label><input id="knrPrice" type="number" min="0" step="any" oninput="kitchReceiveUpdateTotal()"><small class="muted">Master List price; editable to match the invoice.</small></div>
@@ -1744,7 +1786,7 @@ function openKitchNewReceiving(){
  <div class="field"><label>RECEIVING DATE</label><input id="knrDate" type="date" readonly><small class="muted">Automatically set to today.</small></div>
  <div class="field"><label>RECEIVING TEMPERATURE (°C)</label><input id="knrTemp" type="number" step="any" placeholder="If applicable"></div>
  <div class="field"><label>INVOICE / DELIVERY NOTE</label><input id="knrFile" type="file" accept="image/*,.pdf"><small class="muted">PDF, JPG, PNG or WebP; max 2 MB. Saved securely with the receiving record.</small></div>
- </div><div class="note"><b>Accepted stock total: <span id="knrTotal">AED 0.00</span></b></div><p id="knrStatus" class="muted" aria-live="polite"></p><button id="knrSubmit" class="primary" onclick="kitchSaveNewReceiving()">Confirm Receiving</button>`);
+ </div><div class="note"><b>Accepted stock total: <span id="knrTotal">AED 0.00</span></b><div id="knrConversionPreview" style="margin-top:6px;font-size:12px">Receiving quantity converts to inventory base unit.</div></div><p id="knrStatus" class="muted" aria-live="polite"></p><button id="knrSubmit" class="primary" onclick="kitchSaveNewReceiving()">Confirm Receiving</button>`);
  const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);document.getElementById('knrDate').value=localDate;
  kitchReceiveIngredientChanged();
 }
@@ -1754,24 +1796,29 @@ function kitchReceiveIngredientChanged(){
  const sup=document.getElementById('knrSupplier'),price=document.getElementById('knrPrice');
  const linked=supplierProducts().find(p=>String(p.sku||'')===String(ing.sku||'') || String(p.ingredient_id||'')===String(ing.cloud_id||'') || String(p.name||'').toLowerCase()===String(ing.name||'').toLowerCase());
  if(sup)sup.value=ing.supplier||linked?.supplier||linked?.supplier_name||'';
- if(price)price.value=Number(ing.reference_cost??ing.cost??linked?.price??0).toFixed(2);
- const unit=String(ing.base_unit||'unit');
- const qtyLabel=document.getElementById('knrQtyLabel'),priceLabel=document.getElementById('knrPriceLabel'),unitHelp=document.getElementById('knrUnitHelp');
- if(qtyLabel)qtyLabel.textContent='DELIVERED QUANTITY ('+unit+') *';
- if(priceLabel)priceLabel.textContent='UNIT PRICE (AED / '+unit+') *';
- if(unitHelp)unitHelp.textContent='Stock unit: '+unit+' · automatically selected from Ingredient Master.';kitchReceiveUpdateTotal();
+ const unit=String(ing.base_unit||'g');
+ const selector=document.getElementById('knrReceivingUnit');
+ if(selector)selector.value=unit==='l'?'ltr':unit;
+ const packSize=document.getElementById('knrPackSize');if(packSize)packSize.value='';
+ const qtyLabel=document.getElementById('knrQtyLabel');
+ if(qtyLabel)qtyLabel.textContent='DELIVERED QUANTITY ('+(selector?.value||unit)+') *';
+ kitchReceivingUnitChanged();
 }
 async function kitchSaveNewReceiving(){
  const el=id=>document.getElementById(id), ingredient=ingredients().find(x=>String(x.cloud_id)===String(el('knrIng')?.value));
  const supplier=el('knrSupplier').value.trim(),invoice=el('knrInvoice').value.trim(),qty=Number(el('knrQty').value),rejected=Number(el('knrRejected').value),price=Number(el('knrPrice').value);
  const status=el('knrStatus'),btn=el('knrSubmit');
+ const conversion=kitchReceivingConversion(),factor=conversion.factor;
  if(!ingredient||!supplier||!invoice||!Number.isFinite(qty)||qty<=0||!Number.isFinite(rejected)||rejected<0||rejected>qty||!Number.isFinite(price)||price<0){status.textContent='Complete supplier, ingredient, invoice, quantities and price correctly.';return;}
+ if(factor==null||!Number.isFinite(factor)||factor<=0){status.textContent='Set a valid receiving unit or enter how much is in each pack/box before saving.';return;}
+ const baseQty=Number((qty*factor).toFixed(6)),baseRejected=Number((rejected*factor).toFixed(6)),basePrice=price/factor;
+ if(!Number.isFinite(baseQty)||baseQty<=0||!Number.isFinite(baseRejected)||baseRejected<0||baseRejected>baseQty||!Number.isFinite(basePrice)||basePrice<0){status.textContent='Invalid converted quantity or cost. No stock was saved.';return;}
  const expiry=el('knrExpiry').value||null,temp=el('knrTemp').value===''?null:Number(el('knrTemp').value);
  if(temp!==null&&!Number.isFinite(temp)){status.textContent='Invalid receiving temperature.';return;}
  const file=el('knrFile').files?.[0];if(file&&(file.size>2*1024*1024||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))){status.textContent='Invoice must be a PDF/JPG/PNG/WebP under 2 MB.';return;}
  btn.disabled=true;status.textContent='Saving receiving to KITCH Cloud…';
  try{
- const {data,error}=await sb.rpc('kitch_team_receive_stock',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ingredient.cloud_id,p_supplier:supplier,p_invoice_number:invoice,p_invoice_filename:el('knrFile').files?.[0]?.name||null,p_delivered_qty:qty,p_rejected_qty:rejected,p_unit:ingredient.base_unit,p_unit_price:price,p_expiry_date:expiry,p_temperature:temp});
+ const {data,error}=await sb.rpc('kitch_team_receive_stock',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ingredient.cloud_id,p_supplier:supplier,p_invoice_number:invoice,p_invoice_filename:el('knrFile').files?.[0]?.name||null,p_delivered_qty:baseQty,p_rejected_qty:baseRejected,p_unit:ingredient.base_unit,p_unit_price:basePrice,p_expiry_date:expiry,p_temperature:temp});
  if(error)throw error;
  let attachError='';try{const base64=file?await kitchFileToBase64(file):null;const attachment=await sb.rpc('kitch_team_receiving_attach',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_receipt_id:data.id,p_filename:file?.name||'',p_mime:file?.type||null,p_base64:base64,p_production_date:el('knrProduction').value||null});if(attachment.error)throw attachment.error;}catch(e){attachError=' Receipt saved and stock updated, but invoice attachment failed: '+e.message;}
  const arr=getArr('kitch_receiving_local_history_v2');arr.unshift({id:data.id,branch_id:cloud.branch_id,date:new Date().toLocaleDateString(),invoice,supplier,ingredient:ingredient.name,accepted:data.accepted_qty,unit:ingredient.base_unit});setArr('kitch_receiving_local_history_v2',arr.slice(0,150));
