@@ -2647,7 +2647,8 @@ async function kitchCloudSaveRun(run){
   created_at:run.created_at,actual_yield:run.actual_yield||0,yield_unit:run.yield_unit||'kg',actual_unit_cost:run.actual_unit_cost||0,
   production_date:run.production_date||'',expiry_date:run.expiry_date||'',production_temp_c:run.production_temp_c??null,
   completed_at:run.completed_at||'',qc_temp_c:run.qc_temp_c??null,qc_note:run.qc_note||'',qc_serial:run.qc_serial||'',qc_at:run.qc_at||'',
-  production_proof:await kitchProofForCloud(run.production_proof),qc_photo:await kitchProofForCloud(run.qc_photo)};
+  production_proof:['127.0.0.1','localhost'].includes(location.hostname)?'':await kitchProofForCloud(run.production_proof),
+  qc_photo:['127.0.0.1','localhost'].includes(location.hostname)?'':await kitchProofForCloud(run.qc_photo)};
  const {data,error}=await sb.rpc('kitch_team_save_production_record',{
   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_request_id:run.cloud_request_id,p_payload:payload,
   p_expected_revision:Number(run.cloud_sync_revision||0)
