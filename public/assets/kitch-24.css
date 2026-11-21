@@ -62,3 +62,44 @@
     padding:0 12px!important;
   }
 }
+
+/* KITCH unified full-width operational tables — override legacy display:block tables */
+@media (min-width: 701px) {
+  body #app .main .panel,
+  body #app .main .kitchReceivingPage {
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+  }
+  body #app .main .panel > table,
+  body #app .main .panel table,
+  body #app .main .kitchReceivingPage .kitchReceivingTable,
+  body #app .main .productionTable {
+    display:table!important;
+    table-layout:auto!important;
+    border-collapse:collapse;
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    overflow:visible!important;
+  }
+  body #app .main .kitchReceivingTableWrap,
+  body #app .main .productionTableWrap,
+  body #app .main .inventoryTableWrap {
+    display:block!important;
+    width:100%!important;
+    max-width:none!important;
+    min-width:0!important;
+    overflow-x:auto!important;
+  }
+  body #app .main .panel table th,
+  body #app .main .panel table td { 
+    box-sizing:border-box!important;
+    vertical-align:middle!important;
+  }
+}
+@media(max-width:700px){
+  body #app .main .panel {width:100%!important;max-width:100%!important;min-width:0!important;}
+  body #app .main :is(.inventoryTableWrap,.kitchReceivingTableWrap,.productionTableWrap){width:100%!important;max-width:100%!important;overflow-x:auto!important;}
+  body #app .main .panel table{display:table!important;width:100%!important;min-width:680px!important;overflow:visible!important;}
+}
