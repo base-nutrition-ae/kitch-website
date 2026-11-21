@@ -1,9 +1,7 @@
-/* KITCH local multi-item receiving demo. Not a production receiving ledger.
-   Loaded after the original KITCH application script. */
+/* KITCH multi-ingredient Receiving. Uses location-scoped cloud transactions on production and isolated demo RPCs locally. */
 (() => {
  'use strict';
  const LOCAL = ['127.0.0.1','localhost'].includes(location.hostname);
- if (!LOCAL) return;
  const unitsForBase=base=>{
    const u=String(base||'').toLowerCase();
    if(['g','kg'].includes(u))return ['g','kg','pcs','pkt','box'];
@@ -89,7 +87,7 @@
      if(line.temperature!==''&&!Number.isFinite(Number(line.temperature)))throw Error('Invalid temperature on line '+(i+1));
      const delivered=Number((qty*f).toFixed(6)),rejected=Number((rej*f).toFixed(6)),unitPrice=price/f;
      if(delivered<=0||!Number.isFinite(unitPrice))throw Error('Invalid conversion on line '+(i+1));
-     return {ingredient_id:ing.cloud_id,delivered,rejected,price:unitPrice,unit:ing.base_unit,expiry:line.expiry||null,temperature:line.temperature===''?null:Number(line.temperature)};
+     return {ingredient_id:ing.cloud_id,delivered,rejected,price:unitPrice,unit:ing.base_unit,expiry:line.expiry||null,production:line.production||null,temperature:line.temperature===''?null:Number(line.temperature)};
    });
    return {supplier,invoice,payload};
  }
@@ -99,28 +97,28 @@
    try{
      const {supplier,invoice,payload}=validate();
      if(!confirm('Save '+payload.length+' receiving lines under invoice '+invoice+'? All lines will save together.'))return;
-     saving=true;button.disabled=true;message.textContent='Saving all lines to local database…';
-     const {data,error}=await sb.rpc('kitch_team_receive_invoice_demo',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice:invoice,p_lines:payload});
+     saving=true;button.disabled=true;message.textContent=LOCAL?'Saving all lines to local database…':'Saving invoice and accepted stock to KITCH cloud…';
+     const {data,error}=await sb.rpc(LOCAL?'kitch_team_receive_invoice_demo':'kitch_team_receive_invoice',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice:invoice,p_lines:payload});
      if(error)throw error;
      await cloudLoadIngredients();
      closeModal();openPage('Receiving');
-     alert('Local receiving saved: '+data.saved_lines+' items, AED '+Number(data.total_aed||0).toFixed(2)+'. No invoice attachment was uploaded.');
+     alert((LOCAL?'Local receiving saved: ':'Receiving saved to KITCH cloud: ')+data.saved_lines+' items, AED '+Number(data.total_aed||0).toFixed(2)+'.');
    }catch(e){if(message){message.style.color='#b42318';message.textContent='Not saved: '+(e?.message||e)}}
    finally{saving=false;if(button)button.disabled=false}
  }
  window.openKitchNewReceiving=async function(){
-   if(!teamCloudAuth?.staff_name||!cloud?.branch_id)return alert('Sign in with the local Demo Manager account.');
+   if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud?.branch_id)return alert('Sign in to your assigned KITCH location first.');
    if(!ingredientList().length)return alert('Import Ingredient Master first.');
    packageDefaults=new Map();
    try {
-     const result=await sb.rpc('kitch_team_local_package_defaults',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+     const result=await sb.rpc(LOCAL?'kitch_team_local_package_defaults':'kitch_team_package_defaults',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
      if(!result.error&&Array.isArray(result.data))packageDefaults=new Map(result.data.map(x=>[String(x.ingredient_id),x]));
    } catch(err){console.warn('Local package master defaults unavailable',err)}
    lines=[newLine()];counter=lines[0].key;
    modal('<div class="modalHead"><div><h2>New Receiving</h2><small>One invoice · Multiple ingredients</small></div><button class="close" onclick="closeModal()">×</button></div>'+
     '<style>#modal .modalBox{width:min(940px,calc(100vw - 32px));max-width:940px;box-sizing:border-box;padding:24px 28px;border-radius:24px}#modal .modalHead{margin-bottom:14px}#modal .modalHead h2{font-size:24px;letter-spacing:-.035em;margin:0}.kmrWrap{max-height:76vh;overflow:auto;padding-right:4px}.kmrIntro{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 14px;background:#f6f6f5;color:#777;border-radius:12px;padding:10px 13px;margin:4px 0 16px;font-size:12px}.kmrIntro b{color:#222}.kmrHeader{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:18px;border-bottom:1px solid #eaeaea}.kmrHeader label,.kmrGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrHeader input,.kmrGrid input,.kmrGrid select{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrHeader input:focus,.kmrGrid input:focus,.kmrGrid select:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrLine{border:1px solid #e9e9e9;border-radius:18px;background:#fff;padding:17px 18px;margin:14px 0}.kmrLineTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.kmrLineIdentity{display:flex;gap:10px;align-items:center;font-size:15px}.kmrLineNum{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#fff1eb;color:#db6c36;font-size:11px;font-weight:850}.kmrMasterAction{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}.kmrMasterAction button{border:1px solid #efd8c8;background:#fff7f0;color:#a65a2e;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:750;cursor:pointer}.kmrMasterAction span{font-size:11px;color:#999}.kmrLineTop button{border:0;background:#fafafa;padding:9px 12px;border-radius:20px;color:#b64736;font-weight:700;cursor:pointer;font-size:11px}.kmrMainGrid{display:grid;grid-template-columns:1.6fr .75fr .9fr .85fr;gap:12px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrPackInline{display:flex;gap:6px}.kmrPackInline input{flex:1}.kmrPackInline select{flex:0 0 75px}.kmrQualityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid #efefef}.kmrQualityGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrQualityGrid input{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrQualityGrid input:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrExtras{margin-top:13px;border-top:1px solid #eee;padding-top:10px}.kmrExtras summary{font-size:12px;font-weight:750;color:#555;cursor:pointer}.kmrExtras summary span{font-weight:400;color:#999;margin-left:8px}.kmrExtras .kmrGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:11px}.kmrPreview{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f7f7f5;border-radius:10px;margin:12px 0 0;padding:11px 13px;color:#666;font-size:12px}.kmrPreview b{color:#111}#kmrAdd{width:auto;background:white;border:1px dashed #bcbcbc;color:#222;padding:11px 18px;border-radius:30px;font-weight:750;cursor:pointer}.kmrSummary{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 10px;padding:15px 16px;background:#f4f4f2;border-radius:13px}.kmrSummary strong{font-size:17px;color:#111}#kmrSubmit{border-radius:999px;min-height:50px}@media(max-width:840px){.kmrMainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.kmrMainGrid .kmrIngredient{grid-column:span 2}}@media(max-width:560px){.kmrQualityGrid{grid-template-columns:1fr 1fr}.kmrQualityGrid label:last-child{grid-column:span 2}#modal .modalBox{padding:18px 16px;width:calc(100vw - 20px)}.kmrHeader,.kmrExtras .kmrGrid{grid-template-columns:1fr}.kmrMainGrid{grid-template-columns:1fr 1fr;gap:10px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrLine{padding:13px}.kmrPreview{display:block}.kmrPreview span{display:block;margin:3px 0}.kmrSummary strong{font-size:14px}}</style>'+
-    '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>Local test only · No attachments required</span></div>'+
-    '<div class="kmrHeader"><label>SUPPLIER *<input id="kmrSupplier" placeholder="Supplier"></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="LOCAL-INV-001"></label></div>'+
+    '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>'+(LOCAL?'Local test only':'Cloud Receiving · Confirmed stock updates inventory')+'</span></div>'+
+    '<div class="kmrHeader"><label>SUPPLIER *<input id="kmrSupplier" placeholder="Supplier"></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="Supplier invoice number"></label></div>'+
     '<div id="kmrLines"></div><button type="button" id="kmrAdd" class="btn">+ Add Ingredient</button>'+
     '<div class="kmrSummary"><span id="kmrCount">1 item</span><strong>Invoice total: <span id="kmrTotal">AED 0.00</span></strong></div>'+
     '<p id="kmrMessage" role="status" aria-live="polite" style="font-size:12px;color:#555"></p>'+
@@ -139,7 +137,7 @@
      }
      button.disabled=true;status.textContent='Saving package to Ingredient Master...';
      try{
-       const result=await sb.rpc('kitch_team_local_save_package',{
+       const result=await sb.rpc(LOCAL?'kitch_team_local_save_package':'kitch_team_save_package',{
          p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ing.cloud_id,
          p_purchase_unit:line.unit,p_pack_size:Number(line.packSize),p_pack_unit:line.packUnit,
          p_unit_price:Number(line.price)});
@@ -226,7 +224,7 @@
    const total=rows.reduce((s,r)=>s+Number(r.total||0),0);
    const w=window.open('','_blank');if(!w)return alert('Allow pop-ups to print receiving invoice.');
    const rowHTML=rows.map(r=>'<tr><td>'+safe(r.ingredient)+'</td><td>'+safe(r.accepted+' '+r.unit)+'</td><td>'+safe(money(r.price))+'</td><td>'+safe(money(r.total))+'</td><td>'+safe(r.expiry||'—')+'</td></tr>').join('');
-   w.document.write('<!doctype html><html><head><title>KITCH Receiving</title><style>body{font:14px Arial;padding:36px;max-width:850px;margin:auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}footer{margin-top:30px;color:#777}@media print{button{display:none}}</style></head><body><h1>KITCH Receiving</h1><p>LOCAL TEST DEMO · Invoice '+safe(item.invoice)+' · '+safe(item.supplier)+'</p><p>Date: '+safe(new Date(item.date).toLocaleDateString())+'</p><table><thead><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th><th>Expiry</th></tr></thead><tbody>'+rowHTML+'</tbody></table><h2>Total: '+safe(money(total))+'</h2><footer>Local synthetic data only. Not a food safety or accounting record.</footer><button onclick="window.print()">Print / Save PDF</button></body></html>');
+   w.document.write('<!doctype html><html><head><title>KITCH Receiving</title><style>body{font:14px Arial;padding:36px;max-width:850px;margin:auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}footer{margin-top:30px;color:#777}@media print{button{display:none}}</style></head><body><h1>KITCH Receiving</h1><p>'+(LOCAL?'LOCAL TEST DEMO':'KITCH CLOUD RECEIVING')+' · Invoice '+safe(item.invoice)+' · '+safe(item.supplier)+'</p><p>Date: '+safe(new Date(item.date).toLocaleDateString())+'</p><table><thead><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th><th>Expiry</th></tr></thead><tbody>'+rowHTML+'</tbody></table><h2>Total: '+safe(money(total))+'</h2><footer>'+(LOCAL?'Local synthetic data only.':'Verify receiving dates, supplier invoice and accepted quantities against original records.')+'</footer><button onclick="window.print()">Print / Save PDF</button></body></html>');
    w.document.close();
  };
 
