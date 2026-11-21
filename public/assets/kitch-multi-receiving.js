@@ -132,10 +132,10 @@
        const latest=findIngredient(line.id);
        if(!latest || latest.base_unit!==target)throw Error('Ingredient Master unit did not refresh. No invoice was saved.');
        line.packUnit=packBaseUnit(target);
-       line.packSize='';
-       line.price='';
+       // Preserve the staff-entered quantity, package size, and invoice price.
+       // The transaction validator will verify them against the corrected unit.
        draw();
-       throw Error('Ingredient Master unit corrected to '+target+'. Enter the invoice price again and confirm Receiving.');
+       message.textContent='Ingredient Master unit automatically updated to '+target+'.';
      }
      const {supplier,invoice,payload}=validate();
      if(!confirm('Save '+payload.length+' receiving lines under invoice '+invoice+'? All lines will save together.'))return;
