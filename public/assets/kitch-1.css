@@ -1454,3 +1454,6 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 #app .side .sideUtility button {
   white-space: nowrap;
 }
+
+/* Inventory search: hidden rows must stay hidden across legacy table styles. */
+#app .kitchInventory .inventoryTableWrap tr.ingredientRow[hidden] { display: none !important; }
