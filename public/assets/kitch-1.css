@@ -1507,3 +1507,71 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
  #modal .productionStartHead,
  #modal .productionFinish .modalHead{gap:12px;align-items:flex-start!important}
 }
+
+/* Production layout refinement — preserve modal functionality and full-width ledgers. */
+#modal .modalBox:has(.productionFinish),
+#modal .modalBox:has(.productionStartHead){
+ width:min(860px,calc(100vw - 32px))!important;
+ max-width:860px!important;
+ box-sizing:border-box!important;
+ padding:26px 28px!important;
+}
+#modal .productionFinish{width:100%!important;max-width:none!important}
+#modal .productionFinish .modalHead,
+#modal .productionStartHead{
+ display:flex!important;
+ flex-direction:row!important;
+ align-items:flex-start!important;
+ justify-content:space-between!important;
+ width:100%!important;
+ margin:0 0 16px!important;
+ padding:0 0 16px!important;
+ gap:16px!important;
+ border-bottom:1px solid #eaeaea;
+ box-sizing:border-box!important;
+ position:relative!important;
+}
+#modal .productionFinish .modalHead>div:first-child,
+#modal .productionStartHead>h2{min-width:0;flex:1!important;margin:0!important}
+#modal .productionFinish .modalHead>.close,
+#modal .productionStartHead>.close{
+ position:static!important;
+ float:none!important;
+ inset:auto!important;
+ transform:none!important;
+ flex:0 0 38px!important;
+ width:38px!important;height:38px!important;
+ margin:0!important;padding:0!important;
+ display:grid!important;place-items:center!important;
+ background:#f0f0f0!important;
+ border-radius:50%!important;
+ font-size:21px!important;line-height:1!important;
+ align-self:flex-start!important;
+}
+#modal .productionFinish .runMeta{margin:0 0 14px}
+#modal .productionFinish .yieldGrid{display:grid;grid-template-columns:minmax(0,2fr) minmax(130px,1fr);gap:14px}
+#modal .productionFinish .formGrid{margin-top:18px}
+#modal .productionFinish .qcPhoto{margin-top:14px}
+#modal .productionFinish .primary{width:100%;margin-top:18px}
+#app .kitchProductionLedger{width:100%;min-width:0;box-sizing:border-box}
+#app .kitchProductionTableScroll{width:100%;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0}
+#app .kitchProductionTableScroll>.kitchProductionTable{
+ width:100%!important;min-width:720px;
+ display:table!important;
+ table-layout:auto!important;
+ border-collapse:collapse;
+ margin:0!important;
+ white-space:normal!important;
+}
+#app .kitchProductionTable th,#app .kitchProductionTable td{
+ white-space:normal!important;
+ vertical-align:middle;
+ padding:15px 12px;
+}
+#app .kitchProductionTable th{background:#f8f8f8;font-size:10px;letter-spacing:.04em}
+#app .kitchProductionTable tr.productionHistoryRow:hover{background:#faf9f7}
+@media(max-width:600px){
+ #modal .modalBox:has(.productionFinish),#modal .modalBox:has(.productionStartHead){padding:18px 16px!important}
+ #modal .productionFinish .yieldGrid{grid-template-columns:minmax(0,1fr) minmax(90px,.45fr);gap:10px}
+ #app .kitchProductionTableScroll>.kitchProductionTable{min-width:650px}
+}
