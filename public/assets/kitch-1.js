@@ -1814,6 +1814,8 @@ async function kitchSaveNewReceiving(){
  const baseQty=Number((qty*factor).toFixed(6)),baseRejected=Number((rejected*factor).toFixed(6)),basePrice=price/factor;
  if(!Number.isFinite(baseQty)||baseQty<=0||!Number.isFinite(baseRejected)||baseRejected<0||baseRejected>baseQty||!Number.isFinite(basePrice)||basePrice<0){status.textContent='Invalid converted quantity or cost. No stock was saved.';return;}
  const expiry=el('knrExpiry').value||null,temp=el('knrTemp').value===''?null:Number(el('knrTemp').value);
+ const now=new Date();const today=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+ if(expiry&&expiry<today){status.textContent='Expired delivery blocked: expiry '+expiry+' is before today ('+today+'). No stock was changed.';return;}
  if(temp!==null&&!Number.isFinite(temp)){status.textContent='Invalid receiving temperature.';return;}
  const file=el('knrFile').files?.[0];if(file&&(file.size>2*1024*1024||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))){status.textContent='Invoice must be a PDF/JPG/PNG/WebP under 2 MB.';return;}
  btn.disabled=true;status.textContent='Saving receiving to KITCH Cloud…';
