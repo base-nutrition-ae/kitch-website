@@ -151,4 +151,37 @@
    root.querySelector('#kmrLines').addEventListener('change',e=>{if(e.target.matches('select'))change(e)});
    draw();
  };
+
+ // Show one receiving entry per supplier invoice, even when it has several ingredients.
+ function grouped(){
+   const sets=new Map();
+   (kitchReceivingHistory||[]).forEach(r=>{
+     const day=String(r.date||'').slice(0,10);
+     const key=String(r.supplier||'').toLowerCase()+'|'+String(r.invoice||'').toLowerCase()+'|'+day;
+     if(!sets.has(key))sets.set(key,[]);
+     sets.get(key).push(r);
+   });
+   return [...sets.values()];
+ }
+ window.kitchRenderReceivingRows=function(){
+   const target=document.getElementById('kitchReceivingRows');if(!target)return;
+   target.innerHTML=grouped().map(group=>{
+     const first=group[0],count=group.length,total=group.reduce((s,r)=>s+Number(r.total||0),0);
+     const exp=group.map(r=>r.expiry).filter(Boolean).sort();
+     const ingredientsText=count===1?first.ingredient:count+' items: '+group.map(r=>r.ingredient).join(', ');
+     return '<tr><td>'+safe(new Date(first.date).toLocaleDateString())+'</td><td>'+safe(first.invoice)+'</td><td>'+safe(first.supplier)+'</td><td>'+safe(ingredientsText)+'</td>'+
+      '<td>'+safe(group.map(r=>r.accepted+' '+r.unit).join(' · '))+'</td><td>'+safe(money(total))+'</td><td>'+safe(exp.length?exp[0]:'—')+'</td><td>—</td>'+
+      '<td><button class="kitchReceivingBtn small" onclick="kitchPrintReceipt(\''+safe(first.id)+'\')">PDF</button></td></tr>';
+   }).join('')||'<tr><td colspan="9" class="empty">No receiving records yet. Click + New Receiving.</td></tr>';
+ };
+ window.kitchPrintReceipt=function(id){
+   const item=(kitchReceivingHistory||[]).find(r=>String(r.id)===String(id));if(!item)return;
+   const rows=(kitchReceivingHistory||[]).filter(r=>r.invoice===item.invoice&&r.supplier===item.supplier&&String(r.date||'').slice(0,10)===String(item.date||'').slice(0,10));
+   const total=rows.reduce((s,r)=>s+Number(r.total||0),0);
+   const w=window.open('','_blank');if(!w)return alert('Allow pop-ups to print receiving invoice.');
+   const rowHTML=rows.map(r=>'<tr><td>'+safe(r.ingredient)+'</td><td>'+safe(r.accepted+' '+r.unit)+'</td><td>'+safe(money(r.price))+'</td><td>'+safe(money(r.total))+'</td><td>'+safe(r.expiry||'—')+'</td></tr>').join('');
+   w.document.write('<!doctype html><html><head><title>KITCH Receiving</title><style>body{font:14px Arial;padding:36px;max-width:850px;margin:auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}footer{margin-top:30px;color:#777}@media print{button{display:none}}</style></head><body><h1>KITCH Receiving</h1><p>LOCAL TEST DEMO · Invoice '+safe(item.invoice)+' · '+safe(item.supplier)+'</p><p>Date: '+safe(new Date(item.date).toLocaleDateString())+'</p><table><thead><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th><th>Expiry</th></tr></thead><tbody>'+rowHTML+'</tbody></table><h2>Total: '+safe(money(total))+'</h2><footer>Local synthetic data only. Not a food safety or accounting record.</footer><button onclick="window.print()">Print / Save PDF</button></body></html>');
+   w.document.close();
+ };
+
 })();
