@@ -4,7 +4,13 @@
  'use strict';
  const LOCAL = ['127.0.0.1','localhost'].includes(location.hostname);
  if (!LOCAL) return;
- const units = ['g','kg','ml','ltr','pcs','pkt','box'];
+ const unitsForBase=base=>{
+   const u=String(base||'').toLowerCase();
+   if(['g','kg'].includes(u))return ['g','kg','pkt','box'];
+   if(['ml','ltr','l'].includes(u))return ['ml','ltr','pkt','box'];
+   if(u==='pcs')return ['pcs','pkt','box'];
+   return [u,'pkt','box'].filter(Boolean);
+ };
  const safe = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
  const options=(values,selected)=>values.map(u=>'<option value="'+u+'"'+(u===selected?' selected':'')+'>'+u+'</option>').join('');
@@ -36,11 +42,12 @@
    const list=ingredientList().map(x=>'<option value="'+safe(x.cloud_id)+'"'+(String(x.cloud_id)===line.id?' selected':'')+'>'+safe(x.name)+'</option>').join('');
    const baseQty=factor(line,base),qty=Number(line.qty||0),rej=Number(line.rejected||0);
    const stock=(baseQty!=null&&qty>=rej && rej>=0)?(qty-rej)*baseQty:null;
+   const hint=base==='ml'?'Use ml/ltr, or select pkt/box and enter the volume per package.':base==='g'?'Use g/kg, or enter weight per packet/box.':'';
    return '<div class="kmrLine" data-key="'+line.key+'">'+
     '<div class="kmrLineTop"><div class="kmrLineIdentity"><span class="kmrLineNum">'+String(i+1).padStart(2,'0')+'</span><strong>'+safe(ing?.name||'Select ingredient')+'</strong></div><button type="button" data-action="remove" data-key="'+line.key+'" aria-label="Remove item">Remove</button></div>'+
     '<div class="kmrGrid kmrMainGrid">'+
      '<label class="kmrIngredient">Ingredient *<select data-field="id" data-key="'+line.key+'"><option value="">Choose ingredient</option>'+list+'</select></label>'+
-     '<label>Unit *<select data-field="unit" data-key="'+line.key+'">'+options(units,line.unit)+'</select></label>'+
+     '<label>Unit *<select data-field="unit" data-key="'+line.key+'">'+options(unitsForBase(base),line.unit)+'</select></label>'+
      (isPack?'<label class="kmrPackSize">Pack size *<div class="kmrPackInline"><input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="5"><select data-field="packUnit" data-key="'+line.key+'" aria-label="Pack size unit">'+options(possibleSizeUnits(base),line.packUnit)+'</select></div></label>':'')+
      '<label>Delivered *<input data-field="qty" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.qty)+'" placeholder="0"></label>'+
      '<label>Rejected<input data-field="rejected" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.rejected)+'"></label>'+
@@ -51,7 +58,7 @@
      '<label>Production date<input data-field="production" data-key="'+line.key+'" type="date" value="'+safe(line.production)+'"></label>'+
      '<label>Receiving temperature (°C)<input data-field="temperature" data-key="'+line.key+'" type="number" step="any" placeholder="Optional" value="'+safe(line.temperature)+'"></label>'+
     '</div>'+
-    '<div class="kmrPreview"><span>Accepted stock: <b>'+(stock==null?'Check unit / pack size':Number(stock.toFixed(6))+' '+safe(base))+'</b></span><span>Line total: <b>AED '+((qty>=rej && rej>=0 && Number.isFinite(Number(line.price)))?((qty-rej)*Number(line.price)).toFixed(2):'—')+'</b></span></div>'+
+    '<div class="kmrPreview"><span>Accepted stock: <b>'+(stock==null?safe(hint||'Choose a compatible unit / pack size'):Number(stock.toFixed(6))+' '+safe(base))+'</b></span><span>Line total: <b>AED '+((qty>=rej && rej>=0 && Number.isFinite(Number(line.price)))?((qty-rej)*Number(line.price)).toFixed(2):'—')+'</b></span></div>'+
     '</div>';
  }
  function draw(){
@@ -127,6 +134,9 @@
        const ing=findIngredient(line.id);line.unit=ing?.base_unit||'g';
        line.packUnit=line.unit;line.price=ing?String(Number(ing.reference_cost??ing.cost??0)):'';
        line.packSize='';
+     }
+     if(field==='unit' && !unitsForBase(findIngredient(line.id)?.base_unit).includes(line.unit)){
+       line.unit=findIngredient(line.id)?.base_unit||'g';
      }
      if(field==='unit'){
        const ing=findIngredient(line.id),base=ing?.base_unit||'g';
