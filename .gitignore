@@ -1,1 +1,4 @@
-.local-staging/\n.env\n.env.*\n!.env.example\n
+.local-staging/
+.env
+.env.*
+!.env.example
