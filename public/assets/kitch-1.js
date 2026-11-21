@@ -2154,8 +2154,35 @@ async function kitchLoadCloudExpiryReceipts(){
  }catch(e){el.innerHTML='<h3>Cloud Receiving Lots</h3><p class="bad">Cloud receiving history could not be loaded: '+esc(e.message||'Unknown error')+'</p>';}
  finally{kitchCloudExpiryLoading=false;}
 }
+// Staged FEFO ledger: read only until movement allocations are reconciled.
+async function kitchLoadCloudLotLedger(){
+ const el=document.getElementById('kitchCloudLotLedger');if(!el)return;
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin){el.innerHTML='<p class="muted">Sign in with a staff account to check cloud lot allocations.</p>';return;}
+ try{
+  const {data,error}=await sb.rpc('kitch_team_lot_ledger',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_action:'list'});
+  if(error)throw error;
+  const lots=Array.isArray(data?.lots)?data.lots:[],uses=Array.isArray(data?.unallocated_movements)?data.unallocated_movements:[];
+  const pending=uses.filter(m=>Number(m.remaining_unallocated)>0);
+  const untracked=lots.filter(x=>!x.expiry);
+  const fullyReconciled=pending.length===0 && untracked.length===0;
+  el.innerHTML=`<h3>Cloud Lot Balance & FEFO</h3>
+   <div class="note ${fullyReconciled?'ok':'warn'}"><b>${fullyReconciled?'Lot allocations reconciled in this view':'Lot allocations not fully reconciled'}</b><br>
+   ${pending.length} unallocated stock-usage movements; ${untracked.length} lots missing expiry.
+   Remaining lot balances below reflect assigned usage movements only; actual available inventory must be checked separately.</div>
+   <div class="grid"><div class="card"><span>CLOUD LOTS</span><b>${lots.length}</b></div>
+   <div class="card"><span>UNALLOCATED USAGE MOVEMENTS</span><b>${pending.length}</b></div>
+   <div class="card"><span>LOTS WITHOUT EXPIRY</span><b>${untracked.length}</b></div>
+   <div class="card"><span>FEFO READY</span><b>${fullyReconciled?'Review':'No'}</b></div></div>
+   <div style="overflow-x:auto;margin-top:12px"><table style="min-width:900px"><thead><tr><th>INGREDIENT</th><th>INVOICE / LOT</th><th>ACCEPTED</th><th>ALLOCATED USAGE</th><th>UNALLOCATED LOT BALANCE</th><th>EXPIRY</th><th>STATUS</th></tr></thead><tbody>
+   ${lots.map(x=>{const status=kitchCloudExpiryStatus(x.expiry);
+      return `<tr><td><b>${esc(x.ingredient||'—')}</b></td><td>${esc(x.invoice||'—')}</td><td>${cleanQty(x.received_qty)} ${esc(x.unit||'')}</td>
+      <td>${cleanQty(x.allocated_qty)} ${esc(x.unit||'')}</td><td>${cleanQty(x.remaining_qty)} ${esc(x.unit||'')}</td><td>${esc(x.expiry||'—')}</td><td><span class="${status.cls}">${esc(status.label)}</span></td></tr>`;
+   }).join('')||'<tr><td colspan="7" class="empty">No cloud receipt lots found.</td></tr>'}</tbody></table></div>`;
+ }catch(e){el.innerHTML='<h3>Cloud Lot Balance & FEFO</h3><div class="note warn">Lot ledger is not active yet: '+esc(e.message)+'. The existing receiving history above is unchanged.</div>';}
+}
 function batchesPage(){
  setTimeout(kitchLoadCloudExpiryReceipts,80);
+ setTimeout(kitchLoadCloudLotLedger,110);
  const a=getArr(BATCH_KEY).slice().sort((x,y)=>String(x.expiry_date).localeCompare(String(y.expiry_date)));
  const expired=a.filter(x=>batchStatus(x).label==='EXPIRED').length;
  const soon=a.filter(x=>batchStatus(x).label==='EXPIRING SOON').length;
@@ -2170,7 +2197,7 @@ function batchesPage(){
  <div class="card"><span>LOCAL EXPIRING SOON</span><b>${soon}</b></div><div class="card"><span>LOCAL EXPIRED</span><b>${expired}</b></div>
  <div class="card"><span>LOCAL FEFO TRACKING</span><b>${a.length?'ON':'—'}</b></div></div>
  <div class="panel"><h2>Expiry & Batches</h2><p class="muted">Browser-local batches and cloud Receiving records are shown separately to avoid claiming cloud stock is linked to FEFO when it is not.</p>
- <div id="kitchCloudExpirySection"><h3>Cloud Receiving Lots</h3><p class="muted">Loading cloud receiving history…</p></div>
+ <div id="kitchCloudExpirySection"><h3>Cloud Receiving Lots</h3><p class="muted">Loading cloud receiving history…</p></div><div id="kitchCloudLotLedger" style="margin-top:22px"><h3>Cloud Lot Balance & FEFO</h3><p class="muted">Checking allocation ledger…</p></div>
  <h3 style="margin-top:24px">Local Tracked Batches</h3><div style="overflow-x:auto"><table style="min-width:850px"><tr><th>INGREDIENT</th><th>SUPPLIER</th><th>PO</th><th>BATCH / LOT</th><th>RECEIVED</th><th>REMAINING</th><th>RECEIVED DATE</th><th>EXPIRY</th><th>STATUS</th></tr>
  ${rows||'<tr><td colspan="9" class="empty">No browser-local tracked batches. Cloud receipts, if any, are listed above.</td></tr>'}</table></div></div>`;
 }
