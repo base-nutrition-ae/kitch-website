@@ -21,6 +21,8 @@
        .filter(Boolean).join(' ').toLocaleLowerCase();
      const show=!query||value.includes(query);
      row.classList.toggle('kitch-search-no-match',!show);
+     row.hidden=!show;
+     row.style.setProperty('display',show?'table-row':'none','important');
      if(show)matches++;
    });
    let message=area.querySelector('#kitchIngredientSearchStatus');
