@@ -1462,7 +1462,7 @@ function purchasingPage(){
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
  <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn black" onclick="openUnifiedMasterImport()">Import Unified Master</button><button class="btn" onclick="openSupplierExcel()">Import Supplier Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
- <div class="note" style="margin:14px 0"><b id="kitchCloudPurchaseRole">Cloud Purchasing</b> · Requests require Main Office approval before purchase orders. Existing browser-only orders remain separate; cloud purchase orders do not deduct or receive stock.</div><div class="actions"><button id="kitchCloudRequestCreate" class="btn black" hidden onclick="kitchNewCloudPurchaseRequest()">+ Cloud Purchase Request</button><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Refresh Cloud Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
+ <div class="note" style="margin:14px 0"><b id="kitchCloudPurchaseRole">Cloud Purchasing</b> · Requests require Main Office approval before purchase orders. Existing browser-only orders remain separate; cloud purchase orders do not deduct or receive stock.</div><div class="actions"><button id="kitchCloudRequestCreate" class="btn black" hidden onclick="kitchNewCloudPurchaseRequest()">+ Cloud Purchase Request</button><button id="kitchCloudSupplierCreate" class="btn" hidden onclick="kitchNewCloudSupplier()">+ Cloud Supplier</button><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Refresh Cloud Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
  <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
 }
 
@@ -1578,9 +1578,35 @@ async function kitchRefreshCloudPurchases(){
   if(label)label.textContent='Cloud workspace · '+(data?.role||'staff')+' · '+requests.length+' requests · '+grouped.size+' purchase orders';
   const create=document.getElementById('kitchCloudRequestCreate');
   if(create)create.hidden=!['owner','kitchen_manager','executive_chef','production_staff'].includes(kitchCloudPurchaseCatalog.role);
+  const supplierButton=document.getElementById('kitchCloudSupplierCreate');
+  if(supplierButton)supplierButton.hidden=kitchCloudPurchaseCatalog.role!=='owner';
  }catch(e){
   body.innerHTML='<tr><td colspan="5" class="bad">Could not load cloud Purchasing: '+esc(e.message)+'. No orders changed.</td></tr>';
  }
+}
+function kitchNewCloudSupplier(){
+ if(kitchCloudPurchaseCatalog.role!=='owner')return alert('Only Main Office can register cloud suppliers.');
+ modal(`<div class="modalHead"><h2>Add Cloud Supplier</h2><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note">This adds an approved supplier to the shared KITCH company master. Browser-only suppliers are not imported automatically.</div>
+ <div class="field"><label>SUPPLIER NAME</label><input id="kitchNewSupplierName" maxlength="120" placeholder="Supplier legal or trading name"></div>
+ <div class="actions"><button type="button" class="btn black" id="kitchNewSupplierSave" onclick="kitchSaveCloudSupplier()">Save Cloud Supplier</button></div>
+ <p id="kitchNewSupplierError" role="status" style="font-size:12px;color:#b42318"></p>`);
+}
+async function kitchSaveCloudSupplier(){
+ if(kitchCloudPurchaseBusy)return;
+ const name=document.getElementById('kitchNewSupplierName')?.value.trim()||'';
+ const error=document.getElementById('kitchNewSupplierError');
+ if(!name||name.length>120){if(error)error.textContent='Enter a supplier name up to 120 characters.';return}
+ if(!confirm('Add '+name+' as an approved company supplier?'))return;
+ kitchCloudPurchaseBusy=true;
+ const button=document.getElementById('kitchNewSupplierSave');if(button)button.disabled=true;
+ try{
+  await kitchCloudPurchaseRpc('add_supplier',{p_notes:name});
+  closeModal();
+  await kitchRefreshCloudPurchases();
+  alert('Supplier saved to cloud company master. You can now use it in a purchase order.');
+ }catch(e){if(error)error.textContent='Supplier not saved: '+e.message}
+ finally{kitchCloudPurchaseBusy=false;if(button)button.disabled=false}
 }
 function kitchNewCloudPurchaseRequest(){
  const data=kitchCloudPurchaseCatalog;
