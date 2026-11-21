@@ -113,6 +113,30 @@
    if(saving)return;
    const message=document.getElementById('kmrMessage'),button=document.getElementById('kmrSubmit');
    try{
+     // A selected unit may correct a never-used Ingredient Master without
+     // a separate master-edit screen. An ingredient with stock history is
+     // deliberately rejected by the audited database function.
+     for(const line of lines){
+       const ing=findIngredient(line.id);
+       if(!ing || !isMilkUnitMismatch(ing))continue;
+       const target=['ml','ltr'].includes(line.unit)?line.unit:
+         (['pcs','pkt','box'].includes(line.unit)?'ltr':null);
+       if(!target)throw Error('Choose ml or L for '+ing.name+'.');
+       message.textContent='Checking Ingredient Master unit for '+ing.name+'…';
+       const fixed=await sb.rpc('kitch_team_correct_unused_ingredient_unit',{
+         p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+         p_ingredient_id:ing.cloud_id,p_new_unit:target
+       });
+       if(fixed.error)throw Error(ing.name+': existing stock uses different units. Its opening balance needs an audited stock reconciliation before litres can be received. No invoice was saved.');
+       await cloudLoadIngredients();
+       const latest=findIngredient(line.id);
+       if(!latest || latest.base_unit!==target)throw Error('Ingredient Master unit did not refresh. No invoice was saved.');
+       line.packUnit=packBaseUnit(target);
+       line.packSize='';
+       line.price='';
+       draw();
+       throw Error('Ingredient Master unit corrected to '+target+'. Enter the invoice price again and confirm Receiving.');
+     }
      const {supplier,invoice,payload}=validate();
      if(!confirm('Save '+payload.length+' receiving lines under invoice '+invoice+'? All lines will save together.'))return;
      saving=true;button.disabled=true;message.textContent=LOCAL?'Saving all lines to local database…':'Saving invoice and accepted stock to KITCH cloud…';
