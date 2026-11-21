@@ -138,6 +138,10 @@
      }
      if(['id','unit','packUnit'].includes(field))draw();
      else{
+       if(field==='packSize'){
+         const priceInput=target.closest('.kmrLine')?.querySelector('[data-field="price"]');
+         if(priceInput)priceInput.value=line.price;
+       }
        // Update preview without replacing the focused input during typing.
        const block=target.closest('.kmrLine'),base=findIngredient(line.id)?.base_unit||'g',f=factor(line,base);
        const q=Number(line.qty||0),r=Number(line.rejected||0),p=Number(line.price||0);
