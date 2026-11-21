@@ -116,7 +116,7 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 #overview .overview-kpis{grid-template-columns:1fr}
 }
 </style>
-</head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
+</head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="purchasing">Purchasing</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
 <section class="section active" id="overview">
 <div class="hero"><div><h1>Main Office Overview</h1><p>All your restaurant operations in one place.</p></div><span class="tag">Main Office · Owner View</span></div>
 <div class="note">Live inventory and cloud-synced recipe counts are shown where available. Production stock deductions and costs come from the cloud ledger; final completion and purchasing are not yet fully cloud-connected.</div>
@@ -139,6 +139,19 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 </div></section>
 <section class="section" id="ingredients"><div class="hero"><div><h1>Ingredient Master</h1><p>Company-wide ingredient catalog. Changes sync to all locations; inventory quantities are never changed here.</p></div><button class="btn" id="officeIngredientAdd" type="button">+ Add Ingredient</button></div><div class="card"><div class="titleline"><h2>Approved Ingredients</h2><span class="ghost" id="officeIngredientCount">Loading…</span></div><div class="actions" style="display:flex;gap:10px;flex-wrap:wrap;margin:15px 0"><input id="officeIngredientSearch" placeholder="Search ingredients" style="padding:12px;border:1px solid #ddd;border-radius:12px;flex:1;min-width:180px"><button class="btn" id="officeIngredientExport" type="button">Download CSV</button><label class="btn" style="cursor:pointer">Import Excel / CSV <input type="file" id="officeIngredientImport" accept=".xlsx,.xls,.csv" hidden></label></div><p id="officeIngredientStatus" style="font-size:12px;color:#777"></p><div style="overflow:auto"><table><thead><tr><th>Ingredient</th><th>Unit</th><th>Supplier</th><th>Category</th><th>Reference cost</th><th>Minimum</th><th>Status</th><th>Action</th></tr></thead><tbody id="officeIngredientRows"></tbody></table></div></div></section>
 <dialog class="officeStaffDialog" id="officeIngredientDialog" style="width:min(560px,94vw)"><h2 id="officeIngredientTitle">Add Ingredient</h2><form id="officeIngredientForm"><input type="hidden" id="officeIngredientId"><label>Ingredient name<input id="officeIngredientName" required maxlength="160"></label><label>Base unit<select id="officeIngredientUnit" required><option value="kg">kg</option><option value="pcs">pcs</option><option value="box">box</option><option value="ltr">ltr</option></select></label><label>Category<input id="officeIngredientCategory"></label><label>Supplier<input id="officeIngredientSupplier"></label><label>Receiving type<input id="officeIngredientReceiving" placeholder="Chilled / Frozen / Room Temperature"></label><label>Reference cost (AED per base unit)<input type="number" id="officeIngredientCost" min="0" step="0.01" value="0" required></label><label>Par target<input type="number" id="officeIngredientPar" min="0" step="0.001" value="0" required></label><label>Minimum stock<input type="number" id="officeIngredientMin" min="0" step="0.001" value="0" required></label><label><input type="checkbox" id="officeIngredientActive" checked style="display:inline;width:auto"> Active</label><p id="officeIngredientFormStatus" role="status"></p><div class="actions"><button type="button" id="officeIngredientCancel">Cancel</button><button type="submit" id="officeIngredientSave">Save ingredient</button></div></form></dialog>
+<section class="section" id="purchasing">
+<div class="hero"><div><h1>Cloud Purchasing</h1><p>Main Office approvals, approved suppliers and purchase orders for all locations.</p></div><button class="btn" type="button" id="officePurchaseRefresh">Refresh</button></div>
+<div class="note">Purchase requests and purchase orders are shared in KITCH cloud. Approving or ordering does not add stock. Only confirmed Receiving adds accepted inventory.</div>
+<div class="card" style="margin-bottom:16px">
+<div class="titleline"><h2>Approved Suppliers</h2><span class="ghost" id="officeSupplierCount">-</span></div>
+<div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap"><input id="officeSupplierName" maxlength="120" placeholder="Supplier name" aria-label="Supplier name" style="flex:1;min-width:220px;border:1px solid #ddd;border-radius:12px;padding:12px"><button class="btn" id="officeSupplierAdd" type="button">+ Add Cloud Supplier</button></div>
+<div id="officeSuppliers" class="muted">Loading&</div></div>
+<div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
+<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading&</td></tr></tbody></table></div></div>
+<div class="card"><div class="titleline"><h2>Purchase Orders</h2><span class="ghost" id="officePOCount">-</span></div>
+<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>PO</th><th>SUPPLIER</th><th>STATUS</th><th>TOTAL</th></tr></thead><tbody id="officePurchaseOrders"><tr><td colspan="4">Loading&</td></tr></tbody></table></div></div>
+<p id="officePurchaseMessage" role="status" style="margin-top:14px;color:#b42318"></p>
+</section>
 <section class="section" id="locations"><div class="hero"><div><h1>Locations</h1><p>Manage your kitchens and branches in one place.</p></div><button class="btn" id="officeAddLocation" type="button">+ Add Location</button></div><div class="card"><div class="titleline"><h2>Restaurant Locations</h2><span class="tag">Package 1: 1 · Package 2: Unlimited</span></div><table><thead><tr><th>Location</th><th>Type</th><th>Status</th></tr></thead><tbody><tr><td>Main Kitchen</td><td>Restaurant branch</td><td><span class="status">Demo</span></td></tr></tbody></table></div><div class="note" id="officeLocationNote">Location changes are saved securely. Adding a location requires an active subscription; Package 1 allows one location, Package 2 allows unlimited locations.</div></section>
 <section class="section" id="staff"><div class="hero"><div><h1>Staff &amp; Permissions</h1><p>Unlimited team accounts in both KITCH packages.</p></div><button class="btn" id="officeAddStaff" type="button">+ Add Staff</button></div><div class="grid"><div class="card"><small>Owner</small><div class="number">01</div><div class="foot">Company-wide management</div></div><div class="card"><small>Staff Limit</small><div class="number">∞</div><div class="foot">Unlimited accounts</div></div><div class="card"><small>Access</small><div class="number">PIN</div><div class="foot">Role and location-based</div></div><div class="card"><small>Security</small><div class="number">Role</div><div class="foot">Server-side verification required</div></div></div><div class="card" style="margin-top:15px"><h2>Permission Groups</h2><table><thead><tr><th>Role</th><th>Access</th></tr></thead><tbody><tr><td>Owner / Main Office</td><td>Locations, team, billing, group reports</td></tr><tr><td>Kitchen Manager</td><td>Recipes, production, inventory, QC</td></tr><tr><td>Storekeeper</td><td>Receiving, stock, counts</td></tr><tr><td>Chef</td><td>Production and approved recipes</td></tr><tr><td>Purchasing</td><td>Suppliers and orders</td></tr></tbody></table></div></section>
 <section class="section" id="reports"><div class="hero"><div><h1>Group Reports</h1><p>Consolidated insights across all your locations.</p></div><button class="btn" disabled="">Export Report</button></div><div class="grid"><div class="card"><small>Inventory Value</small><div class="number">—</div><div class="foot">Awaiting live data</div></div><div class="card"><small>Production Cost</small><div class="number">—</div><div class="foot">Awaiting live data</div></div><div class="card"><small>Purchasing</small><div class="number">—</div><div class="foot">Awaiting live data</div></div><div class="card"><small>Transfers</small><div class="number">—</div><div class="foot">Package 2 only</div></div></div><div class="note">Report access must be restricted to the signed-in company and its authorized locations. No simulated financial figures are presented as live data.</div></section>
@@ -326,6 +339,97 @@ function normalizeImportRows(rows){
 }
 ig('officeIngredientImport').onchange=async e=>{const file=e.target.files[0];if(!file)return;let done=0;try{await refreshIngredients();let rows;if(/\.xlsx?$/i.test(file.name)){const reader=window.parent.XLSX;if(!reader)throw Error('Excel reader unavailable. Check connection and retry.');const wb=reader.read(await file.arrayBuffer(),{type:'array'});rows=reader.utils.sheet_to_json(wb.Sheets[wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0]],{defval:''});}else{const csv=parseCSV(await file.text());if(!csv.length)throw Error('Empty file');const headers=csv.shift();rows=csv.map(r=>Object.fromEntries(headers.map((k,i)=>[k,r[i]??''])));}const items=normalizeImportRows(rows);if(!items.length||items.length>500)throw Error('Import must contain 1–500 ingredients');if(!confirm('Import '+items.length+' ingredients? Prices are AED per listed base unit. Missing fields on existing ingredients will be preserved. Stock quantities will not change.'))return;for(const x of items){await saveIngredient(x);done++;ig('officeIngredientStatus').textContent='Imported '+done+' of '+items.length;}await refreshIngredients();alert('Imported and verified '+done+' ingredients.');}catch(err){ig('officeIngredientStatus').textContent='Import stopped after '+done+' verified rows: '+err.message;}finally{e.target.value='';}};
 const oldShowPage=showPage;showPage=function(page){oldShowPage(page);if(page==='ingredients'&&officeRid)refreshIngredients().catch(err=>{ig('officeIngredientCount').textContent='Load failed';ig('officeIngredientStatus').textContent=err.message;});};
+
+const officePurchaseState={requests:[],orders:[],suppliers:[]};
+let officePurchaseBusy=false;
+const officePurchaseEl=id=>document.getElementById(id);
+const officePurchaseStatus=message=>{const n=officePurchaseEl('officePurchaseMessage');if(n)n.textContent=message||''};
+async function officePurchaseRpc(action,values={}){
+ if(!officeRid||!db)throw Error('Sign in to Main Office first');
+ const {data,error}=await db.rpc('kitch_purchase_workflow',{p_action:action,p_restaurant_id:officeRid,...values});
+ if(error)throw Error(error.message);
+ return data;
+}
+async function officePurchaseLoad(){
+ if(!officeRid)return;
+ officePurchaseStatus('');
+ try{
+  const d=await officePurchaseRpc('list');
+  if(d?.role!=='owner')throw Error('Main Office owner access required');
+  const requests=Array.isArray(d.requests)?d.requests:[];
+  const orders=Array.isArray(d.orders)?d.orders:[];
+  const suppliers=Array.isArray(d.suppliers)?d.suppliers:[];
+  officePurchaseState.requests=requests;officePurchaseState.orders=orders;officePurchaseState.suppliers=suppliers;
+  officePurchaseEl('officeSupplierCount').textContent=suppliers.length+' approved';
+  officePurchaseEl('officeRequestCount').textContent=requests.length+' requests';
+  const groups=new Map();
+  for(const o of orders){
+   if(!groups.has(o.id))groups.set(o.id,{...o,total:0});
+   groups.get(o.id).total+=Number(o.total)||0;
+  }
+  officePurchaseEl('officePOCount').textContent=groups.size+' orders';
+  officePurchaseEl('officeSuppliers').textContent=suppliers.map(s=>s.name).join(' · ')||'No approved cloud suppliers yet.';
+  officePurchaseEl('officePurchaseRequests').innerHTML=requests.map(r=>{
+   const status=String(r.status||'');
+   const exists=orders.some(o=>o.request_id===r.id&&o.status!=='cancelled');
+   const actions=status==='pending_approval'
+     ?'<button class="btn" data-po-action="approve" data-id="'+safe(r.id)+'">Approve</button> <button class="btn" data-po-action="reject" data-id="'+safe(r.id)+'">Reject</button>'
+     :status==='approved'&&!exists
+      ?'<button class="btn" data-po-action="create_order" data-id="'+safe(r.id)+'">Create PO</button>'
+      :'-';
+   return '<tr><td>'+safe(r.request_no)+'</td><td>'+safe(r.ingredient)+'</td><td>'+safe(r.quantity)+' '+safe(r.unit)+'</td><td>'+safe(status.replaceAll('_',' '))+'</td><td>'+actions+'</td></tr>';
+  }).join('')||'<tr><td colspan="5">No cloud purchase requests yet.</td></tr>';
+  officePurchaseEl('officePurchaseOrders').innerHTML=[...groups.values()].map(o=>
+   '<tr><td>'+safe(o.po_no)+'</td><td>'+safe(o.supplier)+'</td><td>'+safe(o.status)+'</td><td>'+money(o.total)+'</td></tr>'
+  ).join('')||'<tr><td colspan="4">No cloud purchase orders yet.</td></tr>';
+ }catch(e){officePurchaseStatus('Could not load Purchasing: '+e.message)}
+}
+async function officePurchaseDo(action,id){
+ if(officePurchaseBusy)return;
+ const req=officePurchaseState.requests.find(r=>r.id===id);
+ if(!req)return officePurchaseStatus('Refresh requests and try again.');
+ if(!['pending_approval','approved'].includes(req.status))return officePurchaseStatus('Request is no longer awaiting action.');
+ let values={p_request_id:id};
+ if(action==='approve'||action==='reject'){
+  if(req.status!=='pending_approval')return;
+  if(!confirm((action==='approve'?'Approve':'Reject')+' purchase request '+req.request_no+'?'))return;
+ }else if(action==='create_order'){
+  if(req.status!=='approved')return;
+  if(!officePurchaseState.suppliers.length)return officePurchaseStatus('Add an approved cloud supplier before creating a PO.');
+  const choice=prompt('Supplier name (choose one):\n'+officePurchaseState.suppliers.map(x=>x.name).join('\n'),officePurchaseState.suppliers[0].name);
+  if(choice===null)return;
+  const supplier=officePurchaseState.suppliers.find(x=>x.name.trim().toLowerCase()===choice.trim().toLowerCase());
+  if(!supplier)return officePurchaseStatus('Choose a supplier from the approved list.');
+  const raw=prompt('Purchase order price in AED per '+req.unit+':');
+  if(raw===null)return;
+  const price=Number(raw);
+  if(raw.trim()===''||!Number.isFinite(price)||price<0)return officePurchaseStatus('Enter a valid unit price.');
+  if(!confirm('Create PO for '+req.quantity+' '+req.unit+' of '+req.ingredient+' at AED '+price.toFixed(2)+' per unit?'))return;
+  values={p_request_id:id,p_supplier_id:supplier.id,p_price:price};
+ }else return;
+ officePurchaseBusy=true;
+ try{await officePurchaseRpc(action,values);await officePurchaseLoad()}
+ catch(e){officePurchaseStatus('No changes made: '+e.message)}
+ finally{officePurchaseBusy=false}
+}
+officePurchaseEl('officePurchaseRefresh').addEventListener('click',officePurchaseLoad);
+officePurchaseEl('officePurchaseRequests').addEventListener('click',e=>{
+ const button=e.target.closest('[data-po-action]');if(!button)return;
+ officePurchaseDo(button.dataset.poAction,button.dataset.id);
+});
+officePurchaseEl('officeSupplierAdd').addEventListener('click',async()=>{
+ if(officePurchaseBusy)return;
+ const input=officePurchaseEl('officeSupplierName'),name=input.value.trim();
+ if(!name||name.length>120)return officePurchaseStatus('Enter a supplier name (up to 120 characters).');
+ if(officePurchaseState.suppliers.some(x=>x.name.toLowerCase()===name.toLowerCase()))return officePurchaseStatus('Supplier is already registered.');
+ if(!confirm('Add '+name+' as an approved company supplier?'))return;
+ officePurchaseBusy=true;
+ try{await officePurchaseRpc('add_supplier',{p_notes:name});input.value='';await officePurchaseLoad()}
+ catch(e){officePurchaseStatus('Supplier not saved: '+e.message)}
+ finally{officePurchaseBusy=false}
+});
+const originalOfficeShowPage=showPage;
+showPage=function(page){originalOfficeShowPage(page);if(page==='purchasing'&&officeRid)officePurchaseLoad()};
 
 start().catch(e=>{document.getElementById('officeBoot')?.remove();say(e.message)});
 })();
