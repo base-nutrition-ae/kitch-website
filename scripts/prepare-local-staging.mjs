@@ -10,7 +10,7 @@ const out=path.join(root,'.local-staging','public');
 const sbCommand=process.env.SUPABASE_CLI || 'supabase';
 let status;
 try{
- status=execFileSync(sbCommand,['status','--env'],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
+ status=execFileSync(sbCommand,['status','-o','env'],{encoding:'utf8',stdio:['ignore','pipe','pipe']});
 }catch(e){throw Error('Local Supabase is not running. Install Supabase CLI and a container runtime, then run supabase init and supabase start locally. '+String(e.stderr||''));}
 const variables={};
 for(const line of status.split(/\r?\n/)){
