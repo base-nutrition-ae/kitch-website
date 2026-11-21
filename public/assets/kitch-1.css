@@ -1432,3 +1432,25 @@ input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-
 #publicModal .publicBox > .publicBrand {
   padding-right: 52px;
 }
+
+
+/* Prevent account identity from colliding with Sign out in the compact top bar. */
+#app .side .user {
+  min-width: 0 !important;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+#app .side .user b,
+#app .side .user small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#app .side .sideUtility {
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+#app .side .sideUtility button {
+  white-space: nowrap;
+}
