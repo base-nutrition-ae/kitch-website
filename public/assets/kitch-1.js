@@ -2752,7 +2752,7 @@ function viewProductionDetails(id){
  <h3 style="margin-top:24px">Labels</h3>
  ${qcDone?`<div class="qcDetails"><div class="note"><b>Expiry:</b> ${esc(x.expiry_date||'—')}</div><div class="note"><b>Temperature:</b> ${x.qc_temp_c!==''&&x.qc_temp_c!==undefined?cleanQty(x.qc_temp_c)+' °C':'—'}</div></div><div class="note"><b>QC Result:</b> <span class="${qcPassed?'ok':'bad'}">${esc(x.status)}</span>${x.qc_serial?` · <b>Serial:</b> ${esc(x.qc_serial)}`:''}<br><b>Label Note:</b> ${esc(x.qc_note||'—')}</div>`:`<div class="note warn"><b>QC:</b> ${x.status==='Label Pending'?'Pending — this production still needs QC.':'Not completed for this production record.'}</div>`}
  ${proof}
- <div class="detailActions">${qcPassed?`<button class="btn black" onclick="printQCLabel(${x.id})">Print Label</button>`:''}${x.qc_photo?`<button class="btn" onclick="openQCProof(${x.id})">View Proof</button>`:''}</div>`);
+ <div class="detailActions">${(['127.0.0.1','localhost'].includes(location.hostname)&&x.status==='In Production')?`<button class="btn black" onclick="openActualYield(${x.id})">Resume Completion (no new stock deduction)</button>`:''}${qcPassed?`<button class="btn black" onclick="printQCLabel(${x.id})">Print Label</button>`:''}${x.qc_photo?`<button class="btn" onclick="openQCProof(${x.id})">View Proof</button>`:''}</div>`);
 }
 function formatProductionDate(v){return v?String(v).slice(0,16).replace('T',' '):'—'}
 function openQCProof(id){
