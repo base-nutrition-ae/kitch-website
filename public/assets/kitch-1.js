@@ -2955,12 +2955,33 @@ async function finishQC(id,pass){
 }
 function printQCLabel(id){
  const run=getArr(PROD_KEY).find(x=>x.id===id);if(!run)return;
- const old=document.getElementById('qcLabelPrint');if(old)old.remove();
- const el=document.createElement('div');el.id='qcLabelPrint';
- el.innerHTML=`<div style="font-family:Arial,sans-serif;font-size:12px;line-height:1.35"><b style="font-size:18px">KITCH LABEL</b><br><b>${esc(run.recipe)}</b><br>${esc(run.code)} · ${esc(run.qc_serial||'')}<br>Yield: ${cleanQty(run.actual_yield)} ${esc(run.yield_unit||'')}<br>Temp: ${cleanQty(run.qc_temp_c)} °C<br>Production: ${esc(run.production_date||'—')}<br>Expiry: ${esc(run.expiry_date||'—')}<br>LABEL: CREATED</div>`;
- document.body.appendChild(el);window.print();setTimeout(()=>el.remove(),500);
+ if(!['Label Created','Completed'].includes(run.status))return alert('Finish Label/QC approval before printing.');
+ const selected=window.prompt('KITCH label size:\n1 = 70 × 32 mm\n2 = 40 × 20 mm','1');
+ if(selected===null)return;
+ if(selected!=='1'&&selected!=='2')return alert('Choose 1 or 2.');
+ const compact=selected==='2';
+ const width=compact?40:70,height=compact?20:32;
+ const plain=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const w=window.open('','_blank','width=720,height=540');
+ if(!w)return alert('Allow Safari pop-ups to print a label.');
+ const recipe=plain(run.recipe),code=plain(run.code),serial=plain(run.qc_serial||'');
+ const date=plain(run.production_date||'—'),expiry=plain(run.expiry_date||'—');
+ const temp=Number.isFinite(Number(run.qc_temp_c))?plain(run.qc_temp_c)+'°C':'—';
+ const title=compact?recipe.slice(0,54):recipe;
+ w.document.open();
+ w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+ '<title>KITCH label · '+code+'</title><style>'+
+ '@page{size:'+width+'mm '+height+'mm;margin:0}*{box-sizing:border-box}html,body{padding:0;margin:0;background:#fff;color:#000;font-family:Arial,sans-serif}'+
+ '.sheet{width:'+width+'mm;height:'+height+'mm;overflow:hidden;padding:'+(compact?'1.2':'2')+'mm;display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;page-break-inside:avoid}'+
+ '.head{display:flex;justify-content:space-between;gap:2mm;font-size:'+(compact?'6':'7')+'pt;font-weight:800}.recipe{font-size:'+(compact?'7':'10')+'pt;font-weight:800;line-height:1.1;overflow:hidden;max-height:'+(compact?'7':'10')+'mm}.meta{font-size:'+(compact?'5.5':'7')+'pt;line-height:1.22}.foot{font-size:'+(compact?'5':'6')+'pt;display:flex;justify-content:space-between}'+
+ '.controls{position:fixed;top:20px;left:20px;background:#fff;padding:18px;border:1px solid #ddd;border-radius:10px;box-shadow:0 8px 24px #0002;z-index:5;font:14px Arial}.controls button{padding:9px 16px;background:#111;color:white;border:0;border-radius:8px;cursor:pointer}'+
+ '@media screen{body{background:#eee;padding:80px 20px}.sheet{background:#fff;box-shadow:0 1px 15px #0002;margin:auto}}@media print{html,body{width:'+width+'mm;height:'+height+'mm;overflow:hidden}.controls{display:none!important}.sheet{box-shadow:none!important;margin:0!important} }'+
+ '</style></head><body><div class="controls"><strong>KITCH · '+width+' × '+height+' mm</strong><p>Choose a matching label roll / paper size in Safari printer settings.<br>Disable browser headers and footers. Preview should show one page.</p><button onclick="window.print()">Print / Save as PDF</button></div>'+
+ '<div class="sheet"><div class="head"><span>KITCH</span><span>'+code+'</span></div>'+
+ '<div class="recipe">'+title+'</div><div class="meta">Made: '+date+'<br>Use by: '+expiry+'<br>'+(!compact?'Yield: '+plain(run.actual_yield)+' '+plain(run.yield_unit||'')+' · ':'')+'Temp: '+temp+'</div>'+
+ '<div class="foot"><span>'+serial+'</span><span>QC APPROVED</span></div></div></body></html>');
+ w.document.close();
 }
-
 
 // WASTE & ADJUSTMENTS — raw ingredient waste and finished production waste are kept separate.
 const WASTE_KEY='kitch_demo_waste_v3';
