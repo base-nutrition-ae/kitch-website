@@ -1758,6 +1758,10 @@ function kitchReceivingUnitChanged(){
  const pack=document.getElementById('knrPackField');
  if(pack)pack.style.display=['pkt','box'].includes(selected)?'block':'none';
  const price=document.getElementById('knrPrice'),label=document.getElementById('knrPriceLabel'),help=document.getElementById('knrUnitHelp');
+ const qtyLabel=document.getElementById('knrQtyLabel');
+ if(qtyLabel)qtyLabel.textContent='DELIVERED QUANTITY ('+selected+') *';
+ const rejectedLabel=document.getElementById('knrRejectedLabel');
+ if(rejectedLabel)rejectedLabel.textContent='REJECTED QUANTITY ('+selected+')';
  const {factor}=kitchReceivingConversion();
  const ref=Number(ingredient?.reference_cost??ingredient?.cost??0);
  if(price)price.value=factor!=null?String(Number((ref*factor).toFixed(6))):'';
@@ -1778,7 +1782,7 @@ function openKitchNewReceiving(){
  <div class="field"><label>RECEIVING UNIT *</label><select id="knrReceivingUnit" onchange="kitchReceivingUnitChanged()"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="ltr">ltr</option><option value="pcs">pcs</option><option value="pkt">pkt (packet)</option><option value="box">box</option></select><small class="muted">Auto-selected from Ingredient Master; change to match supplier invoice.</small></div>
  <div class="field" id="knrPackField" style="display:none"><label>QUANTITY PER PACK / BOX *</label><input id="knrPackSize" type="number" min="0.000001" step="any" placeholder="Amount in stock units" oninput="kitchReceivingUnitChanged()"><small class="muted">Example: 1 box = 500 g. Enter 500 if the stock unit is g.</small></div>
  <div class="field"><label id="knrQtyLabel">DELIVERED QUANTITY *</label><input id="knrQty" type="number" min="0.001" step="any" placeholder="Quantity" oninput="kitchReceiveUpdateTotal()"><small class="muted" id="knrUnitHelp">Unit selected from Ingredient Master.</small></div>
- <div class="field"><label>REJECTED QUANTITY</label><input id="knrRejected" type="number" min="0" step="any" value="0" oninput="kitchReceiveUpdateTotal()"></div>
+ <div class="field"><label id="knrRejectedLabel">REJECTED QUANTITY</label><input id="knrRejected" type="number" min="0" step="any" value="0" oninput="kitchReceiveUpdateTotal()"></div>
  <div class="field"><label id="knrPriceLabel">UNIT PRICE (AED) *</label><input id="knrPrice" type="number" min="0" step="any" oninput="kitchReceiveUpdateTotal()"><small class="muted">Master List price; editable to match the invoice.</small></div>
  <div class="field"><label>INVOICE NUMBER *</label><input id="knrInvoice" placeholder="Supplier invoice number"></div>
  <div class="field"><label>PRODUCTION DATE (OPTIONAL)</label><input id="knrProduction" type="date"></div>
