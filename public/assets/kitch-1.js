@@ -3370,7 +3370,7 @@ function downloadRecapExcel(){if(typeof XLSX==='undefined')return downloadRecapC
 function kitchReportsStyles(){return `<style>
 .kitchReports{width:100%;min-width:0}.kitchReports .panel{width:100%;max-width:none;padding:24px;box-sizing:border-box;border-radius:20px}
 .kitchReports .kitchReportToolbar{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0;align-items:center}
-.kitchReports .kitchReportBtn{appearance:none;display:inline-flex;flex:0 0 auto;width:auto;align-items:center;justify-content:center;height:39px;padding:0 16px;border:1px solid #dedede;background:#fff;color:#171717;border-radius:999px;font:750 12px inherit;cursor:pointer}
+.kitchReports .kitchReportBtn{appearance:none;display:inline-flex;flex:0 0 auto;width:auto;align-items:center;justify-content:center;height:39px;padding:0 16px;border:1px solid #dedede;background:#fff;color:#171717;border-radius:999px;font-family:inherit;font-size:12px;font-weight:750;cursor:pointer}
 .kitchReports .kitchReportBtn.isSelected{background:#171717;border-color:#171717;color:#fff}
 .kitchReports .kitchReportBtn:hover:not(.isSelected){background:#f5f5f5}
 .kitchReports .kitchReportDates{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
