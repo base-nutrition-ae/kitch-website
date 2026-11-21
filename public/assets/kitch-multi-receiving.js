@@ -6,8 +6,8 @@
  if (!LOCAL) return;
  const unitsForBase=base=>{
    const u=String(base||'').toLowerCase();
-   if(['g','kg'].includes(u))return ['g','kg','pkt','box'];
-   if(['ml','ltr','l'].includes(u))return ['ml','ltr','pkt','box'];
+   if(['g','kg'].includes(u))return ['g','kg','pcs','pkt','box'];
+   if(['ml','ltr','l'].includes(u))return ['ml','ltr','pcs','pkt','box'];
    if(u==='pcs')return ['pcs','pkt','box'];
    return [u,'pkt','box'].filter(Boolean);
  };
@@ -26,7 +26,7 @@
    if(base==='kg'&&line.unit==='g')return .001;
    if(base==='ml'&&line.unit==='ltr')return 1000;
    if(['ltr','l'].includes(base)&&line.unit==='ml')return .001;
-   if(['pkt','box'].includes(line.unit)){
+   if(['pcs','pkt','box'].includes(line.unit) && base!=='pcs'){
      const n=Number(line.packSize);
      if(!line.packSize || !Number.isFinite(n)||n<=0)return null;
      if(line.packUnit===base || (['ltr','l'].includes(line.packUnit)&&['ltr','l'].includes(base)))return n;
@@ -38,7 +38,7 @@
    return null;
  }
  function markup(line,i){
-   const ing=findIngredient(line.id),base=ing?.base_unit||'g',isPack=['pkt','box'].includes(line.unit);
+   const ing=findIngredient(line.id),base=ing?.base_unit||'g',isPack=['pcs','pkt','box'].includes(line.unit)&&base!=='pcs';
    const list=ingredientList().map(x=>'<option value="'+safe(x.cloud_id)+'"'+(String(x.cloud_id)===line.id?' selected':'')+'>'+safe(x.name)+'</option>').join('');
    const baseQty=factor(line,base),qty=Number(line.qty||0),rej=Number(line.rejected||0);
    const stock=(baseQty!=null&&qty>=rej && rej>=0)?(qty-rej)*baseQty:null;
@@ -48,7 +48,7 @@
     '<div class="kmrGrid kmrMainGrid">'+
      '<label class="kmrIngredient">Ingredient *<select data-field="id" data-key="'+line.key+'"><option value="">Choose ingredient</option>'+list+'</select></label>'+
      '<label>Unit *<select data-field="unit" data-key="'+line.key+'">'+options(unitsForBase(base),line.unit)+'</select></label>'+
-     (isPack?'<label class="kmrPackSize">Pack size *<div class="kmrPackInline"><input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="5"><select data-field="packUnit" data-key="'+line.key+'" aria-label="Pack size unit">'+options(possibleSizeUnits(base),line.packUnit)+'</select></div></label>':'')+
+     (isPack?'<label class="kmrPackSize">Size per '+safe(line.unit)+' *<div class="kmrPackInline"><input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="5"><select data-field="packUnit" data-key="'+line.key+'" aria-label="Pack size unit">'+options(possibleSizeUnits(base),line.packUnit)+'</select></div></label>':'')+
      '<label>Delivered *<input data-field="qty" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.qty)+'" placeholder="0"></label>'+
      '<label>Rejected<input data-field="rejected" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.rejected)+'"></label>'+
      '<label>Price / '+safe(line.unit||base)+' (AED) *<input data-field="price" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.price)+'" placeholder="0"></label>'+
