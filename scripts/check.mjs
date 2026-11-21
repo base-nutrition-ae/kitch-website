@@ -6,7 +6,8 @@ const page=fs.readFileSync('public/index.html','utf8');
 const refs=[...page.matchAll(/(?:src|href)="([^"\s]+)"/g)].map(m=>m[1]);
 let checked=0;
 for (const ref of refs){
-  if (/^(https?:|data:|#|mailto:|javascript:)/i.test(ref)) continue;
+  // Dynamic HTML attributes (e.g. src="${photoData}") are runtime values, not disk assets.
+  if (/^(https?:|data:|#|mailto:|javascript:)/i.test(ref) || ref.includes('${')) continue;
   const filepath=path.join('public',decodeURIComponent(ref.split(/[?#]/)[0]));
   if(!fs.existsSync(filepath)) throw new Error(`Missing referenced asset: ${filepath}`);
   checked++;
