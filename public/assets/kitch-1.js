@@ -1456,6 +1456,7 @@ function openUnifiedMasterImport(){
 }
 function purchasingPage(){
  const clean=syncSupplierMasterFromIngredients(),su=clean.su,po=getArr(PO_KEY),sp=clean.sp;
+ setTimeout(kitchRefreshCloudPurchases,80);
  const pending=po.filter(x=>purchaseStatus(x)==='Pending Approval').length,open=po.filter(x=>['Approved','Open'].includes(purchaseStatus(x))).length;
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
@@ -1564,7 +1565,7 @@ function openPurchaseRequest(){
  <div class="actions"><button class="btn" onclick="addPRLine()">+ Add Item</button></div>
  <div class="panel" style="margin-top:14px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><b>ORDER TOTAL</b><b id="prGrandTotal" style="font-size:22px">AED 0.00</b></div></div>
  <div class="field"><label>NOTES</label><input id="prNotes" placeholder="Optional purchasing note"></div>
- <button class="primary" onclick="savePurchaseRequest()">Submit for Approval</button>`);
+ <button class="primary" onclick="savePurchaseRequest()">Submit Cloud Purchase Request</button>`);
  const d=new Date();d.setDate(d.getDate()+1);const dateEl=document.getElementById('prDate');if(dateEl)dateEl.value=d.toISOString().slice(0,10);addPRLine();
 }
 function resetPRLines(){window._prLines=[];const box=document.getElementById('prLines');if(box)box.innerHTML='';addPRLine()}
@@ -1579,13 +1580,43 @@ function addPRLine(){
 function removePRLine(key){const el=document.getElementById(key);if(el)el.remove();window._prLines=(window._prLines||[]).filter(x=>x!==key);updatePRGrandTotal()}
 function updatePRLine(key){const el=document.getElementById(key);if(!el)return;const id=el.querySelector('.prLineProduct')?.value,p=supplierProducts().find(x=>String(x.id)===String(id)),qty=Number(el.querySelector('.prLineQty')?.value||0);el.querySelector('.prLineMeta').textContent=p?`${p.sku||'No SKU'} · ${p.unit} · ${money(p.price)} each`:'';el.querySelector('.prLineTotal').textContent=p?money(qty*Number(p.price||0)):money(0);updatePRGrandTotal()}
 function updatePRGrandTotal(){let total=0;(window._prLines||[]).forEach(key=>{const el=document.getElementById(key);if(!el)return;const p=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value)),q=Number(el.querySelector('.prLineQty')?.value||0);if(p&&q>0)total+=q*Number(p.price||0)});const t=document.getElementById('prGrandTotal');if(t)t.textContent=money(total)}
-function savePurchaseRequest(){
- const supplier=document.getElementById('prSup')?.value||'',delivery=document.getElementById('prDate')?.value||'',notes=(document.getElementById('prNotes')?.value||'').trim();let lines=[];
- (window._prLines||[]).forEach(key=>{const el=document.getElementById(key);if(!el)return;const p=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value)),qty=Number(el.querySelector('.prLineQty')?.value||0);if(p&&qty>0)lines.push({p,qty})});
- if(!supplier||!lines.length)return alert('Add at least one product with a valid quantity.');
- const existing=getArr(PO_KEY),nums=existing.map(x=>Number(String(x.po||'').match(/(?:PR|PO)-(\d+)/)?.[1]||0)),n=Math.max(0,...nums)+1,pr='PR-'+String(n).padStart(4,'0'),groupId=Date.now();
- lines.forEach((l,i)=>existing.push({id:groupId+i,request_id:groupId,po:pr,supplier,ingredient:l.p.name,sku:l.p.sku||'',unit:l.p.unit,qty:l.qty,price:l.p.price,delivery_date:delivery,notes,status:'Pending Approval',accepted:0,rejected:0,created_at:new Date().toISOString()}));
- setArr(PO_KEY,existing);closeModal();openPage('Suppliers & Purchasing')
+async function savePurchaseRequest(){
+ const supplier=document.getElementById('prSup')?.value||'',
+ delivery=document.getElementById('prDate')?.value||'',
+ notes=(document.getElementById('prNotes')?.value||'').trim();
+ const selections=[];
+ for(const key of window._prLines||[]){
+  const el=document.getElementById(key);if(!el)continue;
+  const product=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value));
+  const qty=Number(el.querySelector('.prLineQty')?.value||0);
+  if(product&&qty>0)selections.push({product,qty});
+ }
+ if(!supplier||!selections.length)return alert('Add at least one product with a valid quantity.');
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Cloud purchasing requires staff sign-in. Nothing has been saved.');
+ const master=ingredients(),lines=[];
+ for(let i=0;i<selections.length;i++){
+  const {product,qty}=selections[i];
+  const matched=master.filter(x=>x.cloud_id&&String(x.name||'').trim().toLowerCase()===String(product.name||'').trim().toLowerCase());
+  if(matched.length!==1)return alert('Cannot create cloud purchase request: '+product.name+' does not match exactly one ingredient in the cloud master.');
+  const ing=matched[0],unit=String(product.unit||'').toLowerCase(),base=String(ing.base_unit||'').toLowerCase();
+  if(unit!==base)return alert('Cloud purchase requires base unit '+base+' for '+product.name+'. Current supplier unit: '+unit+'. No order saved.');
+  const price=Number(product.price||0);
+  if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0)return alert('Invalid quantity or price for '+product.name);
+  lines.push({line_key:'line-'+(i+1),ingredient_id:ing.cloud_id,name:ing.name,unit:base,qty,price});
+ }
+ const id='PR-C-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+ const btn=document.querySelector('#modalRoot .primary[onclick="savePurchaseRequest()"]')||document.querySelector('button[onclick="savePurchaseRequest()"]');
+ if(btn)btn.disabled=true;
+ try{
+  const result=await kitchCloudPurchaseRpc('create',{p_order_ref:id,p_supplier_name:supplier,p_lines:lines,p_delivery_date:delivery||null,p_notes:notes});
+  if(!result?.saved)throw Error('Cloud did not confirm saved order');
+  closeModal();openPage('Suppliers & Purchasing');
+  await kitchRefreshCloudPurchases();
+  alert('Cloud Purchase Request created: '+id+'. No inventory was changed.');
+ }catch(e){
+  alert('Purchase request was not confirmed. '+e.message+' No browser-only fallback was created.');
+  if(btn)btn.disabled=false;
+ }
 }
 function approvePurchase(id){if(session!=='manager'){alert('Only the Kitchen Manager or Head Chef can manage purchase orders.');return;}let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const old=seed.po,newPo=old.replace(/^PR-/,'PO-'),now=new Date().toISOString();a.forEach(x=>{if(x.po===old){x.status='Approved';x.po=newPo;x.approved_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
 function rejectPurchase(id){if(session!=='manager'){alert('Only the Kitchen Manager or Head Chef can manage purchase orders.');return;}let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po;a.forEach(x=>{if(x.po===key)x.status='Rejected'});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
