@@ -2,8 +2,11 @@
 (() => {
  'use strict';
  const LOCAL = ['127.0.0.1','localhost'].includes(location.hostname);
- const unitsForBase=base=>{
-   const u=String(base||'').toLowerCase();
+ const unitsForBase=(base,ing)=>{
+   // Offer volume units for liquid ingredients; do not reinterpret old kg stock.
+   const n=String(ing?.name||'').toLowerCase();
+   const liquid=['milk','juice','water','oil','cream','broth','syrup'].some(x=>n.includes(x));
+   const u=liquid?'ltr':String(base||'').toLowerCase();
    if(['g','kg'].includes(u))return ['g','kg','pcs','pkt','box'];
    if(['ml','ltr','l'].includes(u))return ['ml','ltr','pcs','pkt','box'];
    if(u==='pcs')return ['pcs','pkt','box','tray'];
@@ -49,29 +52,30 @@
  }
  function markup(line,i){
    const ing=findIngredient(line.id),base=ing?.base_unit||'g',isPack=['pcs','pkt','box','tray'].includes(line.unit)&&line.unit!==base;
-   line.packUnit=packBaseUnit(base);
+   const displayBase=isMilkUnitMismatch(ing)?'ltr':base;
+   line.packUnit=packBaseUnit(displayBase);
    const list=ingredientList().map(x=>'<option value="'+safe(x.cloud_id)+'"'+(String(x.cloud_id)===line.id?' selected':'')+'>'+safe(x.name)+'</option>').join('');
-   const baseQty=factor(line,base),qty=Number(line.qty||0),rej=Number(line.rejected||0);
+   const baseQty=isMilkUnitMismatch(ing)?null:factor(line,base),qty=Number(line.qty||0),rej=Number(line.rejected||0);
    const stock=(baseQty!=null&&qty>=rej && rej>=0)?(qty-rej)*baseQty:null;
    const hint=base==='ml'?'Use ml/ltr, or select pkt/box and enter the volume per package.':base==='g'?'Use g/kg, or enter weight per packet/box.':'';
    return '<div class="kmrLine" data-key="'+line.key+'">'+
     '<div class="kmrLineTop"><div class="kmrLineIdentity"><span class="kmrLineNum">'+String(i+1).padStart(2,'0')+'</span><strong>'+safe(ing?.name||'Select ingredient')+'</strong></div><button type="button" data-action="remove" data-key="'+line.key+'" aria-label="Remove item">Remove</button></div>'+
     '<div class="kmrGrid kmrMainGrid">'+
      '<label class="kmrIngredient">Ingredient *<select data-field="id" data-key="'+line.key+'"><option value="">Choose ingredient</option>'+list+'</select></label>'+
-     '<label>Unit *<select data-field="unit" data-key="'+line.key+'">'+options(unitsForBase(base),line.unit)+'</select></label>'+
-     (isPack?'<label class="kmrPackSize">Size per '+safe(line.unit)+' ('+safe(packBaseUnit(base))+') *<input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="Enter package size"></label>':'')+
-     (isMilkUnitMismatch(ing)?'<div class="kmrUnitWarning" role="alert">Ingredient Master needs correction: '+safe(ing.name)+' is configured as '+safe(base)+'. Milk should use a volume unit (ml or L). Receiving is blocked for this ingredient until its existing stock is reconciled.</div>':'')+
+     '<label>Unit *<select data-field="unit" data-key="'+line.key+'">'+options(unitsForBase(base,ing),line.unit)+'</select></label>'+
+     (isPack?'<label class="kmrPackSize">Size per '+safe(line.unit)+' ('+safe(packBaseUnit(displayBase))+') *<input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="Enter package size"></label>':'')+
+     
      '<label>Delivered *<input data-field="qty" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.qty)+'" placeholder="0"></label>'+
      '<label>Rejected<input data-field="rejected" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.rejected)+'"></label>'+
      '<label>Price / '+safe(line.unit||base)+' (AED) *<input data-field="price" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.price)+'" placeholder="0"></label>'+
     '</div>'+
-    (isPack?'<div class="kmrMasterAction"><button type="button" data-action="saveDefault" data-key="'+line.key+'">Save package & price to Master</button><span>Auto-fill next time</span></div>':'')+
+    (isPack?'<div class="kmrMasterAction"><span>Package size and price will be remembered when this invoice is confirmed, if permitted.</span></div>':'')+
     '<div class="kmrQualityGrid">'+
      '<label>Expiry date<input data-field="expiry" data-key="'+line.key+'" type="date" value="'+safe(line.expiry)+'"></label>'+
      '<label>Production date<input data-field="production" data-key="'+line.key+'" type="date" value="'+safe(line.production)+'"></label>'+
      '<label>Receiving temperature (°C)<input data-field="temperature" data-key="'+line.key+'" type="number" step="any" placeholder="Optional" value="'+safe(line.temperature)+'"></label>'+
     '</div>'+
-    '<div class="kmrPreview"><span>Accepted stock: <b>'+(stock==null?safe(hint||'Choose a compatible unit / pack size'):Number(stock.toFixed(6))+' '+safe(base))+'</b></span><span>Line total: <b>AED '+((qty>=rej && rej>=0 && Number.isFinite(Number(line.price)))?((qty-rej)*Number(line.price)).toFixed(2):'—')+'</b></span></div>'+
+    '<div class="kmrPreview"><span>Accepted stock: <b>'+(stock==null?safe(isMilkUnitMismatch(ing)?'Unit reconciliation needed before saving this ingredient':hint||'Choose a compatible unit / pack size'):Number(stock.toFixed(6))+' '+safe(base))+'</b></span><span>Line total: <b>AED '+((qty>=rej && rej>=0 && Number.isFinite(Number(line.price)))?((qty-rej)*Number(line.price)).toFixed(2):'—')+'</b></span></div>'+
     '</div>';
  }
  function draw(){
@@ -170,21 +174,21 @@
      line[field]=target.value;
      if(field==='id'){
        const ing=findIngredient(line.id),saved=packageDefaults.get(String(line.id));
-       line.unit=saved?.purchase_unit||ing?.base_unit||'g';
-       line.packUnit=packBaseUnit(ing?.base_unit||'g');
-       line.packSize=saved?normalizePackSize(saved,ing?.base_unit):'';
-       line.price=saved?String(saved.unit_price):(ing?String(Number(ing.reference_cost??ing.cost??0)):'');
+       line.unit=isMilkUnitMismatch(ing)?'ltr':(saved?.purchase_unit||ing?.base_unit||'g');
+       line.packUnit=packBaseUnit(isMilkUnitMismatch(ing)?'ltr':ing?.base_unit||'g');
+       line.packSize=saved?normalizePackSize(saved,isMilkUnitMismatch(ing)?'ltr':ing?.base_unit):'';
+       line.price=isMilkUnitMismatch(ing)?'':(saved?String(saved.unit_price):(ing?String(Number(ing.reference_cost??ing.cost??0)):''));
      }
-     if(field==='unit' && !unitsForBase(findIngredient(line.id)?.base_unit).includes(line.unit)){
+     if(field==='unit' && !unitsForBase(findIngredient(line.id)?.base_unit,findIngredient(line.id)).includes(line.unit)){
        line.unit=findIngredient(line.id)?.base_unit||'g';
      }
      if(field==='unit'){
        const ing=findIngredient(line.id),base=ing?.base_unit||'g';
        const saved=packageDefaults.get(String(line.id));
-       line.packUnit=packBaseUnit(base);
+       line.packUnit=packBaseUnit(isMilkUnitMismatch(ing)?'ltr':base);
        line.packSize=saved?.purchase_unit===line.unit?normalizePackSize(saved,base):'';
-       const f=factor(line,base);
-       line.price=saved?.purchase_unit===line.unit?String(saved.unit_price):(f==null?'':String(Number(((ing?.reference_cost||0)*f).toFixed(6))));
+       const f=isMilkUnitMismatch(ing)?null:factor(line,base);
+       line.price=isMilkUnitMismatch(ing)?'':(saved?.purchase_unit===line.unit?String(saved.unit_price):(f==null?'':String(Number(((ing?.reference_cost||0)*f).toFixed(6)))));
      }
      if(field==='packSize'||field==='packUnit'){
        const ing=findIngredient(line.id),f=factor(line,ing?.base_unit||'g');
