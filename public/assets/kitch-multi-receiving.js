@@ -37,19 +37,21 @@
    const baseQty=factor(line,base),qty=Number(line.qty||0),rej=Number(line.rejected||0);
    const stock=(baseQty!=null&&qty>=rej && rej>=0)?(qty-rej)*baseQty:null;
    return '<div class="kmrLine" data-key="'+line.key+'">'+
-      '<div class="kmrLineTop"><b>ITEM '+(i+1)+'</b><button type="button" data-action="remove" data-key="'+line.key+'" aria-label="Remove item">Remove</button></div>'+
-      '<div class="kmrGrid">'+
-       '<label>Ingredient *<select data-field="id" data-key="'+line.key+'"><option value="">Choose ingredient</option>'+list+'</select></label>'+
-       '<label>Receiving unit *<select data-field="unit" data-key="'+line.key+'">'+options(units,line.unit)+'</select></label>'+
-       (isPack?'<label>Pack / box size *<input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="5"></label>'+
-       '<label>Pack size unit *<select data-field="packUnit" data-key="'+line.key+'">'+options(possibleSizeUnits(base),line.packUnit)+'</select></label>':'')+
-       '<label>Delivered quantity *<input data-field="qty" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.qty)+'" placeholder="0"></label>'+
-       '<label>Rejected quantity<input data-field="rejected" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.rejected)+'"></label>'+
-       '<label>Invoice price (AED / '+safe(line.unit||base)+') *<input data-field="price" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.price)+'" placeholder="0"></label>'+
-       '<label>Expiry date<input data-field="expiry" data-key="'+line.key+'" type="date" value="'+safe(line.expiry)+'"></label>'+
-       '<label>Production date (optional)<input data-field="production" data-key="'+line.key+'" type="date" value="'+safe(line.production)+'"></label>'+
-       '<label>Temperature (°C)<input data-field="temperature" data-key="'+line.key+'" type="number" step="any" value="'+safe(line.temperature)+'"></label>'+
-      '</div><p class="kmrPreview">Accepted stock: <b>'+(stock==null?'Set valid unit/pack size':Number(stock.toFixed(6))+' '+safe(base))+'</b> · Line value: <b>AED '+((qty>=rej && rej>=0 && Number.isFinite(Number(line.price)))?((qty-rej)*Number(line.price)).toFixed(2):'—')+'</b></p>'+
+    '<div class="kmrLineTop"><div class="kmrLineIdentity"><span class="kmrLineNum">'+String(i+1).padStart(2,'0')+'</span><strong>'+safe(ing?.name||'Select ingredient')+'</strong></div><button type="button" data-action="remove" data-key="'+line.key+'" aria-label="Remove item">Remove</button></div>'+
+    '<div class="kmrGrid kmrMainGrid">'+
+     '<label class="kmrIngredient">Ingredient *<select data-field="id" data-key="'+line.key+'"><option value="">Choose ingredient</option>'+list+'</select></label>'+
+     '<label>Unit *<select data-field="unit" data-key="'+line.key+'">'+options(units,line.unit)+'</select></label>'+
+     (isPack?'<label class="kmrPackSize">Pack size *<div class="kmrPackInline"><input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="5"><select data-field="packUnit" data-key="'+line.key+'" aria-label="Pack size unit">'+options(possibleSizeUnits(base),line.packUnit)+'</select></div></label>':'')+
+     '<label>Delivered *<input data-field="qty" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.qty)+'" placeholder="0"></label>'+
+     '<label>Rejected<input data-field="rejected" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.rejected)+'"></label>'+
+     '<label>Price / '+safe(line.unit||base)+' (AED) *<input data-field="price" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.price)+'" placeholder="0"></label>'+
+     '<label>Expiry date<input data-field="expiry" data-key="'+line.key+'" type="date" value="'+safe(line.expiry)+'"></label>'+
+    '</div>'+
+    '<details class="kmrExtras"><summary>More details <span>Production date and temperature</span></summary><div class="kmrGrid">'+
+     '<label>Production date<input data-field="production" data-key="'+line.key+'" type="date" value="'+safe(line.production)+'"></label>'+
+     '<label>Temperature (°C)<input data-field="temperature" data-key="'+line.key+'" type="number" step="any" value="'+safe(line.temperature)+'"></label>'+
+    '</div></details>'+
+    '<div class="kmrPreview"><span>Accepted stock: <b>'+(stock==null?'Check unit / pack size':Number(stock.toFixed(6))+' '+safe(base))+'</b></span><span>Line total: <b>AED '+((qty>=rej && rej>=0 && Number.isFinite(Number(line.price)))?((qty-rej)*Number(line.price)).toFixed(2):'—')+'</b></span></div>'+
     '</div>';
  }
  function draw(){
@@ -101,9 +103,9 @@
    if(!teamCloudAuth?.staff_name||!cloud?.branch_id)return alert('Sign in with the local Demo Manager account.');
    if(!ingredientList().length)return alert('Import Ingredient Master first.');
    lines=[newLine()];counter=lines[0].key;
-   modal('<div class="modalHead"><div><h2>New Receiving · Multiple Items</h2><small>LOCAL TEST DEMO · one supplier invoice</small></div><button class="close" onclick="closeModal()">×</button></div>'+
+   modal('<div class="modalHead"><div><h2>New Receiving</h2><small>One invoice · Multiple ingredients</small></div><button class="close" onclick="closeModal()">×</button></div>'+
     '<style>.kmrWrap{max-height:76vh;overflow:auto;padding-right:4px}.kmrGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.kmrGrid label{font-size:11px;font-weight:700;color:#555}.kmrGrid select,.kmrGrid input,.kmrHeader input{box-sizing:border-box;display:block;width:100%;padding:11px;border:1px solid #ddd;border-radius:11px;margin-top:6px;background:#fff;color:#111;font-size:14px}.kmrLine{border:1px solid #ddd;border-radius:15px;padding:16px;margin:13px 0;background:#fafafa}.kmrLineTop{display:flex;justify-content:space-between;align-items:center}.kmrLineTop button{border:0;background:transparent;color:#ae3426;font-weight:700;cursor:pointer}.kmrPreview{font-size:12px;color:#555;margin:12px 0 0}.kmrHeader{display:grid;grid-template-columns:1fr 1fr;gap:12px}.kmrSummary{padding:12px;background:#f4f4f2;border-radius:12px;margin:12px 0;display:flex;justify-content:space-between}@media(max-width:600px){.kmrGrid,.kmrHeader{grid-template-columns:1fr}}</style>'+
-    '<div class="kmrWrap"><p class="note">Location: '+safe(assignedLocationName())+'. All items are validated and saved as one local transaction. Do not use real invoices or sensitive information.</p>'+
+    '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>Local test only · No attachments required</span></div>'+
     '<div class="kmrHeader"><label>SUPPLIER *<input id="kmrSupplier" placeholder="Supplier"></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="LOCAL-INV-001"></label></div>'+
     '<div id="kmrLines"></div><button type="button" id="kmrAdd" class="btn">+ Add Ingredient</button>'+
     '<div class="kmrSummary"><span id="kmrCount">1 item</span><strong>Invoice total: <span id="kmrTotal">AED 0.00</span></strong></div>'+
