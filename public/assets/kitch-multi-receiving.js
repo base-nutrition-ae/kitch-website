@@ -245,7 +245,7 @@
      const ingredientsText=count===1?first.ingredient:count+' items: '+group.map(r=>r.ingredient).join(', ');
      return '<tr><td>'+safe(new Date(first.date).toLocaleDateString())+'</td><td>'+safe(first.invoice)+'</td><td>'+safe(first.supplier)+'</td><td>'+safe(ingredientsText)+'</td>'+
       '<td>'+safe(group.map(r=>r.accepted+' '+r.unit).join(' · '))+'</td><td>'+safe(money(total))+'</td><td>'+safe(exp.length?exp[0]:'—')+'</td><td>—</td>'+
-      '<td><button type="button" class="kitchReceivingBtn kitchActionPill" onclick="kitchPrintReceipt(\''+safe(first.id)+'\')">PDF</button></td></tr>';
+      '<td><button type="button" class="kitchReceivingBtn kitchActionPill" style="appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:58px!important;height:32px!important;min-height:32px!important;padding:0 13px!important;border:1px solid #dedfe3!important;border-radius:999px!important;background:#f3f3f5!important;color:#38383b!important;font-size:11px!important;font-weight:800!important;line-height:1!important;white-space:nowrap!important;box-shadow:none!important;vertical-align:middle!important;" onclick="kitchPrintReceipt(\''+safe(first.id)+'\')">PDF</button></td></tr>';
    }).join('')||'<tr><td colspan="9" class="empty">No receiving records yet. Click + New Receiving.</td></tr>';
  };
  window.kitchPrintReceipt=function(id){
