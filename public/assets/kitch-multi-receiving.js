@@ -1,77 +1,14 @@
-/* KITCH multi-ingredient receiving. Production uses secure Supabase invoice transactions. */
+/* KITCH local multi-item receiving demo. Not a production receiving ledger.
+   Loaded after the original KITCH application script. */
 (() => {
  'use strict';
- // Apply the intended Open-style pill to freshly rendered report actions.
- // Inline important properties win against stale module-specific CSS rules.
- function fixKitchReportButtons(){
-   document.querySelectorAll('button').forEach(button=>{
-     const label=(button.textContent||'').trim();
-     if(label!=='PDF' && label!=='Invoice')return;
-     if(!button.closest('table'))return;
-     const style={
-       appearance:'none',display:'inline-flex',alignItems:'center',justifyContent:'center',
-       boxSizing:'border-box',width:'auto',minWidth:'56px',height:'32px',
-       minHeight:'32px',padding:'0 13px',margin:'1px 3px 1px 0',
-       border:'1px solid #dcdde1',borderRadius:'999px',
-       background:'#f3f3f5',color:'#38383b',fontSize:'11px',
-       fontWeight:'800',lineHeight:'1',whiteSpace:'nowrap',
-       boxShadow:'none',verticalAlign:'middle',cursor:'pointer'
-     };
-     for(const [key,value] of Object.entries(style))
-       button.style.setProperty(key.replace(/[A-Z]/g,c=>'-'+c.toLowerCase()),value,'important');
-     button.dataset.kitchReportPill='fixed';
-   });
- }
- let scheduled=false;
- function scheduleKitchPills(){
-   if(scheduled)return;
-   scheduled=true;
-   requestAnimationFrame(()=>{scheduled=false;fixKitchReportButtons()});
- }
- if(document.readyState==='loading')
-   document.addEventListener('DOMContentLoaded',scheduleKitchPills,{once:true});
- else scheduleKitchPills();
- const reportObserver=new MutationObserver(scheduleKitchPills);
- reportObserver.observe(document.documentElement,{subtree:true,childList:true});
- window.kitchFixReportButtonStyle=fixKitchReportButtons;
-
- const actionStyleId='kitch-table-action-pill-v2';
- if(!document.getElementById(actionStyleId)){
-   const node=document.createElement('style');
-   node.id=actionStyleId;
-   node.textContent=`
-   /* Matching action pills for PDF, Open, View, Edit and Details throughout KITCH */
-   body #app .main table td button:not(.primary):not(.isPrimary),
-   body #app .main table td a.btn,
-   body #app .main table td a.kitchReceivingBtn,
-   body #app .main .kitchReceivingPage button.kitchActionPill{
-     -webkit-appearance:none!important;appearance:none!important;
-     display:inline-flex!important;align-items:center!important;justify-content:center!important;
-     box-sizing:border-box!important;vertical-align:middle!important;
-     width:auto!important;min-width:54px!important;height:30px!important;min-height:30px!important;
-     padding:0 12px!important;margin:1px 3px 1px 0!important;
-     border:1px solid #dedfe3!important;border-radius:999px!important;
-     background:#f3f3f5!important;color:#38383b!important;
-     font:800 11px/1 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important;
-     white-space:nowrap!important;text-decoration:none!important;
-     box-shadow:none!important;cursor:pointer!important;
-   }
-   body #app .main table td button:not(.primary):not(.isPrimary):hover,
-   body #app .main .kitchReceivingPage button.kitchActionPill:hover{
-     background:#e9e9ec!important;border-color:#c9c9ce!important;
-   }
-   body #app .main table td button.black{background:#171717!important;border-color:#171717!important;color:#fff!important}
-   body #app .main table td button:focus-visible{outline:2px solid #555!important;outline-offset:2px!important}
-   body #app .main table td button :is(svg,img,i){width:14px!important;height:14px!important;vertical-align:middle!important}
-   `;
-   document.head.appendChild(node);
- }
-
+ const LOCAL = ['127.0.0.1','localhost'].includes(location.hostname);
+ if (!LOCAL) return;
  const unitsForBase=base=>{
    const u=String(base||'').toLowerCase();
    if(['g','kg'].includes(u))return ['g','kg','pcs','pkt','box'];
    if(['ml','ltr','l'].includes(u))return ['ml','ltr','pcs','pkt','box'];
-   if(u==='pcs')return ['pcs','pkt','box'];
+   if(u==='pcs')return ['pcs','pkt','box','tray'];
    return [u,'pkt','box'].filter(Boolean);
  };
  const safe = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -89,10 +26,11 @@
    if(base==='kg'&&line.unit==='g')return .001;
    if(base==='ml'&&line.unit==='ltr')return 1000;
    if(['ltr','l'].includes(base)&&line.unit==='ml')return .001;
-   if(['pcs','pkt','box'].includes(line.unit) && base!=='pcs'){
+   if(['pcs','pkt','box','tray'].includes(line.unit) && line.unit!==base){
      const n=Number(line.packSize);
      if(!line.packSize || !Number.isFinite(n)||n<=0)return null;
      if(line.packUnit===base || (['ltr','l'].includes(line.packUnit)&&['ltr','l'].includes(base)))return n;
+     if(base==='pcs'&&line.packUnit==='pcs')return n;
      if(base==='g'&&line.packUnit==='kg')return n*1000;
      if(base==='kg'&&line.packUnit==='g')return n/1000;
      if(base==='ml'&&line.packUnit==='ltr')return n*1000;
@@ -101,7 +39,7 @@
    return null;
  }
  function markup(line,i){
-   const ing=findIngredient(line.id),base=ing?.base_unit||'g',isPack=['pcs','pkt','box'].includes(line.unit)&&base!=='pcs';
+   const ing=findIngredient(line.id),base=ing?.base_unit||'g',isPack=['pcs','pkt','box','tray'].includes(line.unit)&&line.unit!==base;
    const list=ingredientList().map(x=>'<option value="'+safe(x.cloud_id)+'"'+(String(x.cloud_id)===line.id?' selected':'')+'>'+safe(x.name)+'</option>').join('');
    const baseQty=factor(line,base),qty=Number(line.qty||0),rej=Number(line.rejected||0);
    const stock=(baseQty!=null&&qty>=rej && rej>=0)?(qty-rej)*baseQty:null;
@@ -151,7 +89,7 @@
      if(line.temperature!==''&&!Number.isFinite(Number(line.temperature)))throw Error('Invalid temperature on line '+(i+1));
      const delivered=Number((qty*f).toFixed(6)),rejected=Number((rej*f).toFixed(6)),unitPrice=price/f;
      if(delivered<=0||!Number.isFinite(unitPrice))throw Error('Invalid conversion on line '+(i+1));
-     return {ingredient_id:ing.cloud_id,delivered,rejected,price:unitPrice,unit:ing.base_unit,expiry:line.expiry||null,production:line.production||null,temperature:line.temperature===''?null:Number(line.temperature)};
+     return {ingredient_id:ing.cloud_id,delivered,rejected,price:unitPrice,unit:ing.base_unit,expiry:line.expiry||null,temperature:line.temperature===''?null:Number(line.temperature)};
    });
    return {supplier,invoice,payload};
  }
@@ -161,28 +99,28 @@
    try{
      const {supplier,invoice,payload}=validate();
      if(!confirm('Save '+payload.length+' receiving lines under invoice '+invoice+'? All lines will save together.'))return;
-     saving=true;button.disabled=true;message.textContent='Saving all invoice lines to KITCH cloud inventory…';
-     const {data,error}=await sb.rpc('kitch_team_receive_invoice',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice:invoice,p_lines:payload});
+     saving=true;button.disabled=true;message.textContent='Saving all lines to local database…';
+     const {data,error}=await sb.rpc('kitch_team_receive_invoice_demo',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice:invoice,p_lines:payload});
      if(error)throw error;
      await cloudLoadIngredients();
      closeModal();openPage('Receiving');
-     alert('Receiving saved to KITCH cloud: '+data.saved_lines+' items, AED '+Number(data.total_aed||0).toFixed(2)+'. Stock updated.');
+     alert('Local receiving saved: '+data.saved_lines+' items, AED '+Number(data.total_aed||0).toFixed(2)+'. No invoice attachment was uploaded.');
    }catch(e){if(message){message.style.color='#b42318';message.textContent='Not saved: '+(e?.message||e)}}
    finally{saving=false;if(button)button.disabled=false}
  }
  window.openKitchNewReceiving=async function(){
-   if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud?.branch_id)return alert('Sign in with your KITCH Team account to receive stock.');
+   if(!teamCloudAuth?.staff_name||!cloud?.branch_id)return alert('Sign in with the local Demo Manager account.');
    if(!ingredientList().length)return alert('Import Ingredient Master first.');
    packageDefaults=new Map();
    try {
-     const result=await sb.rpc('kitch_team_package_defaults',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+     const result=await sb.rpc('kitch_team_local_package_defaults',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
      if(!result.error&&Array.isArray(result.data))packageDefaults=new Map(result.data.map(x=>[String(x.ingredient_id),x]));
    } catch(err){console.warn('Local package master defaults unavailable',err)}
    lines=[newLine()];counter=lines[0].key;
    modal('<div class="modalHead"><div><h2>New Receiving</h2><small>One invoice · Multiple ingredients</small></div><button class="close" onclick="closeModal()">×</button></div>'+
     '<style>#modal .modalBox{width:min(940px,calc(100vw - 32px));max-width:940px;box-sizing:border-box;padding:24px 28px;border-radius:24px}#modal .modalHead{margin-bottom:14px}#modal .modalHead h2{font-size:24px;letter-spacing:-.035em;margin:0}.kmrWrap{max-height:76vh;overflow:auto;padding-right:4px}.kmrIntro{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 14px;background:#f6f6f5;color:#777;border-radius:12px;padding:10px 13px;margin:4px 0 16px;font-size:12px}.kmrIntro b{color:#222}.kmrHeader{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:18px;border-bottom:1px solid #eaeaea}.kmrHeader label,.kmrGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrHeader input,.kmrGrid input,.kmrGrid select{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrHeader input:focus,.kmrGrid input:focus,.kmrGrid select:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrLine{border:1px solid #e9e9e9;border-radius:18px;background:#fff;padding:17px 18px;margin:14px 0}.kmrLineTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.kmrLineIdentity{display:flex;gap:10px;align-items:center;font-size:15px}.kmrLineNum{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#fff1eb;color:#db6c36;font-size:11px;font-weight:850}.kmrMasterAction{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}.kmrMasterAction button{border:1px solid #efd8c8;background:#fff7f0;color:#a65a2e;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:750;cursor:pointer}.kmrMasterAction span{font-size:11px;color:#999}.kmrLineTop button{border:0;background:#fafafa;padding:9px 12px;border-radius:20px;color:#b64736;font-weight:700;cursor:pointer;font-size:11px}.kmrMainGrid{display:grid;grid-template-columns:1.6fr .75fr .9fr .85fr;gap:12px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrPackInline{display:flex;gap:6px}.kmrPackInline input{flex:1}.kmrPackInline select{flex:0 0 75px}.kmrQualityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid #efefef}.kmrQualityGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrQualityGrid input{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrQualityGrid input:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrExtras{margin-top:13px;border-top:1px solid #eee;padding-top:10px}.kmrExtras summary{font-size:12px;font-weight:750;color:#555;cursor:pointer}.kmrExtras summary span{font-weight:400;color:#999;margin-left:8px}.kmrExtras .kmrGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:11px}.kmrPreview{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f7f7f5;border-radius:10px;margin:12px 0 0;padding:11px 13px;color:#666;font-size:12px}.kmrPreview b{color:#111}#kmrAdd{width:auto;background:white;border:1px dashed #bcbcbc;color:#222;padding:11px 18px;border-radius:30px;font-weight:750;cursor:pointer}.kmrSummary{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 10px;padding:15px 16px;background:#f4f4f2;border-radius:13px}.kmrSummary strong{font-size:17px;color:#111}#kmrSubmit{border-radius:999px;min-height:50px}@media(max-width:840px){.kmrMainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.kmrMainGrid .kmrIngredient{grid-column:span 2}}@media(max-width:560px){.kmrQualityGrid{grid-template-columns:1fr 1fr}.kmrQualityGrid label:last-child{grid-column:span 2}#modal .modalBox{padding:18px 16px;width:calc(100vw - 20px)}.kmrHeader,.kmrExtras .kmrGrid{grid-template-columns:1fr}.kmrMainGrid{grid-template-columns:1fr 1fr;gap:10px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrLine{padding:13px}.kmrPreview{display:block}.kmrPreview span{display:block;margin:3px 0}.kmrSummary strong{font-size:14px}}</style>'+
-    '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>Live KITCH inventory · One invoice, multiple ingredients</span></div>'+
-    '<div class="kmrHeader"><label>SUPPLIER *<input id="kmrSupplier" placeholder="Supplier"></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="Supplier invoice number"></label></div>'+
+    '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>Local test only · No attachments required</span></div>'+
+    '<div class="kmrHeader"><label>SUPPLIER *<input id="kmrSupplier" placeholder="Supplier"></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="LOCAL-INV-001"></label></div>'+
     '<div id="kmrLines"></div><button type="button" id="kmrAdd" class="btn">+ Add Ingredient</button>'+
     '<div class="kmrSummary"><span id="kmrCount">1 item</span><strong>Invoice total: <span id="kmrTotal">AED 0.00</span></strong></div>'+
     '<p id="kmrMessage" role="status" aria-live="polite" style="font-size:12px;color:#555"></p>'+
@@ -201,7 +139,7 @@
      }
      button.disabled=true;status.textContent='Saving package to Ingredient Master...';
      try{
-       const result=await sb.rpc('kitch_team_save_package',{
+       const result=await sb.rpc('kitch_team_local_save_package',{
          p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ing.cloud_id,
          p_purchase_unit:line.unit,p_pack_size:Number(line.packSize),p_pack_unit:line.packUnit,
          p_unit_price:Number(line.price)});
@@ -279,7 +217,7 @@
      const ingredientsText=count===1?first.ingredient:count+' items: '+group.map(r=>r.ingredient).join(', ');
      return '<tr><td>'+safe(new Date(first.date).toLocaleDateString())+'</td><td>'+safe(first.invoice)+'</td><td>'+safe(first.supplier)+'</td><td>'+safe(ingredientsText)+'</td>'+
       '<td>'+safe(group.map(r=>r.accepted+' '+r.unit).join(' · '))+'</td><td>'+safe(money(total))+'</td><td>'+safe(exp.length?exp[0]:'—')+'</td><td>—</td>'+
-      '<td><button type="button" class="kitchReceivingBtn kitchActionPill" style="appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:58px!important;height:32px!important;min-height:32px!important;padding:0 13px!important;border:1px solid #dedfe3!important;border-radius:999px!important;background:#f3f3f5!important;color:#38383b!important;font-size:11px!important;font-weight:800!important;line-height:1!important;white-space:nowrap!important;box-shadow:none!important;vertical-align:middle!important;" onclick="kitchPrintReceipt(\''+safe(first.id)+'\')">PDF</button></td></tr>';
+      '<td><button class="kitchReceivingBtn kitchActionPill" style="display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;min-width:56px!important;height:32px!important;min-height:32px!important;padding:0 13px!important;border:1px solid #dedfe3!important;border-radius:999px!important;background:#f3f3f5!important;color:#38383b!important;font:800 11px/1 Inter,Arial,sans-serif!important;white-space:nowrap!important;box-shadow:none!important;vertical-align:middle!important;" onclick="kitchPrintReceipt(\''+safe(first.id)+'\')">PDF</button></td></tr>';
    }).join('')||'<tr><td colspan="9" class="empty">No receiving records yet. Click + New Receiving.</td></tr>';
  };
  window.kitchPrintReceipt=function(id){
@@ -288,7 +226,7 @@
    const total=rows.reduce((s,r)=>s+Number(r.total||0),0);
    const w=window.open('','_blank');if(!w)return alert('Allow pop-ups to print receiving invoice.');
    const rowHTML=rows.map(r=>'<tr><td>'+safe(r.ingredient)+'</td><td>'+safe(r.accepted+' '+r.unit)+'</td><td>'+safe(money(r.price))+'</td><td>'+safe(money(r.total))+'</td><td>'+safe(r.expiry||'—')+'</td></tr>').join('');
-   w.document.write('<!doctype html><html><head><title>KITCH Receiving</title><style>body{font:14px Arial;padding:36px;max-width:850px;margin:auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}footer{margin-top:30px;color:#777}@media print{button{display:none}}</style></head><body><h1>KITCH Receiving</h1><p>KITCH Receiving · Invoice '+safe(item.invoice)+' · '+safe(item.supplier)+'</p><p>Date: '+safe(new Date(item.date).toLocaleDateString())+'</p><table><thead><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th><th>Expiry</th></tr></thead><tbody>'+rowHTML+'</tbody></table><h2>Total: '+safe(money(total))+'</h2><footer>Confirm physical counts and food safety checks before receiving.</footer><button onclick="window.print()">Print / Save PDF</button></body></html>');
+   w.document.write('<!doctype html><html><head><title>KITCH Receiving</title><style>body{font:14px Arial;padding:36px;max-width:850px;margin:auto;color:#111}h1{font-size:28px}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}footer{margin-top:30px;color:#777}@media print{button{display:none}}</style></head><body><h1>KITCH Receiving</h1><p>LOCAL TEST DEMO · Invoice '+safe(item.invoice)+' · '+safe(item.supplier)+'</p><p>Date: '+safe(new Date(item.date).toLocaleDateString())+'</p><table><thead><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th><th>Expiry</th></tr></thead><tbody>'+rowHTML+'</tbody></table><h2>Total: '+safe(money(total))+'</h2><footer>Local synthetic data only. Not a food safety or accounting record.</footer><button onclick="window.print()">Print / Save PDF</button></body></html>');
    w.document.close();
  };
 

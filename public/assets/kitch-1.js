@@ -541,6 +541,7 @@ function kitchInvoiceReceiptVerified(line){
     && String(line?.cloud_receipt_po||'')===String(line?.po||''));
 }
 function invoiceMatchingPage(){
+ setTimeout(kitchRefreshCloudInvoices,80);
  const po=getArr(PO_KEY),candidates=po.filter(x=>!['Rejected'].includes(purchaseStatus(x)));
  const verified=candidates.filter(kitchInvoiceReceiptVerified);
  const blocked=candidates.filter(x=>!kitchInvoiceReceiptVerified(x));
@@ -552,7 +553,7 @@ function invoiceMatchingPage(){
    return `<tr><td><b>${esc(x.po||'—')}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(x.ingredient||'—')}</td><td>${cleanQty(x.qty||0)} ${esc(x.unit||'')}</td><td>${valid?cleanQty(x.accepted)+' '+esc(x.unit||''):'Not verified'}</td><td>${money(ref)}</td><td>${x.invoice_price!=null?money(inv):'Not entered'}</td><td class="${Math.abs(diff)>.009?'bad':'ok'}">${x.invoice_price!=null?((diff>=0?'+':'')+money(diff)+(ref?` (${pct>=0?'+':''}${pct.toFixed(1)}%)`:'')):'—'}</td><td><span class="alertBadge ${valid&&status==='Approved'?'alertInfo':status==='Hold'?'alertCritical':'alertWarning'}">${esc(status)}</span>${!valid&&x.invoice_match_status==='Approved'?'<br><small class="bad">Earlier approval requires review</small>':''}</td><td>${valid?(status==='Approved'?'—':`<button class="btn black" onclick="setInvoiceMatch(${x.id},'Approved')">Approve</button> <button class="btn" onclick="setInvoiceMatch(${x.id},'Hold')">Hold</button>`):'<span class="muted">Approval locked</span>'}</td></tr>`;
  }).join('');
  return `<div class="grid"><div class="card"><span>VERIFIED RECEIVED LINES</span><b>${verified.length}</b></div><div class="card"><span>RECEIPT LINK REQUIRED</span><b>${blocked.length}</b></div><div class="card"><span>PRICE VARIANCES</span><b>${variance}</b></div><div class="card"><span>ON HOLD</span><b>${held}</b></div></div>
- <div class="panel"><h2>Invoice Matching</h2><div class="note warn">Purchase orders are currently stored in this browser; cloud Receiving records are separate. Invoice approval is disabled until a matching purchase order, accepted receipt quantity and supplier invoice can be verified. No stock changes are made by this review.</div><div style="overflow-x:auto"><table style="min-width:1120px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>ITEM</th><th>PO QTY</th><th>RECEIVED</th><th>PO PRICE</th><th>INVOICE PRICE</th><th>VARIANCE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>${rows||'<tr><td colspan="10" class="empty">No purchase orders to review.</td></tr>'}</tbody></table></div></div>`;
+ <div class="panel"><h2>Invoice Matching</h2><div id="kitchCloudInvoicePanel"><p class="muted">Loading cloud invoice matching…</p></div><div class="note warn">Purchase orders are currently stored in this browser; cloud Receiving records are separate. Invoice approval is disabled until a matching purchase order, accepted receipt quantity and supplier invoice can be verified. No stock changes are made by this review.</div><div style="overflow-x:auto"><table style="min-width:1120px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>ITEM</th><th>PO QTY</th><th>RECEIVED</th><th>PO PRICE</th><th>INVOICE PRICE</th><th>VARIANCE</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>${rows||'<tr><td colspan="10" class="empty">No purchase orders to review.</td></tr>'}</tbody></table></div></div>`;
 }
 function setInvoiceMatch(id,status){
  const po=getArr(PO_KEY),row=po.find(x=>String(x.id)===String(id));if(!row)return alert('Purchase line not found.');
@@ -1456,11 +1457,12 @@ function openUnifiedMasterImport(){
 }
 function purchasingPage(){
  const clean=syncSupplierMasterFromIngredients(),su=clean.su,po=getArr(PO_KEY),sp=clean.sp;
+ setTimeout(kitchRefreshCloudPurchases,80);
  const pending=po.filter(x=>purchaseStatus(x)==='Pending Approval').length,open=po.filter(x=>['Approved','Open'].includes(purchaseStatus(x))).length;
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
- <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn black" onclick="openUnifiedMasterImport()">Import Unified Master</button><button class="btn" onclick="openSupplierExcel()">Import Supplier Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
- <h3>Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
+ <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn black" onclick="openUnifiedMasterImport()">Import Unified Master</button><button class="btn" onclick="openSupplierExcel()">Import Supplier Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
+ <div class="note" style="margin:14px 0"><b>${['127.0.0.1','localhost'].includes(location.hostname)?'Local Demo Purchasing':'Cloud Purchasing (development)'}</b> · A separate, staff-authenticated order ledger is being prepared. Existing browser orders are not migrated automatically, and none of the cloud actions change inventory.</div><div class="actions"><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Load Cloud Purchase Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
  <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
 }
 
@@ -1521,6 +1523,125 @@ function normalizeSupplierData(){
  su=[...sm.values()];sp=[...pm.values()];setArr(SUP_KEY,su);setSupplierProducts(sp);return {su,sp};
 }
 function importSupplierExcel(file){if(!file)return;const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let base=normalizeSupplierData(),su=base.su,sp=base.sp,addedS=0,updatedS=0,addedP=0,updatedP=0;rows.forEach(row=>{const supplier=String(row.Supplier||row.supplier||'').trim();if(!supplier)return;let sx=su.find(x=>String(x.name||'').toLowerCase()===supplier.toLowerCase());const details={contact:String(row['Contact Person']||row.Contact||'').trim(),phone:String(row['Phone Number']||row.Phone||'').trim(),email:String(row.Email||'').trim(),trn:String(row['TRN / VAT Number']||row.TRN||'').trim(),terms:String(row['Payment Terms']||'').trim(),days:String(row['Delivery Days']||'').trim(),min_order:Number(row['Minimum Order AED']||row['Minimum Order']||0),address:String(row['Address / Location']||row.Address||'').trim(),lead_time:String(row['Lead Time Days']||'').trim(),notes:String(row.Notes||'').trim()};if(!sx){sx={id:Date.now()+Math.random(),name:supplier,...details};su.push(sx);addedS++}else{Object.keys(details).forEach(k=>{if(details[k]!==''&&details[k]!==0)sx[k]=details[k]});updatedS++}const product=String(row.Product||row.Ingredient||'').trim();if(product){const sku=String(row['Supplier SKU']||row.SKU||'').trim(),unit=String(row.Unit||'kg').trim(),price=Number(row['Agreed Price AED']||row.Price||0),lead=String(row['Lead Time Days']||'').trim(),notes=String(row.Notes||'').trim();let px=sp.find(x=>String(x.supplier||'').toLowerCase()===supplier.toLowerCase()&&((sku&&String(x.sku||'').toLowerCase()===sku.toLowerCase())||(!sku&&String(x.name||'').toLowerCase()===product.toLowerCase())));if(px){if(price!==Number(px.price||0))px.previous_price=Number(px.price||0);Object.assign(px,{supplier,name:product,sku,unit,price,lead_time:lead,notes,updated_at:new Date().toISOString()});updatedP++}else{sp.push({id:Date.now()+Math.random(),supplier,name:product,sku,unit,price,previous_price:price,lead_time:lead,notes,updated_at:new Date().toISOString()});addedP++}}});setArr(SUP_KEY,su);setSupplierProducts(sp);normalizeSupplierData();closeModal();openPage('Suppliers & Purchasing');alert(`Import complete. ${addedS} new suppliers, ${updatedS} supplier rows updated, ${addedP} new products, ${updatedP} products updated. Existing duplicates were cleaned.`)}catch(err){console.error(err);alert('Could not read this Excel file. Check the column names.')}};r.readAsArrayBuffer(file)}
+
+// KITCH cloud purchasing staged adapter; distinct from existing browser-only order records.
+// Requires docs/staged-kitch-cloud-purchasing.sql before any live use.
+let kitchCloudPurchaseRows=[];
+async function kitchCloudPurchaseRpc(action,extra={}){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in as KITCH staff to use cloud purchasing.');
+ // The production database has kitch_purchase_workflow, not the staged kitch_team_purchase_cloud ledger.
+ // Allow authenticated, read-only cloud history; do not simulate approvals or create another ledger.
+ if(action!=='list')throw Error('Cloud purchasing changes require the approved production workflow. No order or inventory was changed.');
+ const {data,error}=await sb.rpc('kitch_purchase_workflow',{
+   p_action:'list',p_restaurant_id:cloud?.restaurant_id||null,
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin
+ });
+ if(error)throw Error(error.message);
+ const requests=Array.isArray(data?.requests)?data.requests:[];
+ const orders=Array.isArray(data?.orders)?data.orders:[];
+ const grouped=new Map();
+ for(const o of orders){
+  const key=String(o.id||o.po_no||'');
+  if(!grouped.has(key))grouped.set(key,{id:o.id,order_ref:o.po_no||'PO',supplier:o.supplier||'—',status:o.status||'—',lines:[],source:'approved-cloud-ledger'});
+  grouped.get(key).lines.push(o);
+ }
+ return [...grouped.values(),...requests.map(r=>({id:r.id,order_ref:r.request_no||'PR',supplier:r.ingredient||'Request',status:r.status||'Pending Approval',lines:[r],source:'approved-cloud-ledger'}))];
+}
+function kitchCloudPurchaseActionButtons(x){
+ return '<span class="muted" title="Read-only display. Order actions require the approved Main Office workflow">View only</span>';
+}
+async function kitchRefreshCloudPurchases(){
+ const body=document.getElementById('kitchCloudPOBody');if(!body)return;
+ body.innerHTML='<tr><td colspan="5" class="empty">Loading shared orders…</td></tr>';
+ try{
+  const data=await kitchCloudPurchaseRpc('list');
+  kitchCloudPurchaseRows=Array.isArray(data)?data:[];
+  body.innerHTML=kitchCloudPurchaseRows.map(x=>`<tr><td><b>${esc(x.order_ref)}</b></td><td>${esc(x.supplier)}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${esc(x.status)}</td><td>${kitchCloudPurchaseActionButtons(x)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No cloud purchase orders yet. Legacy browser orders are not synced automatically.</td></tr>';
+ }catch(e){
+  body.innerHTML='<tr><td colspan="5" class="bad">Purchasing ledger unavailable: '+esc(e.message)+'. No orders were changed.</td></tr>';
+ }
+}
+
+function kitchCloudPurchaseMatchSummary(x){
+ const lines=Array.isArray(x.lines)?x.lines:[],links=Array.isArray(x.receipt_links)?x.receipt_links:[];
+ const sums=lines.map(l=>{
+  const rec=links.filter(r=>r.line_key===l.line_key);
+  const qty=rec.reduce((n,r)=>n+Number(r.accepted||0),0);
+  const mismatch=rec.some(r=>Math.abs(Number(r.unit_price)-Number(l.price))>.01);
+  return {name:l.name,unit:l.unit,ordered:Number(l.qty),received:qty,invoiceCount:rec.length,mismatch};
+ });
+ return {lines:sums,fullyReceived:sums.length>0&&sums.every(l=>l.received===l.ordered&&l.invoiceCount>0),hasVariance:sums.some(l=>l.mismatch)};
+}
+async function kitchOpenReceiptLink(id){
+ const order=kitchCloudPurchaseRows.find(x=>x.id===id);if(!order)return alert('Refresh cloud purchase orders first.');
+ if(order.status!=='Open')return alert('Only sent/open purchase orders can link receipts.');
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Sign in with staff credentials.');
+ try{
+  const {data,error}=await sb.rpc('kitch_team_receiving_history',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  if(error)throw error;
+  const receipts=Array.isArray(data)?data:[];
+  const usedIds=new Set((order.receipt_links||[]).map(x=>x.receipt_id));
+  const opts=[];
+  for(const line of order.lines||[]){
+   const existing=(order.receipt_links||[]).filter(x=>x.line_key===line.line_key).reduce((n,x)=>n+Number(x.accepted||0),0);
+   const remaining=Number(line.qty)-existing;
+   for(const rec of receipts){
+    if(usedIds.has(rec.id)||String(rec.supplier||'').trim().toLowerCase()!==String(order.supplier||'').trim().toLowerCase()
+      ||String(rec.ingredient||'').trim().toLowerCase()!==String(line.name||'').trim().toLowerCase()
+      ||rec.unit!==line.unit||!(Number(rec.accepted)>0&&Number(rec.accepted)<=remaining)||!rec.invoice)continue;
+    opts.push({line_key:line.line_key,receipt_id:rec.id,label:line.name+' — '+rec.accepted+' '+rec.unit+' — Invoice '+rec.invoice});
+   }
+  }
+  if(!opts.length)return alert('No eligible cloud receipt matches this PO, supplier, ingredient and outstanding quantity. Existing receipts remain unchanged.');
+  window.__kitchReceiptLinkOptions=opts;
+  modal(`<div class="modalHead"><h2>Link Existing Cloud Receipt</h2><button class="close" onclick="closeModal()">×</button></div>
+  <div class="note">Order ${esc(order.order_ref)} · ${esc(order.supplier)}. This links a previously saved receipt for invoice review. <b>No new stock movement is made.</b></div>
+  <div class="field"><label>VERIFIED RECEIVING RECORD</label><select id="kitchPOReceiptLink">${opts.map((x,i)=>`<option value="${i}">${esc(x.label)}</option>`).join('')}</select></div>
+  <button class="primary" onclick="kitchLinkSelectedReceipt('${esc(order.id)}')">Link Receipt (No Stock Change)</button>`);
+ }catch(e){alert('Could not load cloud receiving history: '+e.message)}
+}
+async function kitchLinkSelectedReceipt(orderId){
+ const ix=Number(document.getElementById('kitchPOReceiptLink')?.value);
+ const match=window.__kitchReceiptLinkOptions?.[ix];
+ if(!match)return alert('Select an eligible receipt.');
+ try{
+  await kitchCloudPurchaseRpc('link_receipt',{p_order_id:orderId,p_receipt_id:match.receipt_id,p_line_key:match.line_key});
+  closeModal();await kitchRefreshCloudPurchases();
+  alert('Existing receipt linked. No stock was added or deducted.');
+ }catch(e){alert('Receipt not linked: '+e.message)}
+}
+async function kitchRefreshCloudInvoices(){
+ const el=document.getElementById('kitchCloudInvoicePanel');if(!el)return;
+ try{
+  const data=await kitchCloudPurchaseRpc('list'),orders=Array.isArray(data)?data:[];
+  const active=orders.filter(x=>['Approved','Open','Closed'].includes(x.status));
+  el.innerHTML=`<h3>Cloud PO / Receiving / Invoice Verification</h3>
+  <p class="muted">Actual receipts linked to the same cloud PO. Approval requires full accepted quantity, valid supplier invoices and exact PO pricing. This review never changes inventory.</p>
+  <div style="overflow:auto"><table style="min-width:940px"><thead><tr><th>PO</th><th>SUPPLIER</th><th>RECEIVING VERIFICATION</th><th>PRICE CHECK</th><th>INVOICE STATUS</th><th>ACTION</th></tr></thead><tbody>
+  ${active.map(x=>{
+   const check=kitchCloudPurchaseMatchSummary(x);
+   const detail=check.lines.map(l=>`${esc(l.name)}: ${cleanQty(l.received)} / ${cleanQty(l.ordered)} ${esc(l.unit)}`).join('<br>');
+   const possible=check.fullyReceived&&!check.hasVariance;
+   const approved=x.invoice_status==='Approved';
+   return `<tr><td><b>${esc(x.order_ref)}</b></td><td>${esc(x.supplier)}</td><td>${detail||'No items'}</td>
+   <td>${check.hasVariance?'<span class="bad">Price mismatch</span>':'No price mismatch recorded'}</td>
+   <td>${esc(x.invoice_status||'Pending Review')}</td>
+   <td>${approved?'Approved':(possible?`<button class="btn black" onclick="kitchCloudInvoiceAction('${esc(x.id)}','approve_invoice')">Approve</button>`:'<span class="muted">Approval locked</span>')}${!approved?` <button class="btn" onclick="kitchCloudInvoiceAction('${esc(x.id)}','hold_invoice')">Hold</button>`:''}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="empty">No shared purchase orders available for matching.</td></tr>'}</tbody></table></div>`;
+ }catch(e){el.innerHTML='<p class="bad">Cloud invoice verification unavailable: '+esc(e.message)+'. No approval actions enabled.</p>';}
+}
+async function kitchCloudInvoiceAction(id,action){
+ if(!['approve_invoice','hold_invoice'].includes(action))return;
+ if(session!=='manager')return alert('Manager approval required.');
+ try{await kitchCloudPurchaseRpc(action,{p_order_id:id});await kitchRefreshCloudInvoices()}
+ catch(e){alert('Cloud invoice action blocked: '+e.message)}
+}
+
+async function kitchUpdateCloudPurchase(id,action){
+ if(!['approve','mark_sent','reject'].includes(action))return;
+ try{await kitchCloudPurchaseRpc(action,{p_order_id:id});await kitchRefreshCloudPurchases()}
+ catch(e){alert('Cloud purchase update failed: '+e.message)}
+}
 function openPurchaseRequest(){
  syncSupplierMasterFromIngredients();const su=getArr(SUP_KEY); if(!su.length)return alert('Create or import suppliers first.');
  window._prLines=[];
@@ -1531,7 +1652,7 @@ function openPurchaseRequest(){
  <div class="actions"><button class="btn" onclick="addPRLine()">+ Add Item</button></div>
  <div class="panel" style="margin-top:14px;padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><b>ORDER TOTAL</b><b id="prGrandTotal" style="font-size:22px">AED 0.00</b></div></div>
  <div class="field"><label>NOTES</label><input id="prNotes" placeholder="Optional purchasing note"></div>
- <button class="primary" onclick="savePurchaseRequest()">Submit for Approval</button>`);
+ <button class="primary" onclick="savePurchaseRequest()">Submit Cloud Purchase Request</button>`);
  const d=new Date();d.setDate(d.getDate()+1);const dateEl=document.getElementById('prDate');if(dateEl)dateEl.value=d.toISOString().slice(0,10);addPRLine();
 }
 function resetPRLines(){window._prLines=[];const box=document.getElementById('prLines');if(box)box.innerHTML='';addPRLine()}
@@ -1546,13 +1667,43 @@ function addPRLine(){
 function removePRLine(key){const el=document.getElementById(key);if(el)el.remove();window._prLines=(window._prLines||[]).filter(x=>x!==key);updatePRGrandTotal()}
 function updatePRLine(key){const el=document.getElementById(key);if(!el)return;const id=el.querySelector('.prLineProduct')?.value,p=supplierProducts().find(x=>String(x.id)===String(id)),qty=Number(el.querySelector('.prLineQty')?.value||0);el.querySelector('.prLineMeta').textContent=p?`${p.sku||'No SKU'} · ${p.unit} · ${money(p.price)} each`:'';el.querySelector('.prLineTotal').textContent=p?money(qty*Number(p.price||0)):money(0);updatePRGrandTotal()}
 function updatePRGrandTotal(){let total=0;(window._prLines||[]).forEach(key=>{const el=document.getElementById(key);if(!el)return;const p=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value)),q=Number(el.querySelector('.prLineQty')?.value||0);if(p&&q>0)total+=q*Number(p.price||0)});const t=document.getElementById('prGrandTotal');if(t)t.textContent=money(total)}
-function savePurchaseRequest(){
- const supplier=document.getElementById('prSup')?.value||'',delivery=document.getElementById('prDate')?.value||'',notes=(document.getElementById('prNotes')?.value||'').trim();let lines=[];
- (window._prLines||[]).forEach(key=>{const el=document.getElementById(key);if(!el)return;const p=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value)),qty=Number(el.querySelector('.prLineQty')?.value||0);if(p&&qty>0)lines.push({p,qty})});
- if(!supplier||!lines.length)return alert('Add at least one product with a valid quantity.');
- const existing=getArr(PO_KEY),nums=existing.map(x=>Number(String(x.po||'').match(/(?:PR|PO)-(\d+)/)?.[1]||0)),n=Math.max(0,...nums)+1,pr='PR-'+String(n).padStart(4,'0'),groupId=Date.now();
- lines.forEach((l,i)=>existing.push({id:groupId+i,request_id:groupId,po:pr,supplier,ingredient:l.p.name,sku:l.p.sku||'',unit:l.p.unit,qty:l.qty,price:l.p.price,delivery_date:delivery,notes,status:'Pending Approval',accepted:0,rejected:0,created_at:new Date().toISOString()}));
- setArr(PO_KEY,existing);closeModal();openPage('Suppliers & Purchasing')
+async function savePurchaseRequest(){
+ const supplier=document.getElementById('prSup')?.value||'',
+ delivery=document.getElementById('prDate')?.value||'',
+ notes=(document.getElementById('prNotes')?.value||'').trim();
+ const selections=[];
+ for(const key of window._prLines||[]){
+  const el=document.getElementById(key);if(!el)continue;
+  const product=supplierProducts().find(x=>String(x.id)===String(el.querySelector('.prLineProduct')?.value));
+  const qty=Number(el.querySelector('.prLineQty')?.value||0);
+  if(product&&qty>0)selections.push({product,qty});
+ }
+ if(!supplier||!selections.length)return alert('Add at least one product with a valid quantity.');
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Cloud purchasing requires staff sign-in. Nothing has been saved.');
+ const master=ingredients(),lines=[];
+ for(let i=0;i<selections.length;i++){
+  const {product,qty}=selections[i];
+  const matched=master.filter(x=>x.cloud_id&&String(x.name||'').trim().toLowerCase()===String(product.name||'').trim().toLowerCase());
+  if(matched.length!==1)return alert('Cannot create cloud purchase request: '+product.name+' does not match exactly one ingredient in the cloud master.');
+  const ing=matched[0],unit=String(product.unit||'').toLowerCase(),base=String(ing.base_unit||'').toLowerCase();
+  if(unit!==base)return alert('Cloud purchase requires base unit '+base+' for '+product.name+'. Current supplier unit: '+unit+'. No order saved.');
+  const price=Number(product.price||0);
+  if(!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0)return alert('Invalid quantity or price for '+product.name);
+  lines.push({line_key:'line-'+(i+1),ingredient_id:ing.cloud_id,name:ing.name,unit:base,qty,price});
+ }
+ const id='PR-C-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+ const btn=document.querySelector('#modalRoot .primary[onclick="savePurchaseRequest()"]')||document.querySelector('button[onclick="savePurchaseRequest()"]');
+ if(btn)btn.disabled=true;
+ try{
+  const result=await kitchCloudPurchaseRpc('create',{p_order_ref:id,p_supplier_name:supplier,p_lines:lines,p_delivery_date:delivery||null,p_notes:notes});
+  if(!result?.saved)throw Error('Cloud did not confirm saved order');
+  closeModal();openPage('Suppliers & Purchasing');
+  await kitchRefreshCloudPurchases();
+  alert('Cloud Purchase Request created: '+id+'. No inventory was changed.');
+ }catch(e){
+  alert('Purchase request was not confirmed. '+e.message+' No browser-only fallback was created.');
+  if(btn)btn.disabled=false;
+ }
 }
 function approvePurchase(id){if(session!=='manager'){alert('Only the Kitchen Manager or Head Chef can manage purchase orders.');return;}let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const old=seed.po,newPo=old.replace(/^PR-/,'PO-'),now=new Date().toISOString();a.forEach(x=>{if(x.po===old){x.status='Approved';x.po=newPo;x.approved_at=now}});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
 function rejectPurchase(id){if(session!=='manager'){alert('Only the Kitchen Manager or Head Chef can manage purchase orders.');return;}let a=getArr(PO_KEY),seed=a.find(v=>v.id===id);if(!seed)return;const key=seed.po;a.forEach(x=>{if(x.po===key)x.status='Rejected'});setArr(PO_KEY,a);openPage('Suppliers & Purchasing')}
@@ -1565,7 +1716,7 @@ async function kitchLoadReceivingHistory(){
  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return;
  try{const {data,error}=await sb.rpc('kitch_team_receiving_history',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});if(error)throw error;kitchReceivingHistory=Array.isArray(data)?data:[];if(document.getElementById('kitchReceivingRows'))kitchRenderReceivingRows();}catch(e){const n=document.getElementById('kitchReceivingMessage');if(n)n.textContent='Cloud history unavailable: '+e.message;}
 }
-function kitchRenderReceivingRows(){const t=document.getElementById('kitchReceivingRows');if(!t)return;t.innerHTML=kitchReceivingHistory.map(x=>`<tr><td>${esc(new Date(x.date).toLocaleDateString())}</td><td>${esc(x.invoice)}</td><td>${esc(x.supplier)}</td><td>${esc(x.ingredient)}</td><td>${esc(x.accepted)} ${esc(x.unit)}</td><td>${money(x.total)}</td><td>${esc(x.expiry||'—')}</td><td>${x.has_attachment?`<button class="kitchReceivingBtn small" onclick="kitchDownloadInvoice('${esc(x.id)}')">Invoice</button>`:'—'}</td><td><button class="kitchReceivingBtn small kitchReportAction" style="appearance:none!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;width:auto!important;min-width:58px!important;height:32px!important;min-height:32px!important;padding:0 13px!important;border:1px solid #dedfe3!important;border-radius:999px!important;background:#f3f3f5!important;color:#38383b!important;font-size:11px!important;font-weight:800!important;line-height:1!important;white-space:nowrap!important;box-shadow:none!important;vertical-align:middle!important;" onclick="kitchPrintReceipt('${esc(x.id)}')">PDF</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">No receiving records yet. Click + New Receiving.</td></tr>';}
+function kitchRenderReceivingRows(){const t=document.getElementById('kitchReceivingRows');if(!t)return;t.innerHTML=kitchReceivingHistory.map(x=>`<tr><td>${esc(new Date(x.date).toLocaleDateString())}</td><td>${esc(x.invoice)}</td><td>${esc(x.supplier)}</td><td>${esc(x.ingredient)}</td><td>${esc(x.accepted)} ${esc(x.unit)}</td><td>${money(x.total)}</td><td>${esc(x.expiry||'—')}</td><td>${x.has_attachment?`<button class="kitchReceivingBtn small" onclick="kitchDownloadInvoice('${esc(x.id)}')">Invoice</button>`:'—'}</td><td><button class="kitchReceivingBtn small" onclick="kitchPrintReceipt('${esc(x.id)}')">PDF</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">No receiving records yet. Click + New Receiving.</td></tr>';}
 function receivingPage(){setTimeout(kitchLoadReceivingHistory,80);return `<style>
 .kitchReceivingPage .kitchReceivingButtons{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0}
 .kitchReceivingPage .kitchReceivingBtn{appearance:none;flex:0 0 auto;width:auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:0 17px;border-radius:999px;border:1px solid #dedede;background:#fff;color:#171717;font-size:12px;font-weight:750;line-height:1.2;letter-spacing:-.01em;cursor:pointer;transition:background .15s ease,border-color .15s ease,transform .15s ease}
@@ -1574,8 +1725,6 @@ function receivingPage(){setTimeout(kitchLoadReceivingHistory,80);return `<style
 .kitchReceivingPage .kitchReceivingBtn.isPrimary{background:#171717;color:#fff;border-color:#171717}
 .kitchReceivingPage .kitchReceivingBtn.isPrimary:hover{background:#333;border-color:#333}
 .kitchReceivingPage .kitchReceivingBtn.small{min-height:34px;padding:0 13px;font-size:11px;white-space:nowrap}
-.kitchReceivingPage .kitchReceivingBtn.kitchReportAction{min-width:62px;min-height:36px;padding:0 15px;border:1px solid #dcdde0;border-radius:999px;background:#f3f3f5;color:#333;font-size:11px;font-weight:800;line-height:1.2;white-space:nowrap;box-shadow:none}
-.kitchReceivingPage .kitchReceivingBtn.kitchReportAction:hover{background:#e9e9ec;border-color:#c8c9ce}
 .kitchReceivingPage .kitchReceivingTableWrap{max-width:100%;overflow-x:auto;border:1px solid #ececec;border-radius:14px;margin-top:12px}
 .kitchReceivingPage .kitchReceivingTable{width:100%;min-width:800px;border-collapse:separate;border-spacing:0}
 .kitchReceivingPage .kitchReceivingTable thead th{background:#f7f7f7}
@@ -1585,7 +1734,51 @@ function receivingPage(){setTimeout(kitchLoadReceivingHistory,80);return `<style
 </style><div class="panel kitchReceivingPage"><h2>Receiving</h2><p class="muted">Receive supplier deliveries into your assigned location. Confirmed quantities update live inventory.</p><div class="kitchReceivingButtons"><button class="kitchReceivingBtn isPrimary" onclick="openKitchNewReceiving()">+ New Receiving</button><button class="kitchReceivingBtn" onclick="kitchLoadReceivingHistory()">↻ Refresh History</button></div><div class="kitchReceivingTableWrap"><table class="kitchReceivingTable"><thead><tr><th>DATE</th><th>INVOICE</th><th>SUPPLIER</th><th>INGREDIENT</th><th>ACCEPTED</th><th>TOTAL</th><th>EXPIRY</th><th>FILE</th><th>REPORT</th></tr></thead><tbody id="kitchReceivingRows"><tr><td colspan="9">Loading cloud history…</td></tr></tbody></table></div><p id="kitchReceivingMessage" class="muted" style="font-size:12px;margin-top:12px">History is saved in Supabase and available across devices for your assigned location. PDF uses your browser's Print → Save as PDF.</p></div>`;}
 async function kitchDownloadInvoice(id){try{const {data,error}=await sb.rpc('kitch_team_receiving_download',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_receipt_id:id});if(error)throw error;const bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([bytes],{type:data.mime}));const a=document.createElement('a');a.href=url;a.download=data.filename||'invoice';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){alert('Cannot download invoice: '+e.message)}}
 function kitchPrintReceipt(id){const x=kitchReceivingHistory.find(r=>r.id===id);if(!x)return;const w=window.open('','_blank');if(!w)return alert('Allow pop-ups to export PDF.');w.document.write(`<!doctype html><html><head><title>KITCH Receiving ${esc(x.invoice)}</title><style>body{font:15px Arial,sans-serif;color:#222;padding:38px;max-width:760px;margin:auto}header{border-bottom:2px solid #222;padding-bottom:16px;margin-bottom:32px}h1{font-size:30px;margin:0}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{text-align:left;padding:12px;border-bottom:1px solid #ddd}.muted{color:#777}footer{margin-top:65px;color:#888;font-size:12px}@media print{button{display:none}}</style></head><body><header><h1>KITCH</h1><div class="muted">Receiving Report · ${esc(currentBranchName())}</div></header><h2>Invoice ${esc(x.invoice)}</h2><p>Supplier: ${esc(x.supplier)}<br>Received: ${esc(new Date(x.date).toLocaleDateString())}</p><table><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th></tr><tr><td>${esc(x.ingredient)}</td><td>${esc(x.accepted)} ${esc(x.unit)}</td><td>${money(x.price)}</td><td>${money(x.total)}</td></tr></table><p>Rejected: ${esc(x.rejected)} ${esc(x.unit)}<br>Production: ${esc(x.production_date||'—')}<br>Expiry: ${esc(x.expiry||'—')}<br>Temperature: ${x.temperature==null?'—':esc(x.temperature)+' °C'}</p><footer>Powered by KITCH · Generated ${new Date().toLocaleString()}</footer><button onclick="window.print()">Print / Save as PDF</button></body></html>`);w.document.close();}
-function kitchReceiveUpdateTotal(){const qty=Number(document.getElementById('knrQty')?.value||0),rej=Number(document.getElementById('knrRejected')?.value||0),price=Number(document.getElementById('knrPrice')?.value||0),el=document.getElementById('knrTotal');if(el)el.textContent=money(Math.max(0,qty-rej)*Math.max(0,price));}
+function kitchReceivingConversion(){
+ const ingredient=ingredients().find(x=>String(x.cloud_id)===String(document.getElementById('knrIng')?.value));
+ const base=String(ingredient?.base_unit||'').toLowerCase();
+ const selected=String(document.getElementById('knrReceivingUnit')?.value||base).toLowerCase();
+ let factor=null;
+ if(selected===base)factor=1;
+ else if(base==='g'&&selected==='kg')factor=1000;
+ else if(base==='kg'&&selected==='g')factor=.001;
+ else if(base==='ml'&&['ltr','l'].includes(selected))factor=1000;
+ else if(['ltr','l'].includes(base)&&selected==='ml')factor=.001;
+ else if(['ltr','l'].includes(base)&&['ltr','l'].includes(selected))factor=1;
+ else if(['pkt','box'].includes(selected)){
+  const v=Number(document.getElementById('knrPackSize')?.value);
+  if(Number.isFinite(v)&&v>0)factor=v;
+ }
+ return {ingredient,base,selected,factor};
+}
+function kitchReceiveUpdateTotal(){
+ const {base,selected,factor}=kitchReceivingConversion();
+ const qty=Number(document.getElementById('knrQty')?.value||0),
+ rej=Number(document.getElementById('knrRejected')?.value||0),
+ price=Number(document.getElementById('knrPrice')?.value||0);
+ const el=document.getElementById('knrTotal'),preview=document.getElementById('knrConversionPreview');
+ if(el)el.textContent=money(Math.max(0,qty-rej)*Math.max(0,price));
+ if(preview)preview.textContent=factor!=null&&Number.isFinite(factor)?
+  'Accepted inventory: '+Number((Math.max(0,qty-rej)*factor).toFixed(6))+' '+base+
+  ' · 1 '+selected+' = '+factor+' '+base:
+  'Enter a valid pack size to convert to '+base+'; stock cannot be saved without it.';
+}
+function kitchReceivingUnitChanged(){
+ const {ingredient,base,selected}=kitchReceivingConversion();
+ const pack=document.getElementById('knrPackField');
+ if(pack)pack.style.display=['pkt','box'].includes(selected)?'block':'none';
+ const price=document.getElementById('knrPrice'),label=document.getElementById('knrPriceLabel'),help=document.getElementById('knrUnitHelp');
+ const qtyLabel=document.getElementById('knrQtyLabel');
+ if(qtyLabel)qtyLabel.textContent='DELIVERED QUANTITY ('+selected+') *';
+ const rejectedLabel=document.getElementById('knrRejectedLabel');
+ if(rejectedLabel)rejectedLabel.textContent='REJECTED QUANTITY ('+selected+')';
+ const {factor}=kitchReceivingConversion();
+ const ref=Number(ingredient?.reference_cost??ingredient?.cost??0);
+ if(price)price.value=factor!=null?String(Number((ref*factor).toFixed(6))):'';
+ if(label)label.textContent='INVOICE UNIT PRICE (AED / '+selected+') *';
+ if(help)help.textContent='Inventory is stored in '+base+'; receiving units are converted automatically.';
+ kitchReceiveUpdateTotal();
+}
 async function kitchFileToBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('Unable to read invoice'));reader.readAsDataURL(file)})}
 function openKitchNewReceiving(){
  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud.branch_id)return alert('Please sign in with your Team account to receive stock for your assigned location.');
@@ -1595,9 +1788,11 @@ function openKitchNewReceiving(){
  <div class="note">Location: <b>${esc(assignedLocationName())}</b>. Only confirmed accepted quantities will be added to inventory.</div>
  <div class="formGrid">
  <div class="field"><label>SUPPLIER *</label><input id="knrSupplier" required placeholder="Auto-filled from Master List"><small class="muted">Auto-selected; editable to match the invoice.</small></div>
- <div class="field"><label>INGREDIENT *</label><select id="knrIng" onchange="kitchReceiveIngredientChanged()">${ing.map(x=>`<option value="${esc(x.cloud_id)}">${esc(x.name)} (${esc(x.base_unit)})</option>`).join('')}</select></div>
+ <div class="field"><label>INGREDIENT *</label><select id="knrIng" onchange="kitchReceiveIngredientChanged()">${ing.map(x=>`<option value="${esc(x.cloud_id)}">${esc(x.name)}</option>`).join('')}</select></div>
+ <div class="field"><label>RECEIVING UNIT *</label><select id="knrReceivingUnit" onchange="kitchReceivingUnitChanged()"><option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="ltr">ltr</option><option value="pcs">pcs</option><option value="pkt">pkt (packet)</option><option value="box">box</option></select><small class="muted">Auto-selected from Ingredient Master; change to match supplier invoice.</small></div>
+ <div class="field" id="knrPackField" style="display:none"><label>QUANTITY PER PACK / BOX *</label><input id="knrPackSize" type="number" min="0.000001" step="any" placeholder="Amount in stock units" oninput="kitchReceivingUnitChanged()"><small class="muted">Example: 1 box = 500 g. Enter 500 if the stock unit is g.</small></div>
  <div class="field"><label id="knrQtyLabel">DELIVERED QUANTITY *</label><input id="knrQty" type="number" min="0.001" step="any" placeholder="Quantity" oninput="kitchReceiveUpdateTotal()"><small class="muted" id="knrUnitHelp">Unit selected from Ingredient Master.</small></div>
- <div class="field"><label>REJECTED QUANTITY</label><input id="knrRejected" type="number" min="0" step="any" value="0" oninput="kitchReceiveUpdateTotal()"></div>
+ <div class="field"><label id="knrRejectedLabel">REJECTED QUANTITY</label><input id="knrRejected" type="number" min="0" step="any" value="0" oninput="kitchReceiveUpdateTotal()"></div>
  <div class="field"><label id="knrPriceLabel">UNIT PRICE (AED) *</label><input id="knrPrice" type="number" min="0" step="any" oninput="kitchReceiveUpdateTotal()"><small class="muted">Master List price; editable to match the invoice.</small></div>
  <div class="field"><label>INVOICE NUMBER *</label><input id="knrInvoice" placeholder="Supplier invoice number"></div>
  <div class="field"><label>PRODUCTION DATE (OPTIONAL)</label><input id="knrProduction" type="date"></div>
@@ -1605,7 +1800,7 @@ function openKitchNewReceiving(){
  <div class="field"><label>RECEIVING DATE</label><input id="knrDate" type="date" readonly><small class="muted">Automatically set to today.</small></div>
  <div class="field"><label>RECEIVING TEMPERATURE (°C)</label><input id="knrTemp" type="number" step="any" placeholder="If applicable"></div>
  <div class="field"><label>INVOICE / DELIVERY NOTE</label><input id="knrFile" type="file" accept="image/*,.pdf"><small class="muted">PDF, JPG, PNG or WebP; max 2 MB. Saved securely with the receiving record.</small></div>
- </div><div class="note"><b>Accepted stock total: <span id="knrTotal">AED 0.00</span></b></div><p id="knrStatus" class="muted" aria-live="polite"></p><button id="knrSubmit" class="primary" onclick="kitchSaveNewReceiving()">Confirm Receiving</button>`);
+ </div><div class="note"><b>Accepted stock total: <span id="knrTotal">AED 0.00</span></b><div id="knrConversionPreview" style="margin-top:6px;font-size:12px">Receiving quantity converts to inventory base unit.</div></div><p id="knrStatus" class="muted" aria-live="polite"></p><button id="knrSubmit" class="primary" onclick="kitchSaveNewReceiving()">Confirm Receiving</button>`);
  const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);document.getElementById('knrDate').value=localDate;
  kitchReceiveIngredientChanged();
 }
@@ -1615,24 +1810,31 @@ function kitchReceiveIngredientChanged(){
  const sup=document.getElementById('knrSupplier'),price=document.getElementById('knrPrice');
  const linked=supplierProducts().find(p=>String(p.sku||'')===String(ing.sku||'') || String(p.ingredient_id||'')===String(ing.cloud_id||'') || String(p.name||'').toLowerCase()===String(ing.name||'').toLowerCase());
  if(sup)sup.value=ing.supplier||linked?.supplier||linked?.supplier_name||'';
- if(price)price.value=Number(ing.reference_cost??ing.cost??linked?.price??0).toFixed(2);
- const unit=String(ing.base_unit||'unit');
- const qtyLabel=document.getElementById('knrQtyLabel'),priceLabel=document.getElementById('knrPriceLabel'),unitHelp=document.getElementById('knrUnitHelp');
- if(qtyLabel)qtyLabel.textContent='DELIVERED QUANTITY ('+unit+') *';
- if(priceLabel)priceLabel.textContent='UNIT PRICE (AED / '+unit+') *';
- if(unitHelp)unitHelp.textContent='Stock unit: '+unit+' · automatically selected from Ingredient Master.';kitchReceiveUpdateTotal();
+ const unit=String(ing.base_unit||'g');
+ const selector=document.getElementById('knrReceivingUnit');
+ if(selector)selector.value=unit==='l'?'ltr':unit;
+ const packSize=document.getElementById('knrPackSize');if(packSize)packSize.value='';
+ const qtyLabel=document.getElementById('knrQtyLabel');
+ if(qtyLabel)qtyLabel.textContent='DELIVERED QUANTITY ('+(selector?.value||unit)+') *';
+ kitchReceivingUnitChanged();
 }
 async function kitchSaveNewReceiving(){
  const el=id=>document.getElementById(id), ingredient=ingredients().find(x=>String(x.cloud_id)===String(el('knrIng')?.value));
  const supplier=el('knrSupplier').value.trim(),invoice=el('knrInvoice').value.trim(),qty=Number(el('knrQty').value),rejected=Number(el('knrRejected').value),price=Number(el('knrPrice').value);
  const status=el('knrStatus'),btn=el('knrSubmit');
+ const conversion=kitchReceivingConversion(),factor=conversion.factor;
  if(!ingredient||!supplier||!invoice||!Number.isFinite(qty)||qty<=0||!Number.isFinite(rejected)||rejected<0||rejected>qty||!Number.isFinite(price)||price<0){status.textContent='Complete supplier, ingredient, invoice, quantities and price correctly.';return;}
+ if(factor==null||!Number.isFinite(factor)||factor<=0){status.textContent='Set a valid receiving unit or enter how much is in each pack/box before saving.';return;}
+ const baseQty=Number((qty*factor).toFixed(6)),baseRejected=Number((rejected*factor).toFixed(6)),basePrice=price/factor;
+ if(!Number.isFinite(baseQty)||baseQty<=0||!Number.isFinite(baseRejected)||baseRejected<0||baseRejected>baseQty||!Number.isFinite(basePrice)||basePrice<0){status.textContent='Invalid converted quantity or cost. No stock was saved.';return;}
  const expiry=el('knrExpiry').value||null,temp=el('knrTemp').value===''?null:Number(el('knrTemp').value);
+ const now=new Date();const today=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+ if(expiry&&expiry<today){status.textContent='Expired delivery blocked: expiry '+expiry+' is before today ('+today+'). No stock was changed.';return;}
  if(temp!==null&&!Number.isFinite(temp)){status.textContent='Invalid receiving temperature.';return;}
  const file=el('knrFile').files?.[0];if(file&&(file.size>2*1024*1024||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))){status.textContent='Invoice must be a PDF/JPG/PNG/WebP under 2 MB.';return;}
  btn.disabled=true;status.textContent='Saving receiving to KITCH Cloud…';
  try{
- const {data,error}=await sb.rpc('kitch_team_receive_stock',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ingredient.cloud_id,p_supplier:supplier,p_invoice_number:invoice,p_invoice_filename:el('knrFile').files?.[0]?.name||null,p_delivered_qty:qty,p_rejected_qty:rejected,p_unit:ingredient.base_unit,p_unit_price:price,p_expiry_date:expiry,p_temperature:temp});
+ const {data,error}=await sb.rpc('kitch_team_receive_stock',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ingredient.cloud_id,p_supplier:supplier,p_invoice_number:invoice,p_invoice_filename:el('knrFile').files?.[0]?.name||null,p_delivered_qty:baseQty,p_rejected_qty:baseRejected,p_unit:ingredient.base_unit,p_unit_price:basePrice,p_expiry_date:expiry,p_temperature:temp});
  if(error)throw error;
  let attachError='';try{const base64=file?await kitchFileToBase64(file):null;const attachment=await sb.rpc('kitch_team_receiving_attach',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_receipt_id:data.id,p_filename:file?.name||'',p_mime:file?.type||null,p_base64:base64,p_production_date:el('knrProduction').value||null});if(attachment.error)throw attachment.error;}catch(e){attachError=' Receipt saved and stock updated, but invoice attachment failed: '+e.message;}
  const arr=getArr('kitch_receiving_local_history_v2');arr.unshift({id:data.id,branch_id:cloud.branch_id,date:new Date().toLocaleDateString(),invoice,supplier,ingredient:ingredient.name,accepted:data.accepted_qty,unit:ingredient.base_unit});setArr('kitch_receiving_local_history_v2',arr.slice(0,150));
@@ -2015,8 +2217,35 @@ async function kitchLoadCloudExpiryReceipts(){
  }catch(e){el.innerHTML='<h3>Cloud Receiving Lots</h3><p class="bad">Cloud receiving history could not be loaded: '+esc(e.message||'Unknown error')+'</p>';}
  finally{kitchCloudExpiryLoading=false;}
 }
+// Staged FEFO ledger: read only until movement allocations are reconciled.
+async function kitchLoadCloudLotLedger(){
+ const el=document.getElementById('kitchCloudLotLedger');if(!el)return;
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin){el.innerHTML='<p class="muted">Sign in with a staff account to check cloud lot allocations.</p>';return;}
+ try{
+  const {data,error}=await sb.rpc('kitch_team_lot_ledger',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_action:'list'});
+  if(error)throw error;
+  const lots=Array.isArray(data?.lots)?data.lots:[],uses=Array.isArray(data?.unallocated_movements)?data.unallocated_movements:[];
+  const pending=uses.filter(m=>Number(m.remaining_unallocated)>0);
+  const untracked=lots.filter(x=>!x.expiry);
+  const fullyReconciled=pending.length===0 && untracked.length===0;
+  el.innerHTML=`<h3>Cloud Lot Balance & FEFO</h3>
+   <div class="note ${fullyReconciled?'ok':'warn'}"><b>${fullyReconciled?'Lot allocations reconciled in this view':'Lot allocations not fully reconciled'}</b><br>
+   ${pending.length} unallocated stock-usage movements; ${untracked.length} lots missing expiry.
+   Remaining lot balances below reflect assigned usage movements only; actual available inventory must be checked separately.</div>
+   <div class="grid"><div class="card"><span>CLOUD LOTS</span><b>${lots.length}</b></div>
+   <div class="card"><span>UNALLOCATED USAGE MOVEMENTS</span><b>${pending.length}</b></div>
+   <div class="card"><span>LOTS WITHOUT EXPIRY</span><b>${untracked.length}</b></div>
+   <div class="card"><span>FEFO READY</span><b>${fullyReconciled?'Review':'No'}</b></div></div>
+   <div style="overflow-x:auto;margin-top:12px"><table style="min-width:900px"><thead><tr><th>INGREDIENT</th><th>INVOICE / LOT</th><th>ACCEPTED</th><th>ALLOCATED USAGE</th><th>UNALLOCATED LOT BALANCE</th><th>EXPIRY</th><th>STATUS</th></tr></thead><tbody>
+   ${lots.map(x=>{const status=kitchCloudExpiryStatus(x.expiry);
+      return `<tr><td><b>${esc(x.ingredient||'—')}</b></td><td>${esc(x.invoice||'—')}</td><td>${cleanQty(x.received_qty)} ${esc(x.unit||'')}</td>
+      <td>${cleanQty(x.allocated_qty)} ${esc(x.unit||'')}</td><td>${cleanQty(x.remaining_qty)} ${esc(x.unit||'')}</td><td>${esc(x.expiry||'—')}</td><td><span class="${status.cls}">${esc(status.label)}</span></td></tr>`;
+   }).join('')||'<tr><td colspan="7" class="empty">No cloud receipt lots found.</td></tr>'}</tbody></table></div>`;
+ }catch(e){el.innerHTML='<h3>Cloud Lot Balance & FEFO</h3><div class="note warn">Lot ledger is not active yet: '+esc(e.message)+'. The existing receiving history above is unchanged.</div>';}
+}
 function batchesPage(){
  setTimeout(kitchLoadCloudExpiryReceipts,80);
+ setTimeout(kitchLoadCloudLotLedger,110);
  const a=getArr(BATCH_KEY).slice().sort((x,y)=>String(x.expiry_date).localeCompare(String(y.expiry_date)));
  const expired=a.filter(x=>batchStatus(x).label==='EXPIRED').length;
  const soon=a.filter(x=>batchStatus(x).label==='EXPIRING SOON').length;
@@ -2031,16 +2260,35 @@ function batchesPage(){
  <div class="card"><span>LOCAL EXPIRING SOON</span><b>${soon}</b></div><div class="card"><span>LOCAL EXPIRED</span><b>${expired}</b></div>
  <div class="card"><span>LOCAL FEFO TRACKING</span><b>${a.length?'ON':'—'}</b></div></div>
  <div class="panel"><h2>Expiry & Batches</h2><p class="muted">Browser-local batches and cloud Receiving records are shown separately to avoid claiming cloud stock is linked to FEFO when it is not.</p>
- <div id="kitchCloudExpirySection"><h3>Cloud Receiving Lots</h3><p class="muted">Loading cloud receiving history…</p></div>
+ <div id="kitchCloudExpirySection"><h3>Cloud Receiving Lots</h3><p class="muted">Loading cloud receiving history…</p></div><div id="kitchCloudLotLedger" style="margin-top:22px"><h3>Cloud Lot Balance & FEFO</h3><p class="muted">Checking allocation ledger…</p></div>
  <h3 style="margin-top:24px">Local Tracked Batches</h3><div style="overflow-x:auto"><table style="min-width:850px"><tr><th>INGREDIENT</th><th>SUPPLIER</th><th>PO</th><th>BATCH / LOT</th><th>RECEIVED</th><th>REMAINING</th><th>RECEIVED DATE</th><th>EXPIRY</th><th>STATUS</th></tr>
  ${rows||'<tr><td colspan="9" class="empty">No browser-local tracked batches. Cloud receipts, if any, are listed above.</td></tr>'}</table></div></div>`;
 }
 
 function filterIngredients(){
- const q=(document.getElementById('ingredientSearch')?.value||'').trim().toLowerCase();
- document.querySelectorAll('.ingredientRow').forEach(row=>{
-   row.style.display=(!q||row.dataset.name.includes(q)||row.dataset.category.includes(q))?'':'none';
+ const input=document.getElementById('ingredientSearch');
+ const container=input?.closest('.kitchInventory');
+ if(!input||!container)return;
+ const q=input.value.trim().toLocaleLowerCase();
+ let shown=0;
+ container.querySelectorAll('tr.ingredientRow').forEach(row=>{
+  const name=(row.dataset.name||'').toLocaleLowerCase();
+  const category=(row.dataset.category||'').toLocaleLowerCase();
+  const sku=(row.cells?.[0]?.textContent||'').toLocaleLowerCase();
+  const match=!q||name.includes(q)||category.includes(q)||sku.includes(q);
+  row.hidden=!match;
+  row.style.setProperty('display',match?'table-row':'none','important');
+  if(match)shown++;
  });
+ let empty=container.querySelector('#kitchIngredientSearchEmpty');
+ if(!empty){
+  empty=document.createElement('div');
+  empty.id='kitchIngredientSearchEmpty';
+  empty.style.cssText='padding:16px;color:#777;font-size:13px;';
+  container.querySelector('.inventoryTableWrap')?.appendChild(empty);
+ }
+ empty.textContent=q&&!shown?'No ingredients match "'+input.value.trim()+'".':'';
+ empty.hidden=!(q&&!shown);
 }
 
 
@@ -2409,7 +2657,8 @@ async function kitchCloudSaveRun(run){
   created_at:run.created_at,actual_yield:run.actual_yield||0,yield_unit:run.yield_unit||'kg',actual_unit_cost:run.actual_unit_cost||0,
   production_date:run.production_date||'',expiry_date:run.expiry_date||'',production_temp_c:run.production_temp_c??null,
   completed_at:run.completed_at||'',qc_temp_c:run.qc_temp_c??null,qc_note:run.qc_note||'',qc_serial:run.qc_serial||'',qc_at:run.qc_at||'',
-  production_proof:await kitchProofForCloud(run.production_proof),qc_photo:await kitchProofForCloud(run.qc_photo)};
+  production_proof:['127.0.0.1','localhost'].includes(location.hostname)?'':await kitchProofForCloud(run.production_proof),
+  qc_photo:['127.0.0.1','localhost'].includes(location.hostname)?'':await kitchProofForCloud(run.qc_photo)};
  const {data,error}=await sb.rpc('kitch_team_save_production_record',{
   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_request_id:run.cloud_request_id,p_payload:payload,
   p_expected_revision:Number(run.cloud_sync_revision||0)
@@ -2490,10 +2739,10 @@ function productionPage(){
  const completedRunCount=kitchCloudProductionRecords? kitchCloudProductionRecords.filter(row=>['Label Pending','Label Created','Label Rejected'].includes(row.payload?.status)).length : runs.filter(x=>['Completed','Label Pending','Label Created','Label Rejected'].includes(x.status)).length;
  const cloudRows=cloudHistory.map(h=>`<tr><td><b>${esc(h.request_id?.slice(0,8)||'—')}</b></td><td>${esc(h.occurred_at?new Date(h.occurred_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):'—')}</td><td>${Number(h.ingredient_lines||0)}</td>${session==='production'?'':`<td>${money(h.stock_usage_cost)}</td>`}<td>${syncedByRequest.has(String(h.request_id))?`<span class="ok"><b>${esc(syncedByRequest.get(String(h.request_id)).status||'Synced')}</b></span>`:`<span style="color:#b45309">Stock deducted · completion not synced</span>`}</td></tr>`).join('');
  return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${completedRunCount}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
- <div class="panel"><div role="status" style="padding:8px 0 12px;font-size:13px">${kitchProductionLoadStatus==='loading'?'Loading shared recipes and production history…':kitchProductionLoadStatus==='error'?`<span class="bad">Cloud data could not be fully loaded: ${esc(kitchProductionLoadError)}</span> <button class="btn" onclick="kitchRefreshProductionPageData()">Retry Cloud Load</button>`:kitchProductionLoadStatus==='ready'?'<span class="ok">Cloud data refreshed.</span>':''}</div><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
+ <div class="panel kitchProductionLedger"><div role="status" style="padding:8px 0 12px;font-size:13px">${kitchProductionLoadStatus==='loading'?'Loading shared recipes and production history…':kitchProductionLoadStatus==='error'?`<span class="bad">Cloud data could not be fully loaded: ${esc(kitchProductionLoadError)}</span> <button class="btn" onclick="kitchRefreshProductionPageData()">Retry Cloud Load</button>`:kitchProductionLoadStatus==='ready'?'<span class="ok">Cloud data refreshed.</span>':''}</div><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
  <div class="actions"><button class="btn black" onclick="openProduction()">+ Start Production</button><button class="btn" onclick="kitchSyncLocalProductionRecords()">Sync Local Production to Cloud</button></div>
- <table><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production runs yet.</td></tr>'}</table><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
- <div class="panel"><h2>Cloud Stock-Deduction History</h2><p class="muted">Read-only production inventory deductions. These entries do not establish that final yield, QC, or labels were completed. No inventory is changed by viewing them.</p><div style="overflow-x:auto"><table><tr><th>REQUEST ID</th><th>DATE (DUBAI)</th><th>INGREDIENT LINES</th>${session==='production'?'':'<th>STOCK USAGE COST</th>'}<th>STATUS</th></tr>${history?cloudRows||'<tr><td colspan="5">No cloud stock-deduction runs recorded.</td></tr>':'<tr><td colspan="5">Cloud history not loaded. Open this page again or check the connection.</td></tr>'}</table></div></div>`;
+ <div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production runs yet.</td></tr>'}</table></div><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
+ <div class="panel kitchProductionLedger"><h2>Cloud Stock-Deduction History</h2><p class="muted">Read-only production inventory deductions. These entries do not establish that final yield, QC, or labels were completed. No inventory is changed by viewing them.</p><div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>REQUEST ID</th><th>DATE (DUBAI)</th><th>INGREDIENT LINES</th>${session==='production'?'':'<th>STOCK USAGE COST</th>'}<th>STATUS</th></tr>${history?cloudRows||'<tr><td colspan="5">No cloud stock-deduction runs recorded.</td></tr>':'<tr><td colspan="5">Cloud history not loaded. Open this page again or check the connection.</td></tr>'}</table></div></div>`;
 }
 
 function viewProductionDetails(id){
@@ -2513,7 +2762,7 @@ function viewProductionDetails(id){
  <h3 style="margin-top:24px">Labels</h3>
  ${qcDone?`<div class="qcDetails"><div class="note"><b>Expiry:</b> ${esc(x.expiry_date||'—')}</div><div class="note"><b>Temperature:</b> ${x.qc_temp_c!==''&&x.qc_temp_c!==undefined?cleanQty(x.qc_temp_c)+' °C':'—'}</div></div><div class="note"><b>QC Result:</b> <span class="${qcPassed?'ok':'bad'}">${esc(x.status)}</span>${x.qc_serial?` · <b>Serial:</b> ${esc(x.qc_serial)}`:''}<br><b>Label Note:</b> ${esc(x.qc_note||'—')}</div>`:`<div class="note warn"><b>QC:</b> ${x.status==='Label Pending'?'Pending — this production still needs QC.':'Not completed for this production record.'}</div>`}
  ${proof}
- <div class="detailActions">${qcPassed?`<button class="btn black" onclick="printQCLabel(${x.id})">Print Label</button>`:''}${x.qc_photo?`<button class="btn" onclick="openQCProof(${x.id})">View Proof</button>`:''}</div>`);
+ <div class="detailActions">${(['127.0.0.1','localhost'].includes(location.hostname)&&x.status==='In Production')?`<button class="btn black" onclick="openActualYield(${x.id})">Resume Completion (no new stock deduction)</button>`:''}${qcPassed?`<button class="btn black" onclick="printQCLabel(${x.id})">Print Label</button>`:''}${x.qc_photo?`<button class="btn" onclick="openQCProof(${x.id})">View Proof</button>`:''}</div>`);
 }
 function formatProductionDate(v){return v?String(v).slice(0,16).replace('T',' '):'—'}
 function openQCProof(id){
@@ -2524,7 +2773,7 @@ function openQCProof(id){
 
 function openProduction(){
  const a=recipes().filter(r=>!recipeNeedsReview(r));if(!a.length)return alert('No recipes pass ingredient and unit validation. Review the Recipe Master first.');
- modal(`<div class="modalHead"><h2>Start Production</h2><button class="close" onclick="closeModal()">×</button></div>
+ modal(`<div class="modalHead productionStartHead"><h2>Start Production</h2><button class="close" aria-label="Close Start Production" onclick="closeModal()">×</button></div>
  <div class="formGrid"><div class="field"><label>APPROVED RECIPE</label><select id="prRecipe" onchange="previewProduction()">${a.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>NUMBER OF BATCHES</label><input id="prBatches" type="number" min="0.001" step="0.001" value="1" oninput="previewProduction()"></div></div>
  <div class="note"><b>Production Location:</b> ${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())} · Recipe quantities are multiplied by the number of batches.</div>
  <div id="prMethod"></div><div id="prPreview"></div>`);previewProduction();
@@ -2622,7 +2871,7 @@ async function confirmProduction(){
   const requestId=crypto.randomUUID();
   const {data,error}=await sb.rpc('kitch_team_start_production',{
    p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
-   p_request_id:requestId,p_recipe_key:String(r.id),p_batches:mult
+   p_request_id:requestId,p_recipe_key:(['127.0.0.1','localhost'].includes(location.hostname)?String(r.name):String(r.id)),p_batches:mult
   });
   if(error)throw Error(error.message);
   if(!data?.saved)throw Error('Cloud production confirmation was not returned.');
@@ -2716,12 +2965,33 @@ async function finishQC(id,pass){
 }
 function printQCLabel(id){
  const run=getArr(PROD_KEY).find(x=>x.id===id);if(!run)return;
- const old=document.getElementById('qcLabelPrint');if(old)old.remove();
- const el=document.createElement('div');el.id='qcLabelPrint';
- el.innerHTML=`<div style="font-family:Arial,sans-serif;font-size:12px;line-height:1.35"><b style="font-size:18px">KITCH LABEL</b><br><b>${esc(run.recipe)}</b><br>${esc(run.code)} · ${esc(run.qc_serial||'')}<br>Yield: ${cleanQty(run.actual_yield)} ${esc(run.yield_unit||'')}<br>Temp: ${cleanQty(run.qc_temp_c)} °C<br>Production: ${esc(run.production_date||'—')}<br>Expiry: ${esc(run.expiry_date||'—')}<br>LABEL: CREATED</div>`;
- document.body.appendChild(el);window.print();setTimeout(()=>el.remove(),500);
+ if(!['Label Created','Completed'].includes(run.status))return alert('Finish Label/QC approval before printing.');
+ const selected=window.prompt('KITCH label size:\n1 = 70 × 32 mm\n2 = 40 × 20 mm','1');
+ if(selected===null)return;
+ if(selected!=='1'&&selected!=='2')return alert('Choose 1 or 2.');
+ const compact=selected==='2';
+ const width=compact?40:70,height=compact?20:32;
+ const plain=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const w=window.open('','_blank','width=720,height=540');
+ if(!w)return alert('Allow Safari pop-ups to print a label.');
+ const recipe=plain(run.recipe),code=plain(run.code),serial=plain(run.qc_serial||'');
+ const date=plain(run.production_date||'—'),expiry=plain(run.expiry_date||'—');
+ const temp=Number.isFinite(Number(run.qc_temp_c))?plain(run.qc_temp_c)+'°C':'—';
+ const title=compact?recipe.slice(0,54):recipe;
+ w.document.open();
+ w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+ '<title>KITCH label · '+code+'</title><style>'+
+ '@page{size:'+width+'mm '+height+'mm;margin:0}*{box-sizing:border-box}html,body{padding:0;margin:0;background:#fff;color:#000;font-family:Arial,sans-serif}'+
+ '.sheet{width:'+width+'mm;height:'+height+'mm;overflow:hidden;padding:'+(compact?'1.2':'2')+'mm;display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;page-break-inside:avoid}'+
+ '.head{display:flex;justify-content:space-between;gap:2mm;font-size:'+(compact?'6':'7')+'pt;font-weight:800}.recipe{font-size:'+(compact?'7':'10')+'pt;font-weight:800;line-height:1.1;overflow:hidden;max-height:'+(compact?'7':'10')+'mm}.meta{font-size:'+(compact?'5.5':'7')+'pt;line-height:1.22}.foot{font-size:'+(compact?'5':'6')+'pt;display:flex;justify-content:space-between}'+
+ '.controls{position:fixed;top:20px;left:20px;background:#fff;padding:18px;border:1px solid #ddd;border-radius:10px;box-shadow:0 8px 24px #0002;z-index:5;font:14px Arial}.controls button{padding:9px 16px;background:#111;color:white;border:0;border-radius:8px;cursor:pointer}'+
+ '@media screen{body{background:#eee;padding:80px 20px}.sheet{background:#fff;box-shadow:0 1px 15px #0002;margin:auto}}@media print{html,body{width:'+width+'mm;height:'+height+'mm;overflow:hidden}.controls{display:none!important}.sheet{box-shadow:none!important;margin:0!important} }'+
+ '</style></head><body><div class="controls"><strong>KITCH · '+width+' × '+height+' mm</strong><p>Choose a matching label roll / paper size in Safari printer settings.<br>Disable browser headers and footers. Preview should show one page.</p><button onclick="window.print()">Print / Save as PDF</button></div>'+
+ '<div class="sheet"><div class="head"><span>KITCH</span><span>'+code+'</span></div>'+
+ '<div class="recipe">'+title+'</div><div class="meta">Made: '+date+'<br>Use by: '+expiry+'<br>'+(!compact?'Yield: '+plain(run.actual_yield)+' '+plain(run.yield_unit||'')+' · ':'')+'Temp: '+temp+'</div>'+
+ '<div class="foot"><span>'+serial+'</span><span>QC APPROVED</span></div></div></body></html>');
+ w.document.close();
 }
-
 
 // WASTE & ADJUSTMENTS — raw ingredient waste and finished production waste are kept separate.
 const WASTE_KEY='kitch_demo_waste_v3';
@@ -2755,8 +3025,9 @@ function wastePage(){
 function openWasteType(){modal(`<div class="modalHead"><div><div class="sub">WASTE CONTROL</div><h2>Record Waste</h2></div><button class="close" onclick="closeModal()">×</button></div><div class="note">Choose what was actually wasted. Normal recipe usage is already counted automatically as production food cost.</div><div class="actions" style="margin-top:18px"><button class="btn black" onclick="openWaste()">Raw Ingredient Waste</button><button class="btn" onclick="openFinishedWaste()">Finished Product Waste</button></div>`)}
 function wasteIngredientOptions(location){return ingredients().slice().sort((a,b)=>a.name.localeCompare(b.name)).map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${prettyCanonical(wasteLocationStock(x,location),x.base_unit)}</option>`).join('')}
 function openWaste(){
+ kitchPendingStockControlId=null;
  if(!ingredients().length)return alert('Ingredient Master is empty.');const loc=wasteLocations()[0];
- modal(`<div class="modalHead"><div><div class="sub">RAW INGREDIENT WASTE</div><h2>Record Ingredient Waste</h2></div><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>Location control:</b> waste is deducted only from the selected location.</div><div class="formGrid"><div class="field"><label>WASTE LOCATION</label><select id="wLocation" onchange="wasteLocationChanged()">${wasteLocationOptions(loc)}</select></div><div class="field"><label>INGREDIENT</label><select id="wIng" class="ingredientSelect" onfocus="openIngredientSelect(this)" onblur="closeIngredientSelect(this)" onchange="wasteIngredientChanged();closeIngredientSelect(this)">${wasteIngredientOptions(loc)}</select></div><div class="field"><label>QUANTITY</label><input id="wQty" type="number" min="0" step=".001" oninput="updateWasteCostPreview()"></div><div class="field"><label>UNIT</label><input id="wUnit" disabled></div><div class="field"><label>REASON *</label><select id="wReason"><option value="">Select reason</option><option>Preparation Waste</option><option>Spoilage</option><option>Expired</option><option>Quality Issue</option><option>Damaged</option><option>Staff Error</option><option>Other</option></select></div></div><div id="wStockInfo" class="note"></div><div class="field"><label>NOTE</label><input id="wNote" placeholder="Optional details"></div><button class="primary" onclick="saveWaste()">Confirm Waste & Deduct Stock</button>`);wasteIngredientChanged();
+ modal(`<div class="modalHead"><div><div class="sub">RAW INGREDIENT WASTE</div><h2>Record Ingredient Waste</h2></div><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>Location control:</b> this is a browser-local waste form. Cloud inventory may differ by location.</div>${teamCloudAuth?.staff_name&&cloud?.branch_id?'<div class="note warn"><b>Cloud stock control:</b> Saving requires a verified cloud transaction. The location must match your staff assignment. No browser-local stock deduction will be used.</div>':''}<div class="formGrid"><div class="field"><label>WASTE LOCATION</label><select id="wLocation" onchange="wasteLocationChanged()">${wasteLocationOptions(loc)}</select></div><div class="field"><label>INGREDIENT</label><select id="wIng" class="ingredientSelect" onfocus="openIngredientSelect(this)" onblur="closeIngredientSelect(this)" onchange="wasteIngredientChanged();closeIngredientSelect(this)">${wasteIngredientOptions(loc)}</select></div><div class="field"><label>QUANTITY</label><input id="wQty" type="number" min="0" step=".001" oninput="updateWasteCostPreview()"></div><div class="field"><label>UNIT</label><input id="wUnit" disabled></div><div class="field"><label>REASON *</label><select id="wReason"><option value="">Select reason</option><option>Preparation Waste</option><option>Spoilage</option><option>Expired</option><option>Quality Issue</option><option>Damaged</option><option>Staff Error</option><option>Other</option></select></div></div><div id="wStockInfo" class="note"></div><div class="field"><label>NOTE</label><input id="wNote" placeholder="Optional details"></div><button class="primary" onclick="saveWaste()">Confirm Waste & Deduct Stock</button>`);wasteIngredientChanged();
 }
 function wasteLocationChanged(){const loc=wLocation.value,sel=wIng.value;wIng.innerHTML=wasteIngredientOptions(loc);if([...wIng.options].some(o=>o.value===sel))wIng.value=sel;wasteIngredientChanged()}
 function estimatedWasteUnitCost(ing,location){
@@ -2774,7 +3045,51 @@ function updateWasteCostPreview(){
  if(box)box.innerHTML=`<b>${esc(loc)} stock:</b> ${prettyCanonical(wasteLocationStock(ing,loc),ing.base_unit)} · <b>Estimated waste cost: AED ${cost.toFixed(2)}</b><br><small>Cost uses the actual FEFO receiving batch where available; final cost is calculated when waste is confirmed.</small>`;
 }
 function wasteIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('wIng')?.value),loc=document.getElementById('wLocation')?.value||primaryRestaurantName();if(x){wUnit.value=unit(x.base_unit);updateWasteCostPreview()}}
+// KITCH cloud stock controls require staged-kitch-cloud-stock-controls.sql.
+let kitchPendingStockControlId=null;
+async function kitchSubmitCloudStockControl(action){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud?.branch_id)throw Error('Cloud staff session is required.');
+ const waste=action==='waste', select=document.getElementById(waste?'wIng':'aIng');
+ const ing=ingredients().find(i=>i.sku===select?.value);
+ const loc=document.getElementById(waste?'wLocation':'aLocation')?.value||'';
+ const qty=Number(document.getElementById(waste?'wQty':'aQty')?.value);
+ const u=unit(document.getElementById(waste?'wUnit':'aUnit')?.value);
+ const reason=document.getElementById(waste?'wReason':'aReason')?.value||'';
+ const note=document.getElementById(waste?'wNote':'aNote')?.value||'';
+ if(!ing?.cloud_id||!Number.isFinite(qty)||qty<=0||!reason)throw Error('Choose an ingredient, positive quantity and reason.');
+ if(!compatibleUnits(u,ing.base_unit))throw Error('Waste/adjustment unit does not match ingredient base unit.');
+ if(loc!==assignedLocationName())throw Error('Choose only your assigned cloud location: '+assignedLocationName()+'. No stock was changed.');
+ // Canonicalizing here ensures RPC receives the ingredient base unit (e.g. grams to kg).
+ const baseQty=fromCanonical(toCanonical(qty,u),ing.base_unit);
+ const direction=waste?'minus':document.getElementById('aDir')?.value;
+ if(direction!=='minus'&&direction!=='plus')throw Error('Choose adjustment direction.');
+ const delta=direction==='minus'?-baseQty:baseQty;
+ if(!kitchPendingStockControlId){
+  if(!window.crypto?.randomUUID)throw Error('Secure transaction identifier is unavailable.');
+  kitchPendingStockControlId=window.crypto.randomUUID();
+ }
+ const payload={p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+  p_transaction_id:kitchPendingStockControlId,p_ingredient_id:ing.cloud_id,p_action:action,
+  p_quantity_delta:delta,p_unit:ing.base_unit,p_reason:reason,p_note:note};
+ const {data,error}=await sb.rpc('kitch_team_cloud_stock_control',payload);
+ if(error)throw Error(error.message);
+ if(!data?.saved)throw Error('Cloud did not confirm the transaction.');
+ kitchPendingStockControlId=null;
+ closeModal();
+ let refreshError='';
+ try{await cloudLoadIngredients();openPage('Waste & Adjustments')}
+ catch(err){refreshError=' Inventory refresh needs a manual reload: '+err.message;}
+ alert((action==='waste'?'Waste':'Adjustment')+' saved in KITCH Cloud.'+(data.after_qty!=null?' New stock: '+data.after_qty+' '+data.unit+'.':'')+' No browser-local inventory was updated.'+refreshError);
+}
+async function kitchCloudStockControlFromForm(action){
+ const btn=document.querySelector('button[onclick="saveWaste()"]')||document.querySelector('button[onclick="saveAdjustment()"]');
+ if(btn)btn.disabled=true;
+ try{await kitchSubmitCloudStockControl(action)}
+ catch(e){alert('Cloud stock transaction not confirmed: '+e.message+'. Do not repeat until checked. The transaction ID remains reserved for safe retry.');}
+ finally{if(btn)btn.disabled=false}
+}
 function saveWaste(){
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id)return kitchCloudStockControlFromForm('waste');
  let a=ingredients(),ing=a.find(x=>x.sku===wIng.value),q=Number(wQty.value||0),u=unit(wUnit.value),reason=wReason.value,location=wLocation.value;if(!ing||q<=0)return alert('Enter a valid waste quantity.');if(!reason)return alert('Select a waste reason.');if(!compatibleUnits(u,ing.base_unit))return alert('Unit is not compatible with this ingredient.');const need=toCanonical(q,u),have=wasteLocationStock(ing,location);if(need>have+1e-9)return alert('Waste quantity is greater than available '+location+' stock.');setLocationStockCanonical(ing,location,have-need);let fefo=null;if(location===primaryRestaurantName()&&!hasCentralStore())fefo=deductFEFO(ing.sku,need);saveIngredients(a);let r=wasteRecords(),baseQty=fromCanonical(need,ing.base_unit),cost=(fefo&&Number(fefo.cost)>0)?Number(fefo.cost):baseQty*Number(ing.latest_cost!=null?ing.latest_cost:ing.cost||0);r.push({id:Date.now(),code:'WST-'+String(r.filter(x=>x.type!=='Stock Adjustment').length+1).padStart(5,'0'),type:'Raw Ingredient Waste',sku:ing.sku,ingredient:ing.name,qty:q,unit:u,canonical:need,location,reason,note:wNote.value.trim(),cost,unit_cost:baseQty?cost/baseQty:0,fefo_batches:fefo&&fefo.used?fefo.used:[],recorded_by:currentActor(),created_at:new Date().toISOString()});setArr(WASTE_KEY,r);closeModal();openPage('Waste & Adjustments')
 }
 function finishedProductionOptions(){return getArr(PROD_KEY).filter(x=>Number(x.actual_yield||0)>0&&['Label Created','Completed'].includes(x.status)&&finishedRemaining(x)>0).slice().reverse().map(x=>`<option value="${x.id}">${esc(x.code)} · ${esc(x.recipe)} · ${esc(x.location||primaryRestaurantName())} · ${prettyCanonical(finishedRemaining(x),x.yield_unit)} remaining</option>`).join('')}
@@ -2782,12 +3097,15 @@ function openFinishedWaste(){const opts=finishedProductionOptions();if(!opts)ret
 function finishedWasteChanged(){const run=getArr(PROD_KEY).find(x=>String(x.id)===String(document.getElementById('fwRun')?.value));if(!run)return;fwUnit.value=unit(run.yield_unit);const cost=productionCostForRun(run),remaining=finishedRemaining(run);fwInfo.innerHTML=`<div class="note"><b>${esc(run.recipe)}</b> · ${esc(run.location||primaryRestaurantName())}<br>Produced ${cleanQty(run.actual_yield)} ${esc(run.yield_unit)} · Remaining ${prettyCanonical(remaining,run.yield_unit)}<br><small>Batch food cost AED ${cost.toFixed(2)} · waste cost is calculated automatically.</small></div>`}
 function saveFinishedWaste(){const run=getArr(PROD_KEY).find(x=>String(x.id)===String(fwRun.value)),q=Number(fwQty.value||0),reason=fwReason.value;if(!run||q<=0)return alert('Enter a valid waste quantity.');if(!reason)return alert('Select a waste reason.');const u=unit(run.yield_unit),need=toCanonical(q,u),remaining=finishedRemaining(run);if(need>remaining+1e-9)return alert('Waste quantity is greater than the finished stock remaining for this production batch.');const totalYield=toCanonical(Number(run.actual_yield||0),u),batchCost=productionCostForRun(run),cost=totalYield?batchCost*(need/totalYield):0;let r=wasteRecords();r.push({id:Date.now(),code:'WST-'+String(r.filter(x=>x.type!=='Stock Adjustment').length+1).padStart(5,'0'),type:'Finished Product Waste',production_id:run.id,production_code:run.code,ingredient:run.recipe,qty:q,unit:u,canonical:need,location:run.location||primaryRestaurantName(),reason,note:fwNote.value.trim(),cost,recorded_by:currentActor(),created_at:new Date().toISOString()});setArr(WASTE_KEY,r);closeModal();openPage('Waste & Adjustments')}
 function openAdjustment(){
+ kitchPendingStockControlId=null;
  if(!ingredients().length)return alert('Ingredient Master is empty.');const loc=wasteLocations()[0];
- modal(`<div class="modalHead"><div><div class="sub">STOCK CONTROL</div><h2>Stock Adjustment</h2></div><button class="close" onclick="closeModal()">×</button></div><div class="note">Use adjustment only to correct a verified stock difference. The correction applies only to the selected location.</div><div class="formGrid"><div class="field"><label>LOCATION</label><select id="aLocation" onchange="adjustmentLocationChanged()">${wasteLocationOptions(loc)}</select></div><div class="field"><label>INGREDIENT</label><select id="aIng" class="ingredientSelect" onfocus="openIngredientSelect(this)" onblur="closeIngredientSelect(this)" onchange="adjustmentIngredientChanged();closeIngredientSelect(this)">${wasteIngredientOptions(loc)}</select></div><div class="field"><label>ADJUSTMENT</label><select id="aDir"><option value="minus">Decrease stock</option><option value="plus">Increase stock</option></select></div><div class="field"><label>QUANTITY</label><input id="aQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><input id="aUnit" disabled></div><div class="field"><label>REASON *</label><select id="aReason"><option value="">Select reason</option><option>Physical Count Correction</option><option>Receiving Correction</option><option>Transfer Correction</option><option>Data Entry Error</option><option>Other</option></select></div></div><div id="aStockInfo" class="note"></div><div class="field"><label>NOTE</label><input id="aNote" placeholder="Explain the correction"></div><button class="primary" onclick="saveAdjustment()">Save Stock Adjustment</button>`);adjustmentIngredientChanged()
+ modal(`<div class="modalHead"><div><div class="sub">STOCK CONTROL</div><h2>Stock Adjustment</h2></div><button class="close" onclick="closeModal()">×</button></div><div class="note">Use adjustments only for verified stock differences. Cloud staff transactions require your assigned location and are validated against live inventory.</div><div class="formGrid"><div class="field"><label>LOCATION</label><select id="aLocation" onchange="adjustmentLocationChanged()">${wasteLocationOptions(loc)}</select></div><div class="field"><label>INGREDIENT</label><select id="aIng" class="ingredientSelect" onfocus="openIngredientSelect(this)" onblur="closeIngredientSelect(this)" onchange="adjustmentIngredientChanged();closeIngredientSelect(this)">${wasteIngredientOptions(loc)}</select></div><div class="field"><label>ADJUSTMENT</label><select id="aDir"><option value="minus">Decrease stock</option><option value="plus">Increase stock</option></select></div><div class="field"><label>QUANTITY</label><input id="aQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><input id="aUnit" disabled></div><div class="field"><label>REASON *</label><select id="aReason"><option value="">Select reason</option><option>Physical Count Correction</option><option>Receiving Correction</option><option>Transfer Correction</option><option>Data Entry Error</option><option>Other</option></select></div></div><div id="aStockInfo" class="note"></div><div class="field"><label>NOTE</label><input id="aNote" placeholder="Explain the correction"></div><button class="primary" onclick="saveAdjustment()">Save Stock Adjustment</button>`);adjustmentIngredientChanged()
 }
 function adjustmentLocationChanged(){const loc=aLocation.value,sel=aIng.value;aIng.innerHTML=wasteIngredientOptions(loc);if([...aIng.options].some(o=>o.value===sel))aIng.value=sel;adjustmentIngredientChanged()}
 function adjustmentIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('aIng')?.value),loc=document.getElementById('aLocation')?.value||primaryRestaurantName();if(x){aUnit.value=unit(x.base_unit);aStockInfo.innerHTML=`<b>${esc(loc)} stock:</b> ${prettyCanonical(wasteLocationStock(x,loc),x.base_unit)}`}}
-function saveAdjustment(){let a=ingredients(),ing=a.find(x=>x.sku===aIng.value),q=Number(aQty.value||0),u=unit(aUnit.value),reason=aReason.value,dir=aDir.value,location=aLocation.value;if(!ing||q<=0)return alert('Enter a valid adjustment quantity.');if(!reason)return alert('Select an adjustment reason.');if(!compatibleUnits(u,ing.base_unit))return alert('Unit is not compatible with this ingredient.');const delta=toCanonical(q,u),have=wasteLocationStock(ing,location);if(dir==='minus'&&delta>have+1e-9)return alert('Adjustment is greater than available '+location+' stock.');const next=dir==='plus'?have+delta:have-delta;setLocationStockCanonical(ing,location,next);saveIngredients(a);let r=wasteRecords();r.push({id:Date.now(),code:'ADJ-'+String(r.filter(x=>x.type==='Stock Adjustment').length+1).padStart(5,'0'),type:'Stock Adjustment',sku:ing.sku,ingredient:ing.name,qty:(dir==='minus'?-q:q),unit:u,canonical:(dir==='minus'?-delta:delta),location,reason,note:aNote.value.trim(),cost:0,value_impact:fromCanonical(delta,ing.base_unit)*Number(ing.latest_cost!=null?ing.latest_cost:ing.cost||0),recorded_by:currentActor(),created_at:new Date().toISOString()});setArr(WASTE_KEY,r);closeModal();openPage('Waste & Adjustments')}
+function saveAdjustment(){
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id)return kitchCloudStockControlFromForm('adjustment');
+ let a=ingredients(),ing=a.find(x=>x.sku===aIng.value),q=Number(aQty.value||0),u=unit(aUnit.value),reason=aReason.value,dir=aDir.value,location=aLocation.value;if(!ing||q<=0)return alert('Enter a valid adjustment quantity.');if(!reason)return alert('Select an adjustment reason.');if(!compatibleUnits(u,ing.base_unit))return alert('Unit is not compatible with this ingredient.');const delta=toCanonical(q,u),have=wasteLocationStock(ing,location);if(dir==='minus'&&delta>have+1e-9)return alert('Adjustment is greater than available '+location+' stock.');const next=dir==='plus'?have+delta:have-delta;setLocationStockCanonical(ing,location,next);saveIngredients(a);let r=wasteRecords();r.push({id:Date.now(),code:'ADJ-'+String(r.filter(x=>x.type==='Stock Adjustment').length+1).padStart(5,'0'),type:'Stock Adjustment',sku:ing.sku,ingredient:ing.name,qty:(dir==='minus'?-q:q),unit:u,canonical:(dir==='minus'?-delta:delta),location,reason,note:aNote.value.trim(),cost:0,value_impact:fromCanonical(delta,ing.base_unit)*Number(ing.latest_cost!=null?ing.latest_cost:ing.cost||0),recorded_by:currentActor(),created_at:new Date().toISOString()});setArr(WASTE_KEY,r);closeModal();openPage('Waste & Adjustments')}
 
 
 
@@ -2800,12 +3118,102 @@ function countLocation(){
 
 function stockCounts(){return getArr(COUNT_KEY)}
 function activeCount(){return stockCounts().find(x=>x.status==='In Progress'&&x.location===countLocation())}
+// Cloud stock counting uses live Supabase snapshots, never the browser-local stock cache.
+// Requires docs/staged-kitch-cloud-stock-count.sql before enabling for customers.
+let kitchCloudCountDraft=null;
+async function kitchCloudCountRpc(action,extra={}){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud?.branch_id)throw Error('Staff cloud login is required.');
+ const {data,error}=await sb.rpc('kitch_team_stock_count_cloud',{
+  p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_action:action,...extra
+ });
+ if(error)throw Error(error.message);
+ return data;
+}
+async function kitchStartCloudStockCount(){
+ if(kitchCloudCountDraft?.lines?.length)return kitchOpenCloudCountDraft();
+ try{
+  const response=await kitchCloudCountRpc('snapshot');
+  if(String(response?.branch_id)!==String(cloud.branch_id))throw Error('Count snapshot belongs to another location');
+  const rows=Array.isArray(response?.ingredients)?response.ingredients:[];
+  if(!rows.length)throw Error('Cloud ingredient snapshot is empty');
+  if(!window.crypto?.randomUUID)throw Error('Secure transaction ID is unavailable');
+  kitchCloudCountDraft={id:window.crypto.randomUUID(),branch_id:cloud.branch_id,lines:rows.map(x=>({
+   ingredient_id:x.ingredient_id,name:x.name,sku:x.sku,unit:x.unit,expected_qty:Number(x.system_qty||0),
+   unit_cost:Number(x.unit_cost||0),physical_qty:null
+  }))};
+  kitchOpenCloudCountDraft();
+ }catch(e){alert('Cloud Stock Count is not ready: '+e.message+'. No inventory was changed.')}
+}
+function kitchOpenCloudCountDraft(){
+ const d=kitchCloudCountDraft;if(!d?.lines?.length)return;
+ modal(`<div class="modalHead"><div><div class="sub">CLOUD PHYSICAL STOCK COUNT</div><h2>Physical Count</h2><div class="muted">${esc(assignedLocationName())} · Cloud draft</div></div><button class="close" onclick="closeModal()">×</button></div>
+ <div class="note">Enter what you physically counted. System values are from a fresh Supabase snapshot. If stock changes before finalizing, KITCH rejects the stale count rather than overwriting newer transactions.</div>
+ <div style="max-height:54vh;overflow:auto"><table style="width:100%"><thead><tr><th>INGREDIENT</th><th>SYSTEM</th><th>PHYSICAL</th><th>VARIANCE</th></tr></thead><tbody>
+ ${d.lines.map((x,i)=>`<tr><td><b>${esc(x.name)}</b></td><td>${cleanQty(x.expected_qty)} ${esc(x.unit)}</td><td><input type="number" min="0" step="any" data-cloud-count-index="${i}" value="${x.physical_qty==null?'':esc(String(x.physical_qty))}" placeholder="Count" oninput="kitchCloudCountPreview(this)" style="width:115px;min-height:40px;border:1px solid #ddd;border-radius:10px;padding:6px"/></td><td id="cloudCountVar${i}">${x.physical_qty==null?'—':cleanQty(x.physical_qty-x.expected_qty)+' '+esc(x.unit)}</td></tr>`).join('')}</tbody></table></div>
+ <div class="actions"><button class="btn" onclick="kitchFillCloudCountUncounted()">Use System Qty for Uncounted Items</button></div>
+ <div class="note" id="kitchCloudCountMessage">Draft only. Finalization writes verified stock adjustments in Supabase. Never use estimated quantities.</div>
+ <button class="primary" id="kitchCloudCountSubmit" onclick="kitchFinalizeCloudStockCount()">Finalize Verified Cloud Stock Count</button>`);
+}
+function kitchCloudCountPreview(input){
+ const d=kitchCloudCountDraft;if(!d)return;
+ const idx=Number(input.dataset.cloudCountIndex),row=d.lines[idx];
+ if(!row)return;
+ const val=input.value===''?null:Number(input.value);
+ row.physical_qty=val!=null&&Number.isFinite(val)&&val>=0?val:null;
+ const cell=document.getElementById('cloudCountVar'+idx);
+ if(cell)cell.textContent=row.physical_qty==null?'—':cleanQty(row.physical_qty-row.expected_qty)+' '+row.unit;
+}
+function kitchFillCloudCountUncounted(){
+ const d=kitchCloudCountDraft;if(!d)return;
+ document.querySelectorAll('[data-cloud-count-index]').forEach(input=>{
+  if(input.value===''){
+   const row=d.lines[Number(input.dataset.cloudCountIndex)];
+   input.value=String(row.expected_qty);kitchCloudCountPreview(input);
+  }
+ });
+}
+async function kitchFinalizeCloudStockCount(){
+ const d=kitchCloudCountDraft;if(!d)return;
+ if(d.branch_id!==cloud.branch_id)return alert('Cloud location changed. Restart the count.');
+ const msg=document.getElementById('kitchCloudCountMessage'),btn=document.getElementById('kitchCloudCountSubmit');
+ if(d.lines.some(x=>x.physical_qty==null||!Number.isFinite(x.physical_qty)||x.physical_qty<0)){
+  if(msg)msg.innerHTML='<b class="bad">Count every ingredient before finalizing.</b>';return;
+ }
+ const variance=d.lines.filter(x=>Math.abs(x.physical_qty-x.expected_qty)>.000001).length;
+ if(!confirm('Finalize physical stock count for '+d.lines.length+' ingredients? '+variance+' quantities differ. This will reconcile the actual cloud inventory.'))return;
+ if(btn)btn.disabled=true;if(msg)msg.textContent='Validating and saving the cloud stock count…';
+ try{
+  const lines=d.lines.map(x=>({ingredient_id:x.ingredient_id,unit:x.unit,
+   expected_qty:x.expected_qty,physical_qty:x.physical_qty}));
+  const result=await kitchCloudCountRpc('finalize',{p_count_id:d.id,p_lines:lines});
+  if(!result?.saved)throw Error('Cloud did not confirm save');
+  kitchCloudCountDraft=null;closeModal();
+  await cloudLoadIngredients();openPage('Stock Count');
+  alert('Cloud Stock Count saved. Total variance: '+money(result.total_variance_cost)+'. '+(result.already_recorded?'Already processed; no duplicate changes.':'Stock reconciled once.'));
+ }catch(e){
+  if(msg)msg.textContent='Not confirmed: '+e.message+'. The count reference is preserved for a safe retry. Do not start a new count until this status is verified.';
+ }finally{if(btn)btn.disabled=false}
+}
+async function kitchLoadCloudStockCountHistory(){
+ const el=document.getElementById('kitchCloudCountHistory');if(!el)return;
+ try{
+  const data=await kitchCloudCountRpc('history');
+  const rows=Array.isArray(data)?data:[];
+  el.innerHTML=`<h3>Completed Cloud Stock Counts</h3><div style="overflow:auto"><table style="width:100%;min-width:560px"><thead><tr><th>DATE</th><th>ITEMS</th><th>VARIANCE VALUE</th><th>STATUS</th></tr></thead><tbody>
+  ${rows.map(x=>`<tr><td>${esc(String(x.date||'').slice(0,10))}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${money(x.total_variance_cost||0)}</td><td>Completed (cloud)</td></tr>`).join('')||'<tr><td colspan="4" class="empty">No completed cloud counts.</td></tr>'}</tbody></table></div>`;
+ }catch(e){el.innerHTML='<div class="note warn">Cloud count history unavailable: '+esc(e.message)+'</div>';}
+}
 function stockCountPage(){
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id)setTimeout(kitchLoadCloudStockCountHistory,90);
  const loc=countLocation(),all=stockCounts().filter(x=>x.location===loc).slice().reverse(),active=activeCount(),completed=all.filter(x=>x.status==='Completed');
  const last=completed[0],varianceValue=completed.reduce((t,c)=>t+Number(c.variance_cost||0),0);
  return `<div class="grid"><div class="card"><span>COUNT LOCATION</span><b style="font-size:17px">${esc(loc)}</b></div><div class="card"><span>COMPLETED COUNTS</span><b>${completed.length}</b></div><div class="card"><span>LAST COUNT</span><b style="font-size:17px">${last?esc(String(last.completed_at).slice(0,10)):'—'}</b></div><div class="card"><span>TOTAL VARIANCE</span><b>AED ${varianceValue.toFixed(2)}</b></div></div>
- <div class="panel"><h2>Stock Count</h2><p class="muted">Count the physical stock at <b>${esc(loc)}</b>. KITCH compares the physical quantity with system stock and shows shortages or overages before you finalize.</p>
- <div class="actions">${active?`<button class="btn black" onclick="openStockCount('${active.id}')">Continue Count</button>`:`<button class="btn black" onclick="startStockCount()">+ Start Stock Count</button>`}</div>
+ <div class="panel"><h2>Stock Count</h2><p class="muted">Count the physical stock at <b>${esc(loc)}</b>. Browser-local count history is shown below. Signed-in cloud staff must use Start Cloud Stock Count, which reads a Supabase snapshot and requires the staged cloud-count RPC; do not use historical local counts for cloud stock.</p>
+ ${teamCloudAuth?.staff_name&&cloud?.branch_id?'<div class="note warn"><b>Cloud stock protection:</b> Legacy browser-local count finalization is blocked for cloud staff. The separate Cloud Stock Count action is staged and must not be used with real inventory until permissions, concurrency and idempotency pass staging tests.</div>':''}
+ <div class="actions">${teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id
+ ?`<button class="btn black" onclick="kitchStartCloudStockCount()">${kitchCloudCountDraft?'Continue Cloud Count':'+ Start Cloud Stock Count'}</button>`
+ :(active?`<button class="btn black" onclick="openStockCount('${active.id}')">Continue Count</button>`:`<button class="btn black" onclick="startStockCount()">+ Start Stock Count</button>`)}</div>
+ ${teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id?'<div id="kitchCloudCountHistory" class="panel" style="margin:14px 0"><h3>Cloud Stock Counts</h3><p class="muted">Loading cloud history…</p></div>':''}
  <table><tr><th>COUNT</th><th>LOCATION</th><th>ITEMS</th><th>VARIANCE ITEMS</th><th>VARIANCE VALUE</th><th>DATE</th><th>STATUS</th><th>ACTION</th></tr>${all.map(c=>`<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.location)}</td><td>${(c.items||[]).length}</td><td>${(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).length}</td><td>${c.status==='Completed'?'AED '+Number(c.variance_cost||0).toFixed(2):'—'}</td><td>${esc(String(c.completed_at||c.created_at||'').slice(0,16).replace('T',' '))}</td><td class="${c.status==='Completed'?'ok':'warn'}"><b>${esc(c.status)}</b></td><td><button class="btn" onclick="openStockCount('${c.id}')">${c.status==='Completed'?'View':'Open'}</button></td></tr>`).join('')||'<tr><td colspan="11" class="empty">No stock counts yet. Start the first physical count.</td></tr>'}</table></div>`;
 }
 function startStockCount(){
@@ -2826,6 +3234,9 @@ function openStockCount(id){
 function previewCountVariance(el){const c=activeCount();if(!c)return;const idx=Number(el.dataset.countIndex),it=c.items[idx],q=Number(el.value);const cell=document.getElementById('countVar'+idx);if(el.value===''){cell.textContent='—';cell.className='';return}const physical=toCanonical(q,it.unit),v=physical-Number(it.system_canonical||0);cell.textContent=(v>0?'+':'')+prettyCanonical(v,it.unit);cell.className=v<0?'bad':v>0?'warn':''}
 function fillCountWithSystemStock(){const c=activeCount();if(!c)return;document.querySelectorAll('[data-count-index]').forEach(el=>{if(el.value===''){const idx=Number(el.dataset.countIndex),it=c.items[idx];el.value=cleanQty(fromCanonical(Number(it.system_canonical||0),it.unit));previewCountVariance(el)}});const m=document.getElementById('countFinalizeMsg');if(m)m.innerHTML='<b>Ready to finalize.</b> Review any physical differences, then click Finalize Stock Count.'}
 function finalizeStockCount(id){
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&cloud?.branch_id){
+  return alert('Cloud stock protection: this Stock Count still reconciles only browser-local inventory. Finalizing is blocked until cloud inventory reconciliation is implemented. Your physical count draft is preserved; no stock was changed.');
+ }
  let counts=stockCounts(),c=counts.find(x=>String(x.id)===String(id));if(!c||c.status==='Completed')return;
  const inputs=[...document.querySelectorAll('[data-count-index]')],msg=document.getElementById('countFinalizeMsg');
  const missing=inputs.filter(x=>x.value==='');if(missing.length){if(msg){msg.innerHTML=`<b class="bad">${missing.length} item${missing.length===1?'':'s'} still uncounted.</b> Enter them or click <b>Use System Qty for Uncounted Items</b>.`;msg.scrollIntoView({behavior:'smooth',block:'nearest'})}return;}
@@ -3141,7 +3552,7 @@ function managerDashboard(){
  const runs=scopedRows(getArr(PROD_KEY)),cloudProduction=kitchCloudProductionSummary,displayProductionRuns=cloudProduction?String(cloudProduction.count):'—',productionValue=cloudProduction?money(cloudProduction.cost):'—',low=ings.filter(x=>displayStock(x)<=Number(x.minimum||0)).length;
  const openReq=session==='manager'?getArr(STOCK_REQUEST_KEY).filter(x=>x.branch===loc&&!['Received','Completed'].includes(x.status)).length:0;
  return `<div class="kitch2026-dashboard">
- <div class="k26-heading"><div><div class="k26-eyebrow">KITCH / OPERATIONS / ${esc(loc).toUpperCase()}</div><h2>Kitchen command center<span class="k26-orange">.</span></h2><p>Live stock, production and operational controls for your location.</p></div><div class="k26-date"><span class="k26-pulse"></span> LIVE WORKSPACE</div></div>
+ <div class="k26-heading"><div><div class="k26-eyebrow">KITCH / OPERATIONS / ${esc(loc).toUpperCase()}</div><h2>Kitchen command center<span class="k26-orange">.</span></h2><p>${location.hostname==='127.0.0.1'||location.hostname==='localhost'?'Local demo only. Inventory and production transactions are not validated.':'Live stock, production and operational controls for your location.'}</p></div><div class="k26-date"><span class="k26-pulse"></span> ${location.hostname==='127.0.0.1'||location.hostname==='localhost'?'LOCAL TEST DEMO':'LIVE WORKSPACE'}</div></div>
  <div class="k26-metrics">
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">▦</span><small>INVENTORY VALUE</small><strong>${window.__kitchInventoryLoadError?'Unavailable':money(inv)}</strong><em>View current stock <span>↗</span></em></button>
  <button class="k26-metric" onclick="openPage('Inventory')"><span class="k26-metric-icon">◉</span><small>LOW / OUT OF STOCK</small><strong>${window.__kitchInventoryLoadError?'—':low}</strong><em>${window.__kitchInventoryLoadError?'Check inventory connection':(low?'Items need attention':'Stock levels healthy')} <span>↗</span></em></button>
@@ -3198,17 +3609,57 @@ function recapData(){
 function recapCsvCell(v){const s=String(v??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
 function downloadRecapCSV(){const d=recapData(),rows=[['KITCH OPERATIONS RECAP',recapPeriod],[],['METRIC','VALUE'],...d.totals,[],['INVENTORY MASTER SNAPSHOT'],['Ingredient','SKU','Unit','Stock','PAR','Cost AED'],...d.inventory.map(x=>Object.values(x)),[],['PURCHASES'],['PO','Ingredient','Supplier','Quantity','Status','Date'],...d.po.map(x=>[x.po,x.ingredient,x.supplier,x.qty,x.status,x.created_at||x.received_at||'']),[],['PRODUCTION'],['Recipe','Cost AED','Date'],...d.prod.map(x=>[x.recipe||x.recipe_name,x.production_cost,x.created_at||x.started_at||'']),[],['WASTE / ADJUSTMENTS'],['Ingredient','Type','Quantity','Cost AED','Date'],...d.wr.map(x=>[x.ingredient,x.type,x.qty,x.cost,x.created_at||'']),[],['STOCK COUNTS'],['Reference','Location','Variance AED','Date'],...d.counts.map(x=>[x.code,x.location,x.variance_cost,x.completed_at||''])];const csv='\ufeff'+rows.map(row=>row.map(recapCsvCell).join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='KITCH_Operations_Recap_'+new Date().toISOString().slice(0,10)+'.csv';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 function downloadRecapExcel(){if(typeof XLSX==='undefined')return downloadRecapCSV();const d=recapData(),wb=XLSX.utils.book_new();const add=(rows,name)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),name);add(d.totals.map(x=>({Metric:x[0],Value:x[1]})),'Recap');add(d.inventory,'Ingredient Master');add(d.po,'Purchasing');add(d.prod,'Production');add(d.wr,'Waste');add(d.counts.map(x=>({Reference:x.code,Location:x.location,Variance_AED:x.variance_cost,Date:x.completed_at})),'Stock Counts');XLSX.writeFile(wb,'KITCH_Operations_Recap.xlsx')}
-function recapControls(){const r=recapWindow(),fmt=d=>d.toISOString().slice(0,10);return `<div class="panel" style="margin-top:0"><h2>Operations Recap & Exports</h2><p class="muted">Included in Starter and Business. Select a period for the recap; the ingredient master snapshot shows current stock.</p><div class="actions">${[['today','Daily'],['7d','Weekly'],['month','Monthly'],['30d','Last 30 Days']].map(x=>`<button class="btn ${recapPeriod===x[0]?'black':''}" onclick="changeRecapPeriod('${x[0]}')">${x[1]}</button>`).join('')}</div><div class="actions" style="align-items:center"><label>From <input id="recapFrom" type="date" value="${recapFrom||fmt(r.start)}"></label><label>To <input id="recapTo" type="date" value="${recapTo||fmt(r.end)}"></label><button class="btn" onclick="applyRecapDates()">Apply Custom Dates</button></div><div class="actions"><button class="btn black" onclick="downloadRecapExcel()">Download Excel Recap</button><button class="btn" onclick="downloadRecapCSV()">Download CSV</button><button class="btn" onclick="window.print()">Print / Save PDF</button></div><table><tr><th>RECAP METRIC</th><th>VALUE</th></tr>${recapData().totals.map(x=>`<tr><td>${esc(x[0])}</td><td><b>${Number(x[1]).toLocaleString('en-AE',{maximumFractionDigits:2})}</b></td></tr>`).join('')}</table></div>`}
+function kitchReportsStyles(){return `<style>
+.kitchReports{width:100%;min-width:0}.kitchReports .panel{width:100%;max-width:none;padding:24px;box-sizing:border-box;border-radius:20px}
+.kitchReports .kitchReportToolbar{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0;align-items:center}
+.kitchReports .kitchReportBtn{appearance:none;display:inline-flex;flex:0 0 auto;width:auto;align-items:center;justify-content:center;height:39px;padding:0 16px;border:1px solid #dedede;background:#fff;color:#171717;border-radius:999px;font-family:inherit;font-size:12px;font-weight:750;cursor:pointer}
+.kitchReports .kitchReportBtn.isSelected{background:#171717;border-color:#171717;color:#fff}
+.kitchReports .kitchReportBtn:hover:not(.isSelected){background:#f5f5f5}
+.kitchReports .kitchReportDates{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.kitchReports .kitchReportDates label{display:flex;flex-direction:column;gap:7px;font-size:11px;color:#777;font-weight:700}
+.kitchReports .kitchReportDates input{height:40px;border:1px solid #dedede;border-radius:11px;background:#fff;padding:0 11px;font:inherit;box-sizing:border-box}
+.kitchReports .kitchReportScroll{width:100%;max-width:100%;overflow-x:auto;border:1px solid #ededed;border-radius:14px;margin-top:12px}
+.kitchReports .kitchReportScroll table{min-width:100%;width:100%;margin:0;border-collapse:collapse}
+.kitchReports .kitchReportScroll th,.kitchReports .kitchReportScroll td{padding:12px 14px;text-align:left;vertical-align:middle;border-bottom:1px solid #f0f0f0}
+.kitchReports .kitchReportScroll th{background:#f8f8f8;white-space:nowrap}
+.kitchReports .kitchReportScroll td:last-child{text-align:right}
+.kitchReports .kitchReportKpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:12px 0}
+.kitchReports .kitchReportKpis .card{min-width:0}
+.kitchReports .kitchReportNotice{padding:14px 16px;background:#f6f6f5;color:#555;border:1px solid #e9e9e8;border-radius:13px;font-size:12px;line-height:1.55;margin:14px 0}
+@media(max-width:900px){.kitchReports .kitchReportKpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.kitchReports .panel{padding:16px}.kitchReports .kitchReportKpis{grid-template-columns:1fr}.kitchReports .kitchReportBtn{padding:0 12px}}
+</style>`;}
+async function kitchReportCloudReceipts(){
+ const el=document.getElementById('kitchReportCloudSummary');if(!el)return;
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin){el.textContent='Staff sign-in required to show cloud Receiving totals.';return;}
+ try{
+ const {data,error}=await sb.rpc('kitch_team_receiving_history',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+ if(error)throw error;const range=recapWindow();
+ const rows=(Array.isArray(data)?data:[]).filter(x=>{const d=new Date(x.date);return Number.isFinite(d.getTime())&&d>=range.start&&d<=range.end});
+ const total=rows.reduce((sum,x)=>sum+Number(x.total||0),0);
+ el.innerHTML='<b>Confirmed Cloud Receiving · '+rows.length+' receipt line(s) · '+money(total)+'</b><div style="margin-top:6px">This reflects Supabase Receiving records in the selected date range. The other purchasing metrics and Excel/CSV exports are still based on local purchase orders.</div>';
+ }catch(e){el.textContent='Cloud Receiving summary unavailable: '+e.message;}
+}
+function recapControls(){
+ const r=recapWindow(),fmt=d=>d.toISOString().slice(0,10);
+ return `<div class="panel"><h2>Operations Recap & Exports</h2><p class="muted">Choose a period for the recap. Cloud Receiving is displayed separately from browser-local purchase order totals.</p>
+ <div class="kitchReportToolbar">${[['today','Daily'],['7d','Weekly'],['month','Monthly'],['30d','Last 30 Days']].map(x=>`<button class="kitchReportBtn ${recapPeriod===x[0]?'isSelected':''}" onclick="changeRecapPeriod('${x[0]}')">${x[1]}</button>`).join('')}</div>
+ <div class="kitchReportDates"><label>From<input id="recapFrom" type="date" value="${recapFrom||fmt(r.start)}"></label><label>To<input id="recapTo" type="date" value="${recapTo||fmt(r.end)}"></label><button class="kitchReportBtn" onclick="applyRecapDates()">Apply Custom Dates</button></div>
+ <div class="kitchReportToolbar"><button class="kitchReportBtn isSelected" onclick="downloadRecapExcel()">Download Excel Recap</button><button class="kitchReportBtn" onclick="downloadRecapCSV()">Download CSV</button><button class="kitchReportBtn" onclick="window.print()">Print / Save PDF</button></div>
+ <div class="kitchReportNotice" id="kitchReportCloudSummary">Loading confirmed cloud Receiving…</div>
+ <div class="kitchReportScroll"><table><tr><th>RECAP METRIC — BROWSER-LOCAL</th><th>VALUE</th></tr>${recapData().totals.map(x=>`<tr><td>${esc(x[0])}</td><td><b>${Number(x[1]).toLocaleString('en-AE',{maximumFractionDigits:2})}</b></td></tr>`).join('')}</table></div></div>`;
+}
 function reportsPage(){
+ setTimeout(kitchReportCloudReceipts,80);
  const po=getArr(PO_KEY),wr=wasteRecords(),counts=stockCounts().filter(x=>x.status==='Completed').slice().reverse(),vs=varianceSummary();
  const rawWaste=wr.filter(x=>x.type==='Raw Ingredient Waste'),finishedWaste=wr.filter(x=>x.type==='Finished Product Waste'),adjustments=wr.filter(x=>x.type==='Stock Adjustment');
  const rawCost=rawWaste.reduce((t,x)=>t+Number(x.cost||0),0),finishedCost=finishedWaste.reduce((t,x)=>t+Number(x.cost||0),0),productionFoodCost=getArr(PROD_KEY).reduce((t,x)=>t+Number(x.production_cost||0),0),orderedValue=orderedPurchaseValue(po),receivedValue=acceptedPurchaseValue(po),openCommitments=openPurchaseCommitmentValue(po);
- return `${recapControls()}<div class="grid"><div class="card"><span>RECEIVED PURCHASES</span><b>${money(receivedValue)}</b></div><div class="card"><span>PO ORDERED VALUE</span><b>${money(orderedValue)}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>${money(openCommitments)}</b></div><div class="card"><span>PRODUCTION FOOD COST</span><b>${money(productionFoodCost)}</b></div><div class="card"><span>RAW WASTE</span><b>${money(rawCost)}</b></div><div class="card"><span>FINISHED WASTE</span><b>${money(finishedCost)}</b></div><div class="card"><span>VARIANCE VALUE</span><b>${money(vs.total)}</b></div></div>
- <div class="panel"><h2>Operational Reports</h2><p class="muted">Received Purchases uses accepted stock only. Rejected quantities never enter inventory or received purchase value. PO Ordered Value remains visible separately for purchasing control.</p><h3>Purchase Reconciliation</h3><table><tr><th>PO</th><th>ITEM</th><th>ORDERED</th><th>DELIVERED</th><th>ACCEPTED</th><th>REJECTED</th><th>REFERENCE PRICE</th><th>INVOICE PRICE</th><th>PRICE CHANGE</th><th>COST IMPACT</th><th>ORDERED VALUE</th><th>RECEIVED VALUE</th><th>STATUS</th></tr>${po.slice().reverse().map(x=>`<tr><td><b>${esc(x.po)}</b></td><td>${esc(x.ingredient)}</td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td>${x.status==='Received'?cleanQty(x.delivered):'—'} ${x.status==='Received'?esc(x.unit):''}</td><td>${x.status==='Received'?cleanQty(x.accepted):'—'} ${x.status==='Received'?esc(x.unit):''}</td><td>${x.status==='Received'?cleanQty(x.rejected):'—'} ${x.status==='Received'?esc(x.unit):''}</td><td>${x.status==='Received'?money(x.reference_price!=null?x.reference_price:x.price):'—'}</td><td>${x.status==='Received'?money(x.invoice_price!=null?x.invoice_price:x.price):'—'}</td><td>${x.status==='Received'?(Number(x.price_variance_pct||0)>=0?'+':'')+Number(x.price_variance_pct||0).toFixed(2)+'%':'—'}</td><td>${x.status==='Received'?(Number(x.price_cost_impact||0)>=0?'+':'')+money(x.price_cost_impact||0):'—'}</td><td>${money(Number(x.qty||0)*Number(x.po_price!=null?x.po_price:x.price||0))}</td><td>${money(x.status==='Received'?Number(x.accepted||0)*Number(x.invoice_price!=null?x.invoice_price:x.price||0):0)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="13" class="empty">No purchase orders yet.</td></tr>'}</table><h3 style="margin-top:28px">Waste & Variance</h3><p class="muted">Main Office sees waste and unexplained stock variance separately. Recorded waste is a known loss; Stock Count variance is a difference that requires investigation.</p>
- <h3>Waste Report</h3><table><tr><th>REFERENCE</th><th>TYPE</th><th>ITEM</th><th>QTY</th><th>LOCATION</th><th>REASON</th><th>COST</th><th>RECORDED BY</th><th>DATE</th></tr>${wr.filter(x=>x.type!=='Stock Adjustment').slice().reverse().map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td>${esc(x.ingredient)}</td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td>${esc(x.location||'—')}</td><td>${esc(x.reason||'—')}</td><td>${money(x.cost)}</td><td>${esc(x.recorded_by||'Legacy record')}</td><td>${esc(String(x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="11" class="empty">No waste records yet.</td></tr>'}</table>
- <h3 style="margin-top:28px">Stock Variance Report</h3><table><tr><th>COUNT</th><th>LOCATION</th><th>ITEM</th><th>SYSTEM</th><th>PHYSICAL</th><th>RESULT</th><th>VALUE</th><th>DATE</th></tr>${vs.rows.slice().reverse().map(i=>{const v=Number(i.variance_canonical||0),val=Math.abs(fromCanonical(v,i.unit)*Number(i.cost||0));return `<tr><td><b>${esc(i.count_code)}</b></td><td>${esc(i.location)}</td><td>${esc(i.name)}</td><td>${prettyCanonical(i.system_canonical,i.unit)}</td><td>${prettyCanonical(i.physical_canonical,i.unit)}</td><td class="${v<0?'bad':'warn'}"><b>${v<0?'SHORTAGE':'OVERAGE'}</b><br><small>${v>0?'+':''}${prettyCanonical(v,i.unit)}</small></td><td>${money(val)}</td><td>${esc(String(i.completed_at||'').slice(0,10))}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">No stock variance recorded.</td></tr>'}</table>
- <h3 style="margin-top:28px">Stock Count History</h3><table><tr><th>COUNT</th><th>LOCATION</th><th>ITEMS</th><th>VARIANCE ITEMS</th><th>VARIANCE VALUE</th><th>DATE</th></tr>${counts.map(c=>`<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.location)}</td><td>${(c.items||[]).length}</td><td>${(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).length}</td><td>${money(c.variance_cost)}</td><td>${esc(String(c.completed_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No completed stock counts yet.</td></tr>'}</table>
- <h3 style="margin-top:28px">Stock Adjustments</h3><table><tr><th>REFERENCE</th><th>ITEM</th><th>QTY</th><th>LOCATION</th><th>REASON</th><th>RECORDED BY</th><th>DATE</th></tr>${adjustments.slice().reverse().map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.ingredient)}</td><td>${Number(x.qty)>0?'+':''}${cleanQty(x.qty)} ${esc(x.unit)}</td><td>${esc(x.location||'—')}</td><td>${esc(x.reason||'—')}</td><td>${esc(x.recorded_by||'Legacy record')}</td><td>${esc(String(x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No stock adjustments yet.</td></tr>'}</table></div>`
+ return `${kitchReportsStyles()}<div class="kitchReports">${recapControls()}<div class="kitchReportKpis"><div class="card"><span>RECEIVED PURCHASES</span><b>${money(receivedValue)}</b></div><div class="card"><span>PO ORDERED VALUE</span><b>${money(orderedValue)}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>${money(openCommitments)}</b></div><div class="card"><span>PRODUCTION FOOD COST</span><b>${money(productionFoodCost)}</b></div><div class="card"><span>RAW WASTE</span><b>${money(rawCost)}</b></div><div class="card"><span>FINISHED WASTE</span><b>${money(finishedCost)}</b></div><div class="card"><span>VARIANCE VALUE</span><b>${money(vs.total)}</b></div></div>
+ <div class="panel"><h2>Operational Reports</h2><p class="muted">These purchase reconciliation figures are from browser-local purchase orders, not confirmed cloud receipts. A cloud delivery can be present while local Received Purchases remains AED 0. Use the separate Cloud Receiving summary above.</p><h3>Purchase Reconciliation</h3><div class="kitchReportScroll"><table><tr><th>PO</th><th>ITEM</th><th>ORDERED</th><th>DELIVERED</th><th>ACCEPTED</th><th>REJECTED</th><th>REFERENCE PRICE</th><th>INVOICE PRICE</th><th>PRICE CHANGE</th><th>COST IMPACT</th><th>ORDERED VALUE</th><th>RECEIVED VALUE</th><th>STATUS</th></tr>${po.slice().reverse().map(x=>`<tr><td><b>${esc(x.po)}</b></td><td>${esc(x.ingredient)}</td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td>${x.status==='Received'?cleanQty(x.delivered):'—'} ${x.status==='Received'?esc(x.unit):''}</td><td>${x.status==='Received'?cleanQty(x.accepted):'—'} ${x.status==='Received'?esc(x.unit):''}</td><td>${x.status==='Received'?cleanQty(x.rejected):'—'} ${x.status==='Received'?esc(x.unit):''}</td><td>${x.status==='Received'?money(x.reference_price!=null?x.reference_price:x.price):'—'}</td><td>${x.status==='Received'?money(x.invoice_price!=null?x.invoice_price:x.price):'—'}</td><td>${x.status==='Received'?(Number(x.price_variance_pct||0)>=0?'+':'')+Number(x.price_variance_pct||0).toFixed(2)+'%':'—'}</td><td>${x.status==='Received'?(Number(x.price_cost_impact||0)>=0?'+':'')+money(x.price_cost_impact||0):'—'}</td><td>${money(Number(x.qty||0)*Number(x.po_price!=null?x.po_price:x.price||0))}</td><td>${money(x.status==='Received'?Number(x.accepted||0)*Number(x.invoice_price!=null?x.invoice_price:x.price||0):0)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="13" class="empty">No purchase orders yet.</td></tr>'}</table></div><h3 style="margin-top:28px">Waste & Variance</h3><p class="muted">Main Office sees waste and unexplained stock variance separately. Recorded waste is a known loss; Stock Count variance is a difference that requires investigation.</p>
+ <h3>Waste Report</h3><div class="kitchReportScroll"><table><tr><th>REFERENCE</th><th>TYPE</th><th>ITEM</th><th>QTY</th><th>LOCATION</th><th>REASON</th><th>COST</th><th>RECORDED BY</th><th>DATE</th></tr>${wr.filter(x=>x.type!=='Stock Adjustment').slice().reverse().map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.type)}</td><td>${esc(x.ingredient)}</td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td>${esc(x.location||'—')}</td><td>${esc(x.reason||'—')}</td><td>${money(x.cost)}</td><td>${esc(x.recorded_by||'Legacy record')}</td><td>${esc(String(x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="11" class="empty">No waste records yet.</td></tr>'}</table></div>
+ <h3 style="margin-top:28px">Stock Variance Report</h3><div class="kitchReportScroll"><table><tr><th>COUNT</th><th>LOCATION</th><th>ITEM</th><th>SYSTEM</th><th>PHYSICAL</th><th>RESULT</th><th>VALUE</th><th>DATE</th></tr>${vs.rows.slice().reverse().map(i=>{const v=Number(i.variance_canonical||0),val=Math.abs(fromCanonical(v,i.unit)*Number(i.cost||0));return `<tr><td><b>${esc(i.count_code)}</b></td><td>${esc(i.location)}</td><td>${esc(i.name)}</td><td>${prettyCanonical(i.system_canonical,i.unit)}</td><td>${prettyCanonical(i.physical_canonical,i.unit)}</td><td class="${v<0?'bad':'warn'}"><b>${v<0?'SHORTAGE':'OVERAGE'}</b><br><small>${v>0?'+':''}${prettyCanonical(v,i.unit)}</small></td><td>${money(val)}</td><td>${esc(String(i.completed_at||'').slice(0,10))}</td></tr>`}).join('')||'<tr><td colspan="11" class="empty">No stock variance recorded.</td></tr>'}</table></div>
+ <h3 style="margin-top:28px">Stock Count History</h3><div class="kitchReportScroll"><table><tr><th>COUNT</th><th>LOCATION</th><th>ITEMS</th><th>VARIANCE ITEMS</th><th>VARIANCE VALUE</th><th>DATE</th></tr>${counts.map(c=>`<tr><td><b>${esc(c.code)}</b></td><td>${esc(c.location)}</td><td>${(c.items||[]).length}</td><td>${(c.items||[]).filter(i=>Math.abs(Number(i.variance_canonical||0))>.000001).length}</td><td>${money(c.variance_cost)}</td><td>${esc(String(c.completed_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No completed stock counts yet.</td></tr>'}</table></div>
+ <h3 style="margin-top:28px">Stock Adjustments</h3><div class="kitchReportScroll"><table><tr><th>REFERENCE</th><th>ITEM</th><th>QTY</th><th>LOCATION</th><th>REASON</th><th>RECORDED BY</th><th>DATE</th></tr>${adjustments.slice().reverse().map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.ingredient)}</td><td>${Number(x.qty)>0?'+':''}${cleanQty(x.qty)} ${esc(x.unit)}</td><td>${esc(x.location||'—')}</td><td>${esc(x.reason||'—')}</td><td>${esc(x.recorded_by||'Legacy record')}</td><td>${esc(String(x.created_at||'').slice(0,16).replace('T',' '))}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No stock adjustments yet.</td></tr>'}</table></div></div></div>`
 }
 
 
