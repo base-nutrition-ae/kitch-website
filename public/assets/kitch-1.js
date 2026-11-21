@@ -2763,7 +2763,7 @@ function openQCProof(id){
 
 function openProduction(){
  const a=recipes().filter(r=>!recipeNeedsReview(r));if(!a.length)return alert('No recipes pass ingredient and unit validation. Review the Recipe Master first.');
- modal(`<div class="modalHead"><h2>Start Production</h2><button class="close" onclick="closeModal()">×</button></div>
+ modal(`<div class="modalHead productionStartHead"><h2>Start Production</h2><button class="close" aria-label="Close Start Production" onclick="closeModal()">×</button></div>
  <div class="formGrid"><div class="field"><label>APPROVED RECIPE</label><select id="prRecipe" onchange="previewProduction()">${a.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>NUMBER OF BATCHES</label><input id="prBatches" type="number" min="0.001" step="0.001" value="1" oninput="previewProduction()"></div></div>
  <div class="note"><b>Production Location:</b> ${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())} · Recipe quantities are multiplied by the number of batches.</div>
  <div id="prMethod"></div><div id="prPreview"></div>`);previewProduction();
