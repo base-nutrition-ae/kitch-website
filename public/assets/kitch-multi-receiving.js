@@ -18,6 +18,16 @@
  const findIngredient=id=>ingredientList().find(x=>String(x.cloud_id)===String(id));
  const packBaseUnit=b=>({l:'ltr'}[String(b||'').toLowerCase()]||String(b||'').toLowerCase());
  const isMilkUnitMismatch=ing=>/\bmilk\b/i.test(ing?.name||'') && ['g','kg'].includes(String(ing?.base_unit||'').toLowerCase());
+ const normalizePackSize=(saved,base)=>{
+   const n=Number(saved?.pack_size),from=packBaseUnit(saved?.pack_unit),to=packBaseUnit(base);
+   if(!Number.isFinite(n)||n<=0)return '';
+   if(from===to)return String(n);
+   const conversion={
+     'g:kg':.001,'kg:g':1000,
+     'ml:ltr':.001,'ltr:ml':1000
+   }[from+':'+to];
+   return conversion==null?'':String(Number((n*conversion).toFixed(6)));
+ };
  function factor(line,base){
    if(!line||!base) return null;
    if(line.unit===base || (['ltr','l'].includes(line.unit)&&['ltr','l'].includes(base)))return 1;
@@ -162,7 +172,7 @@
        const ing=findIngredient(line.id),saved=packageDefaults.get(String(line.id));
        line.unit=saved?.purchase_unit||ing?.base_unit||'g';
        line.packUnit=packBaseUnit(ing?.base_unit||'g');
-       line.packSize=saved && packBaseUnit(saved.pack_unit)===packBaseUnit(ing?.base_unit)?String(saved.pack_size):'';
+       line.packSize=saved?normalizePackSize(saved,ing?.base_unit):'';
        line.price=saved?String(saved.unit_price):(ing?String(Number(ing.reference_cost??ing.cost??0)):'');
      }
      if(field==='unit' && !unitsForBase(findIngredient(line.id)?.base_unit).includes(line.unit)){
@@ -172,7 +182,7 @@
        const ing=findIngredient(line.id),base=ing?.base_unit||'g';
        const saved=packageDefaults.get(String(line.id));
        line.packUnit=packBaseUnit(base);
-       line.packSize=saved?.purchase_unit===line.unit?String(saved.pack_size):'';
+       line.packSize=saved?.purchase_unit===line.unit?normalizePackSize(saved,base):'';
        const f=factor(line,base);
        line.price=saved?.purchase_unit===line.unit?String(saved.unit_price):(f==null?'':String(Number(((ing?.reference_cost||0)*f).toFixed(6))));
      }
