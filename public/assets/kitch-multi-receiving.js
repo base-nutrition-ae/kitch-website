@@ -118,9 +118,32 @@
      saving=true;button.disabled=true;message.textContent=LOCAL?'Saving all lines to local database…':'Saving invoice and accepted stock to KITCH cloud…';
      const {data,error}=await sb.rpc(LOCAL?'kitch_team_receive_invoice_demo':'kitch_team_receive_invoice',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice:invoice,p_lines:payload});
      if(error)throw error;
+     // Receiving is already committed atomically. Save valid package/price
+     // defaults afterwards, without ever retrying the invoice on default errors.
+     const defaultsFailed=[];
+     for(const line of lines){
+       if(!['pcs','pkt','box'].includes(line.unit) || !(Number(line.packSize)>0))continue;
+       const ing=findIngredient(line.id);
+       if(!ing || isMilkUnitMismatch(ing) || factor(line,ing.base_unit)==null)continue;
+       const same=packageDefaults.get(String(line.id));
+       const packUnit=packBaseUnit(ing.base_unit);
+       const unitPrice=Number(line.price);
+       if(same?.purchase_unit===line.unit &&
+          normalizePackSize(same,ing.base_unit)===String(Number(line.packSize)) &&
+          Number(same.unit_price)===unitPrice)continue;
+       try{
+         const saved=await sb.rpc(LOCAL?'kitch_team_local_save_package':'kitch_team_save_package',{
+           p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+           p_ingredient_id:ing.cloud_id,p_purchase_unit:line.unit,
+           p_pack_size:Number(line.packSize),p_pack_unit:packUnit,p_unit_price:unitPrice
+         });
+         if(saved.error)throw saved.error;
+       }catch(e){defaultsFailed.push(ing.name);}
+     }
      await cloudLoadIngredients();
      closeModal();openPage('Receiving');
-     alert((LOCAL?'Local receiving saved: ':'Receiving saved to KITCH cloud: ')+data.saved_lines+' items, AED '+Number(data.total_aed||0).toFixed(2)+'.');
+     alert((LOCAL?'Local receiving saved: ':'Receiving saved to KITCH cloud: ')+data.saved_lines+' items, AED '+Number(data.total_aed||0).toFixed(2)+'.'+
+       (defaultsFailed.length?' Package defaults could not be updated for '+defaultsFailed.join(', ')+'. The invoice was saved and must not be submitted again.':''));
    }catch(e){if(message){message.style.color='#b42318';message.textContent='Not saved: '+(e?.message||e)}}
    finally{saving=false;if(button)button.disabled=false}
  }
