@@ -2860,7 +2860,7 @@ async function confirmProduction(){
   const requestId=crypto.randomUUID();
   const {data,error}=await sb.rpc('kitch_team_start_production',{
    p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
-   p_request_id:requestId,p_recipe_key:String(r.id),p_batches:mult
+   p_request_id:requestId,p_recipe_key:(['127.0.0.1','localhost'].includes(location.hostname)?String(r.name):String(r.id)),p_batches:mult
   });
   if(error)throw Error(error.message);
   if(!data?.saved)throw Error('Cloud production confirmation was not returned.');
