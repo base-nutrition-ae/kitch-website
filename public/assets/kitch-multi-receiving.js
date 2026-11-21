@@ -1,6 +1,38 @@
 /* KITCH multi-ingredient receiving. Production uses secure Supabase invoice transactions. */
 (() => {
  'use strict';
+ const actionStyleId='kitch-table-action-pill-v2';
+ if(!document.getElementById(actionStyleId)){
+   const node=document.createElement('style');
+   node.id=actionStyleId;
+   node.textContent=`
+   /* Matching action pills for PDF, Open, View, Edit and Details throughout KITCH */
+   body #app .main table td button:not(.primary):not(.isPrimary),
+   body #app .main table td a.btn,
+   body #app .main table td a.kitchReceivingBtn,
+   body #app .main .kitchReceivingPage button.kitchActionPill{
+     -webkit-appearance:none!important;appearance:none!important;
+     display:inline-flex!important;align-items:center!important;justify-content:center!important;
+     box-sizing:border-box!important;vertical-align:middle!important;
+     width:auto!important;min-width:54px!important;height:30px!important;min-height:30px!important;
+     padding:0 12px!important;margin:1px 3px 1px 0!important;
+     border:1px solid #dedfe3!important;border-radius:999px!important;
+     background:#f3f3f5!important;color:#38383b!important;
+     font:800 11px/1 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important;
+     white-space:nowrap!important;text-decoration:none!important;
+     box-shadow:none!important;cursor:pointer!important;
+   }
+   body #app .main table td button:not(.primary):not(.isPrimary):hover,
+   body #app .main .kitchReceivingPage button.kitchActionPill:hover{
+     background:#e9e9ec!important;border-color:#c9c9ce!important;
+   }
+   body #app .main table td button.black{background:#171717!important;border-color:#171717!important;color:#fff!important}
+   body #app .main table td button:focus-visible{outline:2px solid #555!important;outline-offset:2px!important}
+   body #app .main table td button :is(svg,img,i){width:14px!important;height:14px!important;vertical-align:middle!important}
+   `;
+   document.head.appendChild(node);
+ }
+
  const unitsForBase=base=>{
    const u=String(base||'').toLowerCase();
    if(['g','kg'].includes(u))return ['g','kg','pcs','pkt','box'];
@@ -213,7 +245,7 @@
      const ingredientsText=count===1?first.ingredient:count+' items: '+group.map(r=>r.ingredient).join(', ');
      return '<tr><td>'+safe(new Date(first.date).toLocaleDateString())+'</td><td>'+safe(first.invoice)+'</td><td>'+safe(first.supplier)+'</td><td>'+safe(ingredientsText)+'</td>'+
       '<td>'+safe(group.map(r=>r.accepted+' '+r.unit).join(' · '))+'</td><td>'+safe(money(total))+'</td><td>'+safe(exp.length?exp[0]:'—')+'</td><td>—</td>'+
-      '<td><button class="kitchReceivingBtn small" onclick="kitchPrintReceipt(\''+safe(first.id)+'\')">PDF</button></td></tr>';
+      '<td><button type="button" class="kitchReceivingBtn kitchActionPill" onclick="kitchPrintReceipt(\''+safe(first.id)+'\')">PDF</button></td></tr>';
    }).join('')||'<tr><td colspan="9" class="empty">No receiving records yet. Click + New Receiving.</td></tr>';
  };
  window.kitchPrintReceipt=function(id){
