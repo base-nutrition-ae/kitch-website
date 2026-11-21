@@ -1,1 +1,64 @@
 #kitchOfficeOverlay{position:fixed;inset:0;background:#f8f8f8;z-index:2147483000;display:none;flex-direction:column}#kitchOfficeOverlay.open{display:flex}#kitchOfficeFrame{flex:1;width:100%;border:0;background:#f8f8f8;opacity:0;transition:opacity .18s ease}#kitchOfficeFrame.ready{opacity:1}#kitchOfficeLoading{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:#f8f8f8;color:#444;font:700 14px Arial;pointer-events:none}#kitchOfficeOverlay.open #kitchOfficeLoading{display:flex}#kitchOfficeOverlay.open #kitchOfficeFrame.ready+#kitchOfficeLoading{display:none}.officeBar{height:52px;flex:none;background:#fff;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font:700 13px Arial}.officeBar button{border:1px solid #ddd;border-radius:24px;padding:9px 15px;background:#fff;color:#111;cursor:pointer}
+/* KITCH shared table-action design — PDFs, Open, View, Edit, Details, icons.
+   Scope to workspace tables; do not alter modal submit buttons or action logic. */
+.main table td :is(button, a.btn, a.kitchReceivingBtn):not(.primary):not(.isPrimary) {
+  appearance:none!important;
+  box-sizing:border-box!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  vertical-align:middle!important;
+  gap:6px!important;
+  width:auto!important;
+  min-width:62px!important;
+  height:36px!important;
+  min-height:36px!important;
+  padding:0 14px!important;
+  margin:2px 3px 2px 0!important;
+  border:1px solid #dedee2!important;
+  border-radius:999px!important;
+  background:#f4f4f5!important;
+  color:#333!important;
+  font:750 11px/1.2 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important;
+  letter-spacing:0!important;
+  text-decoration:none!important;
+  white-space:nowrap!important;
+  box-shadow:none!important;
+  cursor:pointer!important;
+  transition:background .15s ease,border-color .15s ease!important;
+}
+.main table td :is(button, a.btn, a.kitchReceivingBtn):not(.primary):not(.isPrimary):hover {
+  background:#e9e9eb!important;
+  border-color:#cacad0!important;
+}
+.main table td :is(button, a.btn, a.kitchReceivingBtn):focus-visible {
+  outline:2px solid #555!important;
+  outline-offset:2px!important;
+}
+.main table td :is(button, a.btn, a.kitchReceivingBtn) :is(svg, img, i) {
+  width:14px!important;
+  height:14px!important;
+  flex:0 0 14px!important;
+  vertical-align:middle!important;
+}
+.main table td :is(button, a.btn, a.kitchReceivingBtn):disabled {
+  cursor:not-allowed!important;
+  opacity:.48!important;
+}
+.main table td button.black {
+  background:#171717!important;
+  border-color:#171717!important;
+  color:#fff!important;
+}
+.main table td button.black:hover {
+  background:#353535!important;
+  border-color:#353535!important;
+}
+@media(max-width:650px){
+  .main table td :is(button, a.btn, a.kitchReceivingBtn):not(.primary):not(.isPrimary){
+    min-width:58px!important;
+    height:34px!important;
+    min-height:34px!important;
+    padding:0 12px!important;
+  }
+}
