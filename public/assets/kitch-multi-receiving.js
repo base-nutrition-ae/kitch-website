@@ -175,7 +175,7 @@
      }
      if(field==='packSize'||field==='packUnit'){
        const ing=findIngredient(line.id),f=factor(line,ing?.base_unit||'g');
-       if(f!=null)line.price=String(Number((Number(ing?.reference_cost||0)*f).toFixed(6)));
+       if(f!=null && line.price==='')line.price=String(Number((Number(ing?.reference_cost||0)*f).toFixed(6)));
      }
      if(['id','unit','packUnit'].includes(field))draw();
      else{
