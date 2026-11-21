@@ -46,6 +46,13 @@ BEGIN
  OR jsonb_array_length(p_lines)>100
  THEN RAISE EXCEPTION 'Invoice must have between 1 and 100 ingredient lines'; END IF;
 
+ -- Serialize deliveries for this supplier invoice and refuse duplicate invoice submissions.
+ PERFORM pg_advisory_xact_lock(hashtextextended(lower(btrim(p_supplier))||':'||lower(btrim(p_invoice)),0));
+ IF EXISTS (SELECT 1 FROM public.kitch_local_demo_receipts
+            WHERE lower(btrim(supplier))=lower(btrim(p_supplier))
+              AND lower(btrim(invoice))=lower(btrim(p_invoice)))
+ THEN RAISE EXCEPTION 'Supplier invoice already received; no stock was changed'; END IF;
+
  -- Validate every line before any writes.
  FOR ln IN SELECT value FROM jsonb_array_elements(p_lines)
  LOOP
