@@ -1460,7 +1460,7 @@ function purchasingPage(){
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
  <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn black" onclick="openUnifiedMasterImport()">Import Unified Master</button><button class="btn" onclick="openSupplierExcel()">Import Supplier Excel</button><button class="btn black" onclick="openPurchaseRequest()">+ Purchase Request</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
- <h3>Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
+ <div class="note" style="margin:14px 0"><b>Cloud Purchasing (development)</b> · A separate, staff-authenticated order ledger is being prepared. Existing browser orders are not migrated automatically, and none of the cloud actions change inventory.</div><div class="actions"><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Load Cloud Purchase Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
  <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
 }
 
@@ -1521,6 +1521,39 @@ function normalizeSupplierData(){
  su=[...sm.values()];sp=[...pm.values()];setArr(SUP_KEY,su);setSupplierProducts(sp);return {su,sp};
 }
 function importSupplierExcel(file){if(!file)return;const r=new FileReader();r.onload=e=>{try{const wb=XLSX.read(e.target.result,{type:'array'}),rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});let base=normalizeSupplierData(),su=base.su,sp=base.sp,addedS=0,updatedS=0,addedP=0,updatedP=0;rows.forEach(row=>{const supplier=String(row.Supplier||row.supplier||'').trim();if(!supplier)return;let sx=su.find(x=>String(x.name||'').toLowerCase()===supplier.toLowerCase());const details={contact:String(row['Contact Person']||row.Contact||'').trim(),phone:String(row['Phone Number']||row.Phone||'').trim(),email:String(row.Email||'').trim(),trn:String(row['TRN / VAT Number']||row.TRN||'').trim(),terms:String(row['Payment Terms']||'').trim(),days:String(row['Delivery Days']||'').trim(),min_order:Number(row['Minimum Order AED']||row['Minimum Order']||0),address:String(row['Address / Location']||row.Address||'').trim(),lead_time:String(row['Lead Time Days']||'').trim(),notes:String(row.Notes||'').trim()};if(!sx){sx={id:Date.now()+Math.random(),name:supplier,...details};su.push(sx);addedS++}else{Object.keys(details).forEach(k=>{if(details[k]!==''&&details[k]!==0)sx[k]=details[k]});updatedS++}const product=String(row.Product||row.Ingredient||'').trim();if(product){const sku=String(row['Supplier SKU']||row.SKU||'').trim(),unit=String(row.Unit||'kg').trim(),price=Number(row['Agreed Price AED']||row.Price||0),lead=String(row['Lead Time Days']||'').trim(),notes=String(row.Notes||'').trim();let px=sp.find(x=>String(x.supplier||'').toLowerCase()===supplier.toLowerCase()&&((sku&&String(x.sku||'').toLowerCase()===sku.toLowerCase())||(!sku&&String(x.name||'').toLowerCase()===product.toLowerCase())));if(px){if(price!==Number(px.price||0))px.previous_price=Number(px.price||0);Object.assign(px,{supplier,name:product,sku,unit,price,lead_time:lead,notes,updated_at:new Date().toISOString()});updatedP++}else{sp.push({id:Date.now()+Math.random(),supplier,name:product,sku,unit,price,previous_price:price,lead_time:lead,notes,updated_at:new Date().toISOString()});addedP++}}});setArr(SUP_KEY,su);setSupplierProducts(sp);normalizeSupplierData();closeModal();openPage('Suppliers & Purchasing');alert(`Import complete. ${addedS} new suppliers, ${updatedS} supplier rows updated, ${addedP} new products, ${updatedP} products updated. Existing duplicates were cleaned.`)}catch(err){console.error(err);alert('Could not read this Excel file. Check the column names.')}};r.readAsArrayBuffer(file)}
+
+// KITCH cloud purchasing staged adapter; distinct from existing browser-only order records.
+// Requires docs/staged-kitch-cloud-purchasing.sql before any live use.
+let kitchCloudPurchaseRows=[];
+async function kitchCloudPurchaseRpc(action,extra={}){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in as KITCH staff to use cloud purchasing.');
+ const {data,error}=await sb.rpc('kitch_team_purchase_cloud',{
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_action:action,...extra
+ });
+ if(error)throw Error(error.message);
+ return data;
+}
+function kitchCloudPurchaseActionButtons(x){
+ if(session!=='manager')return 'Manager approval required';
+ let action=x.status==='Pending Approval'?'approve':x.status==='Approved'?'mark_sent':null;
+ return action?`<button class="btn" onclick="kitchUpdateCloudPurchase('${esc(x.id)}','${action}')">${action==='approve'?'Approve':'Mark Sent'}</button>`:'—';
+}
+async function kitchRefreshCloudPurchases(){
+ const body=document.getElementById('kitchCloudPOBody');if(!body)return;
+ body.innerHTML='<tr><td colspan="5" class="empty">Loading shared orders…</td></tr>';
+ try{
+  const data=await kitchCloudPurchaseRpc('list');
+  kitchCloudPurchaseRows=Array.isArray(data)?data:[];
+  body.innerHTML=kitchCloudPurchaseRows.map(x=>`<tr><td><b>${esc(x.order_ref)}</b></td><td>${esc(x.supplier)}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${esc(x.status)}</td><td>${kitchCloudPurchaseActionButtons(x)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No cloud purchase orders yet. Legacy browser orders are not synced automatically.</td></tr>';
+ }catch(e){
+  body.innerHTML='<tr><td colspan="5" class="bad">Cloud Purchasing unavailable: '+esc(e.message)+'. No orders were changed.</td></tr>';
+ }
+}
+async function kitchUpdateCloudPurchase(id,action){
+ if(!['approve','mark_sent','reject'].includes(action))return;
+ try{await kitchCloudPurchaseRpc(action,{p_order_id:id});await kitchRefreshCloudPurchases()}
+ catch(e){alert('Cloud purchase update failed: '+e.message)}
+}
 function openPurchaseRequest(){
  syncSupplierMasterFromIngredients();const su=getArr(SUP_KEY); if(!su.length)return alert('Create or import suppliers first.');
  window._prLines=[];
