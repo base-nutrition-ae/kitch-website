@@ -6,3 +6,8 @@
   Cache-Control: public, max-age=0, must-revalidate
 /assets/kitch-2.js
   Cache-Control: public, max-age=0, must-revalidate
+
+/operations-current.html
+  Cache-Control: public, max-age=0, must-revalidate
+/assets/kitch-multi-receiving.js
+  Cache-Control: public, max-age=0, must-revalidate
