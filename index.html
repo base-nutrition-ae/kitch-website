@@ -3738,7 +3738,7 @@ function apply(doc){
  const current=keyFor(supplier.selectedOptions?.[0]?.textContent)||keyFor(supplier.value);
  // Identify ingredient dropdowns by the master item options, not by HTML class names.
  const ingredientSelects=selects.filter(s=>s!==supplier &&
-   (s.dataset.kitchCatalogFilter==='yes'||[...s.options].some(o=>/^(baby spinach|broccoli|chicken breast|chicken thigh|brown rice)\b/i.test(o.textContent.trim()))));
+   (!!s.__kitchOriginalOptions||[...s.options].some(o=>/^(baby spinach|broccoli|chicken breast|chicken thigh|brown rice)\b/i.test(o.textContent.trim()))));
  for(const select of ingredientSelects){
   if(!select.__kitchOriginalOptions)select.__kitchOriginalOptions=[...select.options].map(o=>o.cloneNode(true));
   const allowed=select.__kitchOriginalOptions.filter(o=>!o.value||(current&&permitted(ingredientName(o),current)));
