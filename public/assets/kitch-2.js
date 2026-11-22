@@ -13,7 +13,13 @@ function openKitchMainOffice(){
  if(frame.dataset.initialized==='yes')return;
  if(frame.dataset.initialized==='loading')return;
  frame.dataset.initialized='loading';frame.classList.remove('ready');
- prepareKitchOffice().then(html=>{frame.srcdoc=html;frame.dataset.initialized='yes'}).catch(e=>{
+ prepareKitchOffice().then(html=>{
+  // Unified Master has one import entry point in Operations Inventory.
+  // Preserve the embedded office code and hide legacy duplicate controls.
+  html=html.replace('id="officeSupplierSync" type="button"','id="officeSupplierSync" type="button" hidden')
+    .replace('label class="btn" style="cursor:pointer">Import Excel / CSV','label class="btn" style="display:none">Import Excel / CSV');
+  frame.srcdoc=html;frame.dataset.initialized='yes'
+}).catch(e=>{
   console.error('Main Office loading failed',e);frame.dataset.initialized='';
   document.getElementById('kitchOfficeLoading').textContent='Unable to load Main Office. Please refresh and try again.';
  });
