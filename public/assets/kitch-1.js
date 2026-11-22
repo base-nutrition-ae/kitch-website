@@ -1622,8 +1622,7 @@ function kitchAddCloudRequestLine(){
  if(!holder||holder.children.length>=50)return;
  const row=document.createElement('div');
  row.className='kitchPrLine';
- row.style.cssText='display:grid;grid-template-columns:minmax(150px,2fr) minmax(100px,1fr) auto;gap:10px;align-items:end;border:1px solid #e8e8e8;border-radius:14px;padding:12px;margin:8px 0;background:#fff';
- row.innerHTML='<div class="field"><label>INGREDIENT</label><select class="kitchPrIngredient">'+kitchPurchaseLineOptions()+'</select></div><div class="field"><label>QUANTITY</label><input class="kitchPrQty" type="number" step="any" min="0.0001" placeholder="Quantity"></div><button type="button" class="btn" onclick="this.closest(\'.kitchPrLine\').remove();kitchUpdateCloudRequestSummary()">Remove</button>';
+ row.innerHTML='<div class="field"><label>INGREDIENT</label><select class="kitchPrIngredient">'+kitchPurchaseLineOptions()+'</select></div><div class="field"><label>QUANTITY</label><input class="kitchPrQty" type="number" step="any" min="0.0001" placeholder="0.00"></div><button type="button" class="btn kitchPrRemove" onclick="this.closest(\'.kitchPrLine\').remove();kitchUpdateCloudRequestSummary()" aria-label="Remove ingredient">Remove</button>';
  holder.appendChild(row);
  row.querySelector('.kitchPrIngredient').addEventListener('change',kitchUpdateCloudRequestSummary);
  row.querySelector('.kitchPrQty').addEventListener('input',kitchUpdateCloudRequestSummary);
@@ -1645,14 +1644,46 @@ function kitchNewCloudPurchaseRequest(){
   return alert('Your staff role cannot request purchases.');
  if(!data.ingredients.length)return alert('No cloud ingredients found. Load the cloud Ingredient Master first.');
  if(data.role==='owner'&&!cloud?.branch_id)return alert('Choose an assigned kitchen location before submitting an owner request.');
- modal('<div class="modalHead"><h2>New Purchase Request</h2><button class="close" onclick="closeModal()">×</button></div>'+
- '<div class="note">Add all ingredients needed for one purchase request. Main Office checks prices and approves one combined order. Requesting never changes stock.</div>'+
- '<div id="kitchPrLines" style="max-height:53vh;overflow:auto"></div>'+
- '<button type="button" class="btn" onclick="kitchAddCloudRequestLine()">+ Add Ingredient</button>'+
- '<div class="note" id="kitchPrSummary" style="margin:12px 0">0 ingredients</div>'+
- '<div class="field"><label>NOTES (OPTIONAL)</label><input id="kitchPrNotes" placeholder="Required delivery date or instructions"></div>'+
- '<div class="actions"><button type="button" class="btn black" id="kitchPrSave" onclick="kitchSubmitCloudRequest()">Submit Entire Request</button></div>'+
+ if(!document.getElementById('kitchPrModernStyle')){
+  const style=document.createElement('style');style.id='kitchPrModernStyle';
+  style.textContent=`
+  .modalBox.kitchPrModern{width:min(930px,calc(100vw - 32px))!important;max-width:930px!important;border-radius:25px!important;padding:0!important;overflow:auto!important;max-height:calc(100vh - 34px)!important;background:#fff!important}
+  .kitchPrModern .kitchPrHeader{padding:28px 30px 20px!important;display:flex;justify-content:space-between;gap:16px;align-items:start;border-bottom:1px solid #ececec}
+  .kitchPrModern .kitchPrEyebrow{font-size:10px;letter-spacing:.15em;color:#888;font-weight:800;margin-bottom:9px}
+  .kitchPrModern .kitchPrHeader h2{font-size:25px!important;letter-spacing:-.045em!important;margin:0 0 7px!important;color:#161616!important}
+  .kitchPrModern .kitchPrHeader .muted{font-size:12px!important;margin:0;color:#777}
+  .kitchPrModern .kitchPrClose{height:36px!important;width:36px!important;min-width:36px;border:0!important;border-radius:99px!important;background:#f1f1f1!important;color:#222!important;box-shadow:none!important;font-size:23px!important;line-height:1!important}
+  .kitchPrModern .kitchPrBody{padding:25px 30px 18px}
+  .kitchPrModern .kitchPrSection{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+  .kitchPrModern .kitchPrSection strong{font-size:13px}
+  .kitchPrModern .kitchPrSection span{font-size:11px;color:#888}
+  .kitchPrModern #kitchPrLines{max-height:38vh!important;overflow:auto!important;border:1px solid #e8e8e8;border-radius:16px;padding:15px;background:#fff}
+  .kitchPrModern .kitchPrLine{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(125px,175px) 70px!important;gap:14px!important;align-items:end!important;padding:0 0 14px!important;margin:0 0 14px!important;background:transparent!important;border:0!important;border-bottom:1px solid #eee!important;border-radius:0!important}
+  .kitchPrModern .kitchPrLine:last-child{padding-bottom:0!important;margin-bottom:0!important;border-bottom:0!important}
+  .kitchPrModern .kitchPrLine .field{margin:0!important;min-width:0!important}
+  .kitchPrModern .kitchPrLine label{display:block;font-size:11px!important;font-weight:750!important;letter-spacing:.035em;color:#666!important;margin:0 0 8px!important}
+  .kitchPrModern .kitchPrLine select,.kitchPrModern .kitchPrLine input{width:100%!important;max-width:100%!important;box-sizing:border-box!important;height:46px!important;padding:0 13px!important;background:#fff!important;border:1px solid #dcdcdc!important;border-radius:12px!important;color:#161616!important;font-size:14px!important;margin:0!important}
+  .kitchPrModern .kitchPrLine button.kitchPrRemove{height:43px!important;padding:0 8px!important;border:1px solid #e4e4e4!important;border-radius:99px!important;background:#fff!important;color:#222!important;font-size:11px!important;font-weight:700!important;box-shadow:none!important}
+  .kitchPrModern .kitchPrAdd{border-radius:99px!important;background:#fff!important;color:#111!important;border:1px solid #ddd!important;min-height:38px!important;margin-top:12px!important;padding:8px 15px!important}
+  .kitchPrModern #kitchPrSummary{border:1px solid #eaeaea!important;background:#f5f5f5!important;border-radius:13px!important;padding:14px 16px!important;color:#666!important;font-size:12px!important;margin:16px 0 22px!important}
+  .kitchPrModern .kitchPrNotes{display:block;font-size:11px;font-weight:800;color:#666;letter-spacing:.025em}
+  .kitchPrModern #kitchPrNotes{box-sizing:border-box;width:100%!important;max-width:none!important;height:48px!important;margin:8px 0 0!important;padding:0 14px!important;border:1px solid #ddd!important;border-radius:12px!important;background:#fff!important;font-size:14px!important}
+  .kitchPrModern .kitchPrFooter{display:flex!important;justify-content:flex-end!important;align-items:center;gap:12px;padding:20px 30px 24px;border-top:1px solid #ececec}
+  .kitchPrModern .kitchPrFooter .btn{min-height:44px!important;border-radius:99px!important;padding:10px 20px!important}
+  .kitchPrModern .kitchPrFooter .btn.black{background:#161616!important;color:#fff!important}
+  .kitchPrModern #kitchPrError{margin:0 30px 15px}
+  @media(max-width:650px){.modalBox.kitchPrModern{width:calc(100vw - 16px)!important}.kitchPrModern .kitchPrHeader{padding:18px 16px}.kitchPrModern .kitchPrBody{padding:18px 16px}.kitchPrModern .kitchPrLine{grid-template-columns:minmax(0,1fr) 90px 51px!important;gap:7px!important}.kitchPrModern .kitchPrLine button.kitchPrRemove{font-size:9px!important;padding:0 3px!important}.kitchPrModern .kitchPrFooter{padding:16px}.kitchPrModern #kitchPrLines{max-height:42vh!important}}
+  `;
+  document.head.appendChild(style);
+ }
+ modal('<div class="kitchPrHeader"><div><div class="kitchPrEyebrow">PURCHASING · MAIN KITCHEN</div><h2>New Purchase Request</h2><p class="muted">Add ingredients and quantities to one request for Main Office approval.</p></div><button type="button" class="kitchPrClose" onclick="closeModal()" aria-label="Close">×</button></div>'+
+ '<div class="kitchPrBody"><div class="kitchPrSection"><strong>Ingredients & quantities</strong><span>Up to 50 items in one request</span></div><div id="kitchPrLines"></div>'+
+ '<button type="button" class="btn kitchPrAdd" onclick="kitchAddCloudRequestLine()">+ Add Ingredient</button>'+
+ '<div id="kitchPrSummary">0 ingredients</div>'+
+ '<label class="kitchPrNotes">NOTES (OPTIONAL)<input id="kitchPrNotes" maxlength="300" placeholder="Required delivery date or instructions"></label></div>'+
+ '<div class="kitchPrFooter"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button type="button" class="btn black" id="kitchPrSave" onclick="kitchSubmitCloudRequest()">Submit Entire Request</button></div>'+
  '<p id="kitchPrError" role="status" style="font-size:12px;color:#b42318"></p>');
+ document.querySelector('.modalBox')?.classList.add('kitchPrModern');
  kitchAddCloudRequestLine();
 }
 async function kitchSubmitCloudRequest(){
