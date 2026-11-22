@@ -1951,12 +1951,41 @@ async function kitchSaveCloudSupplier(){
  finally{kitchCloudPurchaseBusy=false;if(button)button.disabled=false}
 }
 
+// Supplier-to-product catalogue from the 36-ingredient master. Shared chicken items
+// are intentionally offered by both BUTCHER LLC and URS LLC.
+const kitchSupplierProductNames={
+ 'gpfruit llc':'Cabbage|Carrot|Cucumber|Tomato|Cherry tomato|Lettuce|Rocket leaves|Baby spinach|Red onion|Broccoli|Lime|Fresh coriander',
+ 'butcher llc':'Chicken breast|Chicken thigh',
+ 'seaplus llc':'',
+ 'urs llc':'Meal container 750 ml|Meal container 1000 ml|Clear salad bowl 1000 ml|Salad bowl lid|Paper takeaway bag|Paper cup 12 oz|Coffee cup lid 12 oz|Wooden fork|Wooden spoon|Napkins|Sauce cup 2 oz|Sauce cup lid 2 oz|Chicken breast|Chicken thigh|Brown rice|White rice|Quinoa|Soy sauce|Sesame oil|Olive oil|Salt|Black pepper|Oats|Honey'
+};
+const kitchSupplierNorm=s=>String(s||'').trim().toLowerCase().replace(/[^a-z0-9]+/g,' ');
+const kitchSupplierProductSets=Object.fromEntries(Object.entries(kitchSupplierProductNames).map(([name,items])=>[name,new Set(items.split('|').filter(Boolean).map(kitchSupplierNorm))]));
+function kitchSelectedCloudSupplier(){
+ const id=document.getElementById('kitchPrSupplier')?.value;
+ return kitchCloudPurchaseCatalog.suppliers.find(s=>String(s.id)===String(id))||null;
+}
+function kitchAllowedCloudIngredients(){
+ const supplier=kitchSelectedCloudSupplier();
+ if(!supplier)return [];
+ const name=kitchSupplierNorm(supplier.name);
+ const known=kitchSupplierProductSets[name];
+ return kitchCloudPurchaseCatalog.ingredients.filter(item=>{
+  const itemName=kitchSupplierNorm(item.name);
+  if(known)return known.has(itemName);
+  // For new suppliers, require an explicit supplier assignment; do not display all products.
+  const links=[item.supplier_id,item.supplier_name,item.supplier].filter(Boolean).map(kitchSupplierNorm);
+  return links.includes(kitchSupplierNorm(supplier.id))||links.includes(name);
+ });
+}
 function kitchPurchaseLineOptions(){
- return kitchCloudPurchaseCatalog.ingredients.map(i=>'<option value="'+esc(i.id)+'">'+esc(i.name)+' ('+esc(i.unit)+')</option>').join('');
+ return kitchAllowedCloudIngredients().map(i=>'<option value="'+esc(i.id)+'">'+esc(i.name)+' ('+esc(i.unit)+')</option>').join('');
 }
 function kitchAddCloudRequestLine(){
  const holder=document.getElementById('kitchPrLines');
  if(!holder||holder.children.length>=50)return;
+ if(!kitchSelectedCloudSupplier())return alert('Choose a supplier first.');
+ if(!kitchAllowedCloudIngredients().length)return alert('No products are assigned to this supplier in the current master.');
  const row=document.createElement('div');
  row.className='kitchPrLine';
  row.innerHTML='<div class="field"><label>INGREDIENT</label><select class="kitchPrIngredient">'+kitchPurchaseLineOptions()+'</select></div><div class="field"><label>QUANTITY</label><input class="kitchPrQty" type="number" step="any" min="0.0001" placeholder="0.00"></div><button type="button" class="btn kitchPrRemove" onclick="this.closest(\'.kitchPrLine\').remove();kitchUpdateCloudRequestSummary()" aria-label="Remove ingredient">Remove</button>';
@@ -2026,12 +2055,17 @@ function kitchNewCloudPurchaseRequest(){
  '<div class="kitchPrFooter"><button type="button" class="btn" onclick="closeModal()">Cancel</button><button type="button" class="btn black" id="kitchPrSave" onclick="kitchSubmitCloudRequest()">Submit Entire Request</button></div>'+
  '<p id="kitchPrError" role="status" style="font-size:12px;color:#b42318"></p>');
  document.querySelector('.modalBox')?.classList.add('kitchPrModern');
- kitchAddCloudRequestLine();
+ kitchUpdateCloudRequestSupplier();
 }
 function kitchUpdateCloudRequestSupplier(){
- const selected=kitchCloudPurchaseCatalog.suppliers.find(x=>String(x.id)===String(document.getElementById('kitchPrSupplier')?.value));
+ const selected=kitchSelectedCloudSupplier();
  const info=document.getElementById('kitchPrSupplierInfo');
- if(info)info.textContent=selected?('Contact: '+(selected.contact_name||'Not added')+' · Email: '+(selected.email||'Not added')+' · Phone: '+(selected.phone||'Not added')):'Select one supplier for this purchase request.';
+ if(info)info.textContent=selected?('Contact: '+(selected.contact_name||'Not added')+' · Email: '+(selected.email||'Not added')+' · Phone: '+(selected.phone||'Not added')+' · '+kitchAllowedCloudIngredients().length+' available products'):'Select one supplier for this purchase request.';
+ // A supplier change must also clear old selections and quantities.
+ const holder=document.getElementById('kitchPrLines');
+ if(holder)holder.replaceChildren();
+ if(selected&&kitchAllowedCloudIngredients().length)kitchAddCloudRequestLine();
+ else kitchUpdateCloudRequestSummary();
 }
 async function kitchSubmitCloudRequest(){
  if(kitchCloudPurchaseBusy)return;
@@ -2043,7 +2077,7 @@ async function kitchSubmitCloudRequest(){
  const seen=new Set(),items=[];
  for(const row of lines){
   const id=row.querySelector('.kitchPrIngredient').value;
-  const ing=kitchCloudPurchaseCatalog.ingredients.find(i=>i.id===id);
+  const ing=kitchAllowedCloudIngredients().find(i=>String(i.id)===String(id));
   const raw=row.querySelector('.kitchPrQty').value.trim(),qty=Number(raw);
   if(!ing||raw===''||!Number.isFinite(qty)||qty<=0||qty>100000){
    if(error)error.textContent='Enter a valid ingredient and quantity for every line.';return;
@@ -2051,7 +2085,7 @@ async function kitchSubmitCloudRequest(){
   if(seen.has(id)){if(error)error.textContent='Select each ingredient only once.';return}
   seen.add(id);items.push({ingredient_id:id,quantity:qty,unit:ing.unit});
  }
- if(!items.length){if(error)error.textContent='Add at least one ingredient.';return}
+ if(!items.length){if(error)error.textContent='Add at least one ingredient assigned to this supplier.';return}
  if(!confirm('Submit '+items.length+' ingredients to '+supplier.name+' for Main Office approval?'))return;
  kitchCloudPurchaseBusy=true;
  const button=document.getElementById('kitchPrSave');if(button)button.disabled=true;
