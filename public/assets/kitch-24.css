@@ -111,3 +111,60 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
     z-index:5!important;
   }
 }
+
+/* KITCH SMOOTH MOBILE SIDEBAR SCROLL V2 */
+@media screen and (max-width:850px){
+ body #app .side{
+  display:flex!important;flex-direction:column!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  scroll-behavior:smooth!important;
+  touch-action:pan-y!important;
+  padding-top:calc(56px + env(safe-area-inset-top,0px))!important;
+ }
+ body #app .side .sideLogoWrap{flex-shrink:0!important}
+ body #app .side .nav{
+  flex:0 0 auto!important;min-height:0!important;max-height:none!important;
+  overflow:visible!important;touch-action:pan-y!important;
+  padding-bottom:10px!important;
+ }
+ body #app .side .nav .kitchMoreInline{
+  box-sizing:border-box!important;
+  position:static!important;display:flex!important;flex-direction:column!important;
+  width:100%!important;max-width:100%!important;min-width:0!important;
+  height:auto!important;max-height:none!important;overflow:visible!important;
+  transform:none!important;opacity:1!important;visibility:visible!important;
+  padding:6px 0 8px 12px!important;margin:0!important;
+  border:0!important;border-left:2px solid #e7e7e7!important;
+  border-radius:0!important;background:#fff!important;box-shadow:none!important;
+  z-index:auto!important;
+ }
+ body #app .side .nav .kitchMoreInline button{
+  display:block!important;position:static!important;width:100%!important;
+  padding:11px 12px!important;margin:1px 0!important;
+  min-height:42px!important;white-space:normal!important;
+  font-size:12px!important;line-height:1.35!important;
+  color:#343434!important;background:#fff!important;border:0!important;
+  text-align:left!important;
+ }
+ body #app .side .nav .kitchMoreInline button:hover,
+ body #app .side .nav .kitchMoreInline button:focus-visible{
+  background:#f3f3f3!important;
+ }
+ body #app .side .upgradeNav,
+ body #app .side .user,body #app .side .sideUtility{
+  flex:0 0 auto!important;margin-top:12px!important;
+ }
+ body #app.mobileMenuOpen #appMobileMenu.appMobileMenu{
+  position:fixed!important;top:calc(15px + env(safe-area-inset-top,0px))!important;
+  right:calc(min(320px,88vw) - 53px)!important;left:auto!important;
+  width:40px!important;min-width:40px!important;height:40px!important;
+  border-radius:12px!important;z-index:1006!important;
+ }
+}
+@media screen and (max-width:480px){
+ body #app.mobileMenuOpen #appMobileMenu.appMobileMenu{
+  right:calc(min(320px,90vw) - 47px)!important;
+ }
+}
