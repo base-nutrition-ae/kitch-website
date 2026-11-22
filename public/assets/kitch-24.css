@@ -1054,3 +1054,54 @@ body #app .main input,body #app .main select,body #app .main textarea{border-col
  #publicModal .kitchProFeatures{grid-template-columns:minmax(0,1fr)!important}
  #publicModal .kitchProIntro h2{font-size:27px!important}
 }
+
+
+/* KITCH PHONE DRAWERS AND PUBLIC WHITE MENU V12 */
+@media(max-width:850px){
+ /* Public sign-in/marketing menu: same white palette as KITCH dashboard */
+ #login .mobilePublicMenuPanel,.mobilePublicMenuPanel{
+  width:min(300px,78vw)!important;max-width:78vw!important;
+  background:#f8f9f9!important;color:#24282a!important;
+  box-shadow:12px 0 30px #00000020!important;
+  padding:calc(18px + env(safe-area-inset-top,0px)) 14px calc(20px + env(safe-area-inset-bottom,0px))!important;
+ }
+ .mobilePublicMenuPanel .mobileMenuHead{
+  border-bottom:1px solid #e3e6e8!important;padding:2px 0 16px!important;
+  align-items:center!important
+ }
+ .mobilePublicMenuPanel .mobileMenuBrand b{color:#25292c!important;font-size:23px!important}
+ .mobilePublicMenuPanel .mobileMenuBrand span{color:#92979a!important;font-size:8px!important;letter-spacing:.075em!important}
+ .mobilePublicMenuPanel .mobileMenuClose{
+  background:#e9ebec!important;color:#262a2d!important;border:1px solid #dfe2e4!important;
+  width:37px!important;height:37px!important;border-radius:11px!important;font-size:23px!important
+ }
+ .mobilePublicMenuPanel .mobileMenuLinks{display:grid!important;gap:4px!important;padding-top:13px!important}
+ .mobilePublicMenuPanel .mobileMenuLinks button,
+ .mobilePublicMenuPanel .mobileMenuLinks a{
+  box-sizing:border-box!important;display:flex!important;align-items:center!important;
+  min-height:43px!important;height:auto!important;
+  background:transparent!important;color:#3f4549!important;
+  border:0!important;border-radius:10px!important;
+  padding:10px 13px!important;font-size:13px!important;font-weight:600!important;
+  text-align:left!important
+ }
+ .mobilePublicMenuPanel .mobileMenuLinks button:hover,
+ .mobilePublicMenuPanel .mobileMenuLinks a:hover{background:#e7e9eb!important}
+ .mobilePublicMenuPanel .mobileMenuLinks .solid{
+  color:#1e2326!important;background:#e1e4e6!important;border:0!important;font-weight:750!important
+ }
+ /* Logged-in kitchen: compact one-scroll drawer */
+ body #app.app:not(.hidden)>.side{
+  width:min(300px,78vw)!important;max-width:78vw!important;
+  padding-left:12px!important;padding-right:12px!important;
+ }
+ body #app .side .sideLogoWrap{
+  min-height:52px!important;padding:2px 42px 10px 6px!important;
+ }
+ body #app .side .sideLogoWrap>.kitchNavBrand{font-size:19px!important}
+ body #app .side .sideLogoWrap>.kitchNavBrand small{font-size:9px!important}
+ body #app .side .nav>button{min-height:39px!important;padding:9px 12px!important;font-size:12px!important;line-height:1.25!important}
+ body #app .side .sideUtility button{min-height:36px!important;font-size:11px!important}
+ body #app .side .user{padding:9px 11px!important}
+ body #app .side .kitchDrawerClose{width:34px!important;height:34px!important;min-width:34px!important;font-size:22px!important}
+}
