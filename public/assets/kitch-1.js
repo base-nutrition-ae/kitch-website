@@ -598,6 +598,18 @@ function priceAlertsPage(){
 function toggleAppMobileMenu(open){
  const a=document.getElementById('app');
  if(!a)return;
+ // Staff mobile drawer has its own close control in the drawer header.
+ const brand=a.querySelector('.side .sideLogoWrap');
+ if(brand&&!brand.querySelector('.kitchDrawerClose')){
+  const close=document.createElement('button');
+  close.type='button';close.className='kitchDrawerClose';
+  close.setAttribute('aria-label','Close navigation');
+  close.textContent='×';
+  close.addEventListener('click',()=>toggleAppMobileMenu(false));
+  brand.appendChild(close);
+ }
+ const trigger=document.getElementById('appMobileMenu');
+ if(trigger){trigger.setAttribute('aria-expanded',String(!!open));trigger.setAttribute('aria-label',open?'Close navigation':'Open menu');}
  a.classList.toggle('mobileMenuOpen',!!open);
  const more=document.getElementById('kitchMoreMenu');
  if(!open&&more){more.remove();document.querySelector('.kitchMoreTrigger')?.setAttribute('aria-expanded','false');}
