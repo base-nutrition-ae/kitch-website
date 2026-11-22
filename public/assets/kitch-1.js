@@ -387,7 +387,7 @@ const roles={
  owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
  manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
  store:{name:'Central Store Manager',label:'Central Store Manager',nav:['Inventory','Receiving','Expiry & Batches','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
- production:{name:'Production Staff',label:'Production Staff',nav:['Production','Recipes','Suppliers & Purchasing','Label','Notifications']}
+ production:{name:'Production Staff',label:'Production Staff',nav:['Recipes','Production','Label']}
 };
 let session=null;
 let dashboardPeriod='30d',dashboardCustomStart='',dashboardCustomEnd='';
@@ -524,7 +524,7 @@ function renderNav(){
      const i=items.indexOf('Receiving')+1;items.splice(i,0,'Stock Requests','Stock Transfer');
    }
  }
- const preferred=session==='store'?['Dashboard','Receiving','Inventory','Stock Requests']:session==='production'?['Dashboard','Recipes','Production','QC Labels']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
+ const preferred=session==='store'?['Dashboard','Receiving','Inventory','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
  const mainItems=preferred.filter(x=>items.includes(x)).slice(0,4);
  for(const x of items){if(mainItems.length>=4)break;if(!mainItems.includes(x))mainItems.push(x)}
  const extra=items.filter(x=>!mainItems.includes(x) && !(items.includes('Suppliers & Purchasing') && x==='Receiving'));
@@ -2950,6 +2950,50 @@ function cleanQty(v){
  return String(Number(n.toFixed(3)));
 }
 function prettyCanonical(q,u){return cleanQty(fromCanonical(Number(q||0),u))+' '+unit(u)}
+
+(function(){
+ if(document.getElementById('kitchProduction2026Style'))return;
+ const css=document.createElement('style');css.id='kitchProduction2026Style';
+ css.textContent=`
+ .kitchProductionLedger{border:1px solid #ededed!important;border-radius:22px!important;padding:23px!important;background:#fff!important;box-shadow:none!important;margin-bottom:17px!important}
+ .kitchProductionLedger h2{font-size:20px!important;letter-spacing:-.035em!important;margin:4px 0 8px!important}
+ .kitchProductionLedger .muted{color:#878787!important;line-height:1.55}
+ .kitchProductionActions{display:flex!important;align-items:center!important;gap:10px!important;flex-wrap:wrap!important;margin:18px 0!important}
+ .kitchProductionActions .btn{min-height:39px!important;border-radius:999px!important;padding:9px 16px!important;font-size:12px!important;font-weight:700!important}
+ .kitchProductionTableScroll{border:1px solid #eee!important;border-radius:14px!important;overflow:auto!important}
+ .kitchProductionTable{width:100%;border-collapse:collapse}
+ .kitchProductionTable th{background:#f7f7f7!important;color:#777!important;font-size:10px!important;letter-spacing:.045em!important;padding:13px!important}
+ .kitchProductionTable td{padding:14px 13px!important;vertical-align:middle!important;border-top:1px solid #f1f1f1!important}
+ .kitchProductionTable .empty{padding:30px!important;color:#8b8b8b!important;text-align:center!important}
+ .kitchProductionLedger .productionHistoryRow:hover{background:#fafafa;cursor:pointer}
+ .modalBox:has(.productionStartHead){width:min(920px,calc(100vw - 30px))!important;max-height:calc(100vh - 28px)!important;overflow:auto!important;border-radius:24px!important;padding:27px 30px!important;background:#fff!important}
+ .productionStartHead{display:flex!important;align-items:center!important;justify-content:space-between!important;padding:0 0 18px!important;margin-bottom:18px!important;border-bottom:1px solid #eee!important}
+ .productionStartHead h2{font-size:25px!important;letter-spacing:-.05em!important;margin:0!important}
+ .productionStartHead .close{background:#f2f2f2!important;border:0!important;border-radius:99px!important;width:37px!important;height:37px!important;font-size:20px!important}
+ .kitchStartProductionIntro{font-size:12px;color:#838383;margin-bottom:18px;line-height:1.5}
+ .modalBox:has(.productionStartHead) .formGrid{gap:16px!important}
+ .modalBox:has(.productionStartHead) .formGrid select,.modalBox:has(.productionStartHead) .formGrid input{height:46px!important;min-height:46px!important;border:1px solid #dedede!important;border-radius:12px!important;background:#fff!important;padding:0 13px!important;box-sizing:border-box!important}
+ .modalBox:has(.productionStartHead) .note:not(.bad):not(.ok){border:0!important;border-radius:12px!important;background:#f5f5f5!important;padding:13px 15px!important;color:#777!important;margin:14px 0!important}
+ .modalBox:has(.productionStartHead) .productionMethod{border-radius:13px!important;background:#f7f7f7!important;padding:16px!important;margin:12px 0 18px!important}
+ .kitchProductionStockHeadline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:20px 0 12px}
+ .kitchProductionStockHeadline strong{font-size:13px}
+ .kitchStockIndicator{display:inline-flex;align-items:center;border-radius:999px;padding:6px 10px;font-size:11px!important;font-weight:750;white-space:nowrap}
+ .kitchStockIndicator.ready{background:#eaf7ee;color:#187341}
+ .kitchStockIndicator.short{background:#fcecec;color:#b42318}
+ .modalBox:has(.productionStartHead) .productionTableWrap{border:1px solid #eee!important;border-radius:14px!important;overflow:auto!important;margin:0 0 16px!important}
+ .modalBox:has(.productionStartHead) .productionTable{width:100%!important;border-collapse:collapse!important}
+ .modalBox:has(.productionStartHead) .productionTable th{background:#f7f7f7!important;color:#777!important;font-size:10px!important;white-space:nowrap!important;padding:11px!important}
+ .modalBox:has(.productionStartHead) .productionTable td{padding:11px!important;border-bottom:1px solid #f1f1f1!important;vertical-align:middle!important}
+ .kitchProductionFooterNote{padding:13px 16px;border-radius:12px;margin:10px 0 13px;font-size:12px;line-height:1.5}
+ .kitchProductionFooterNote.ready{background:#edf8f0;color:#17663c}
+ .kitchProductionFooterNote.blocked{background:#fff1f1;color:#a52121}
+ .modalBox:has(.productionStartHead) .kitchStartBatchButton{min-height:47px!important;width:100%!important;border-radius:13px!important;font-size:13px!important;font-weight:800!important}
+ .modalBox:has(.productionStartHead) .kitchStartBatchButton:disabled{background:#f0f0f0!important;color:#999!important;opacity:1!important;border:1px solid #e6e6e6!important;cursor:not-allowed!important}
+ @media(max-width:630px){.modalBox:has(.productionStartHead){padding:20px 16px!important}.kitchProductionLedger{padding:15px!important}.kitchProductionStockHeadline .kitchStockIndicator{white-space:normal}.kitchProductionTable{min-width:510px}}
+ `;
+ document.head.appendChild(css);
+})();
+
 function productionPage(){
  linkRecipeIngredients();
  const approved=recipes().filter(r=>!recipeNeedsReview(r)), runs=scopedRows(getArr(PROD_KEY)).slice().reverse();
@@ -2960,8 +3004,8 @@ function productionPage(){
  const cloudRows=cloudHistory.map(h=>`<tr><td><b>${esc(h.request_id?.slice(0,8)||'—')}</b></td><td>${esc(h.occurred_at?new Date(h.occurred_at).toLocaleString('en-GB',{timeZone:'Asia/Dubai'}):'—')}</td><td>${Number(h.ingredient_lines||0)}</td>${session==='production'?'':`<td>${money(h.stock_usage_cost)}</td>`}<td>${syncedByRequest.has(String(h.request_id))?`<span class="ok"><b>${esc(syncedByRequest.get(String(h.request_id)).status||'Synced')}</b></span>`:`<span style="color:#b45309">Stock deducted · completion not synced</span>`}</td></tr>`).join('');
  return `<div class="grid"><div class="card"><span>APPROVED RECIPES</span><b>${approved.length}</b></div><div class="card"><span>PRODUCTION LOCATION</span><b style="font-size:17px">${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())}</b></div><div class="card"><span>COMPLETED RUNS</span><b>${completedRunCount}</b></div><div class="card"><span>STOCK CONTROL</span><b style="font-size:18px">FEFO</b></div></div>
  <div class="panel kitchProductionLedger"><div role="status" style="padding:8px 0 12px;font-size:13px">${kitchProductionLoadStatus==='loading'?'Loading shared recipes and production history…':kitchProductionLoadStatus==='error'?`<span class="bad">Cloud data could not be fully loaded: ${esc(kitchProductionLoadError)}</span> <button class="btn" onclick="kitchRefreshProductionPageData()">Retry Cloud Load</button>`:kitchProductionLoadStatus==='ready'?'<span class="ok">Cloud data refreshed.</span>':''}</div><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
- <div class="actions"><button class="btn black" onclick="openProduction()">+ Start Production</button><button class="btn" onclick="kitchSyncLocalProductionRecords()">Sync Local Production to Cloud</button></div>
- <div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production runs yet.</td></tr>'}</table></div><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
+ <div class="actions kitchProductionActions"><button class="btn black" onclick="openProduction()">+ Start Production</button><button class="btn" onclick="kitchSyncLocalProductionRecords()">↻ Sync Production Records</button></div>
+ <div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production recorded yet. Select <b>Start Production</b> to begin your first batch.</td></tr>'}</table></div><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
  <div class="panel kitchProductionLedger"><h2>Cloud Stock-Deduction History</h2><p class="muted">Read-only production inventory deductions. These entries do not establish that final yield, QC, or labels were completed. No inventory is changed by viewing them.</p><div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>REQUEST ID</th><th>DATE (DUBAI)</th><th>INGREDIENT LINES</th>${session==='production'?'':'<th>STOCK USAGE COST</th>'}<th>STATUS</th></tr>${history?cloudRows||'<tr><td colspan="5">No cloud stock-deduction runs recorded.</td></tr>':'<tr><td colspan="5">Cloud history not loaded. Open this page again or check the connection.</td></tr>'}</table></div></div>`;
 }
 
@@ -2994,7 +3038,7 @@ function openQCProof(id){
 function openProduction(){
  const a=recipes().filter(r=>!recipeNeedsReview(r));if(!a.length)return alert('No recipes pass ingredient and unit validation. Review the Recipe Master first.');
  modal(`<div class="modalHead productionStartHead"><h2>Start Production</h2><button class="close" aria-label="Close Start Production" onclick="closeModal()">×</button></div>
- <div class="formGrid"><div class="field"><label>APPROVED RECIPE</label><select id="prRecipe" onchange="previewProduction()">${a.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>NUMBER OF BATCHES</label><input id="prBatches" type="number" min="0.001" step="0.001" value="1" oninput="previewProduction()"></div></div>
+ <div class="kitchStartProductionIntro">Select a recipe and batch quantity. Ingredients are checked against current stock before production can start.</div><div class="formGrid"><div class="field"><label>APPROVED RECIPE</label><select id="prRecipe" onchange="previewProduction()">${a.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>NUMBER OF BATCHES</label><input id="prBatches" type="number" min="0.001" step="0.001" value="1" oninput="previewProduction()"></div></div>
  <div class="note"><b>Production Location:</b> ${esc(hasCentralStore()?currentBranchName():primaryRestaurantName())} · Recipe quantities are multiplied by the number of batches.</div>
  <div id="prMethod"></div><div id="prPreview"></div>`);previewProduction();
 }
@@ -3026,11 +3070,11 @@ function previewProduction(){
   const key=String(ing.cloud_id||ing.name.toLowerCase());
   const needed=totals.get(key)||0,good=have+1e-9>=needed;
   if(!good)ok=false;
-  return `<tr><td><b>${esc(ing.name)}</b></td><td>${required}</td><td>${prettyCanonical(have,ing.base_unit)}</td><td><span class="${good?'ok':'bad'}"><b>${good?'READY':'SHORT '+prettyCanonical(Math.max(0,needed-have),ing.base_unit)}</b></span></td></tr>`;
+  return `<tr><td><b>${esc(ing.name)}</b></td><td>${required}</td><td>${prettyCanonical(have,ing.base_unit)}</td><td><span class="kitchStockIndicator ${good?'ready':'short'}"><b>${good?'✓ Ready':'Short '+prettyCanonical(Math.max(0,needed-have),ing.base_unit)}</b></span></td></tr>`;
  }).join('');
- document.getElementById('prPreview').innerHTML=`<div class="productionTableWrap"><table class="productionTable"><tr><th>INGREDIENT</th><th>REQUIRED</th><th>RESTAURANT STOCK</th><th>CHECK</th></tr>${rows}</table></div>
- <div class="note ${ok?'ok':'bad'}"><b>${ok?'Stock ready.':'Production blocked.'}</b> ${ok?'Starting production will request a secure inventory deduction.':'Correct missing stock, ingredient mapping, or unit mismatches before starting.'}</div>
- <button class="primary" ${ok?'':'disabled style="opacity:.4;cursor:not-allowed"'} onclick="confirmProduction()">Start ${cleanQty(mult)} Batch${mult===1?'':'es'}</button>`;
+ document.getElementById('prPreview').innerHTML=`<div class="kitchProductionStockHeadline"><strong>Ingredient stock check</strong><span class="kitchStockIndicator ${ok?'ready':'short'}">${ok?'All ingredients ready':'Insufficient stock — review highlighted ingredients'}</span></div><div class="productionTableWrap"><table class="productionTable"><tr><th>INGREDIENT</th><th>REQUIRED</th><th>RESTAURANT STOCK</th><th>CHECK</th></tr>${rows}</table></div>
+ <div class="kitchProductionFooterNote ${ok?'ready':'blocked'}">${ok?'Stock ready. Starting production will request a secure inventory deduction.':'Production blocked: receive missing ingredients or correct ingredient mapping before starting.'}</div>
+ <button class="primary kitchStartBatchButton" ${ok?'':'disabled'} onclick="confirmProduction()">${ok?'Start '+cleanQty(mult)+' Batch'+(mult===1?'':'es'):'Cannot Start — Stock Shortage'}</button>`;
 }
 
 async function requestProductionShortages(){
