@@ -552,6 +552,33 @@ function renderNav(){
  };
  document.getElementById('kitchMoreMenu')?.remove();
  nav.replaceChildren(...ordered.map(makeButton));
+ // Keep the quick-access rail as its own desktop column, independent of the menu panel.
+ const rail=document.getElementById('kitchIconRail');
+ if(rail){
+  const railButton=(text,label,handler,kind)=>{
+   const b=document.createElement('button');b.type='button';b.className='kitchRailButton'+(kind?' '+kind:'');b.textContent=text;
+   b.title=label;b.setAttribute('aria-label',label);b.addEventListener('click',handler);return b;
+  };
+  const appEl=document.getElementById('app');
+  const toggle=railButton('☰','Toggle sidebar',()=>{
+   const isCollapsed=appEl.classList.toggle('kitchSidebarCollapsed');
+   rail.querySelector('.kitchRailToggle')?.setAttribute('aria-expanded',String(!isCollapsed));
+  },'kitchRailToggle');
+  toggle.setAttribute('aria-expanded',String(!appEl.classList.contains('kitchSidebarCollapsed')));
+  const logo=document.createElement('div');logo.className='kitchRailMark';logo.textContent='K';logo.title='KITCH';
+  rail.replaceChildren(toggle,logo);
+  for(const x of ordered.filter(v=>['Dashboard','Inventory','Suppliers & Purchasing','Production','Recipes','Label','Reports','Receiving'].includes(v)).slice(0,7)){
+   const icon=({'Dashboard':'⌂','Inventory':'▦','Suppliers & Purchasing':'⇄','Production':'▤','Recipes':'▣','Label':'▧','Reports':'▥','Receiving':'↓'}[x]||'•');
+   const btn=railButton(icon,x,()=>openPage(x),'kitchRailLink');
+   btn.dataset.page=x;
+   btn.classList.toggle('active',pageTitle?.textContent===x);
+   rail.appendChild(btn);
+  }
+  const railEnd=document.createElement('div');railEnd.className='kitchRailEnd';
+  const account=railButton('⚙','Settings',()=>{appEl.classList.remove('kitchSidebarCollapsed');document.querySelector('.side .sideUtility button:nth-child(2)')?.click();},'');
+  const exit=railButton('↪','Sign out',()=>logout(),'kitchRailSignOut');
+  railEnd.append(account,exit);rail.appendChild(railEnd);
+ }
  const side=document.querySelector('#app .side');
  if(side){
   const brand=side.querySelector('.sideLogoWrap');
@@ -699,6 +726,7 @@ function openPage(name){
  void refreshKitchTrialStatus();
  pageTitle.textContent=name;
  [...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));
+ document.querySelectorAll('#kitchIconRail [data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
  content.innerHTML=page(name);
  if(window.innerWidth<=850)toggleAppMobileMenu(false);
  if(name==='Production')void kitchRefreshProductionPageData();
