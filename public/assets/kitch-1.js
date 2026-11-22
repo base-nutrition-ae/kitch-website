@@ -3644,7 +3644,99 @@ function kitchApprovedLabels(){
  rows.forEach(x=>unique.set(String(x.cloud_request_id||x.id),x));
  return [...unique.values()].sort((a,b)=>String(b.qc_at||'').localeCompare(String(a.qc_at||'')));
 }
-function kitchLabelFormat(){return document.getElementById('kitchLabelFormat')?.value==='40'?'40':'70'}
+
+/* KITCH label sizing: presentation/printing only; no QC or inventory writes. */
+const KITCH_LABEL_SIZE_KEY='kitch_sticker_sizes_v2';
+const KITCH_LABEL_DEFAULTS=[{w:70,h:32},{w:60,h:40},{w:40,h:20}];
+let kitchLabelSelectedIds=new Set();
+let kitchLabelSizeChosen='70x32';
+function kitchLabelSizeText(size){return size.w+' × '+size.h+' mm'}
+function kitchLabelSizes(){
+ let custom=[];
+ try{custom=JSON.parse(localStorage.getItem(KITCH_LABEL_SIZE_KEY)||'[]')}catch(e){}
+ if(!Array.isArray(custom))custom=[];
+ return [...KITCH_LABEL_DEFAULTS,...custom.filter(s=>s&&Number.isInteger(s.w)&&Number.isInteger(s.h)&&s.w>=20&&s.w<=150&&s.h>=15&&s.h<=100)].filter((v,i,a)=>a.findIndex(x=>x.w===v.w&&x.h===v.h)===i);
+}
+function kitchLabelSize(){
+ const m=/^(\d+)x(\d+)$/.exec(kitchLabelSizeChosen),w=m?Number(m[1]):70,h=m?Number(m[2]):32;
+ return kitchLabelSizes().some(s=>s.w===w&&s.h===h)?{w,h}:{w:70,h:32};
+}
+function kitchLabelFormat(){return kitchLabelSize().w<=40?'40':'70'}
+function kitchLabelMenuPosition(){
+ const menu=document.getElementById('kitchLabelSizeMenu'),button=document.getElementById('kitchLabelSizeButton');
+ if(!menu||!button||menu.hidden)return;
+ const rect=button.getBoundingClientRect(),width=Math.min(280,Math.max(220,window.innerWidth-24));
+ menu.style.position='fixed';menu.style.width=width+'px';
+ menu.style.left=Math.max(12,Math.min(rect.left,window.innerWidth-width-12))+'px';
+ menu.style.top='0px';menu.style.bottom='auto';menu.style.maxHeight='min(460px, calc(100dvh - 24px))';menu.style.overflowY='auto';
+ const height=menu.getBoundingClientRect().height,below=window.innerHeight-rect.bottom-12,above=rect.top-12;
+ const top=(below>=height||below>=above)?rect.bottom+7:rect.top-height-7;
+ menu.style.top=Math.max(12,Math.min(top,window.innerHeight-height-12))+'px';
+}
+function kitchLabelCloseMenu(){
+ const menu=document.getElementById('kitchLabelSizeMenu');
+ if(menu){menu.hidden=true;const picker=document.getElementById('kitchLabelSizePicker');if(picker)picker.appendChild(menu);else menu.remove();}
+ document.getElementById('kitchLabelSizeButton')?.setAttribute('aria-expanded','false');
+}
+function kitchLabelToggleMenu(){
+ const menu=document.getElementById('kitchLabelSizeMenu'),button=document.getElementById('kitchLabelSizeButton');
+ if(!menu||!button)return;
+ if(!menu.hidden){kitchLabelCloseMenu();return;}
+ document.querySelectorAll('body > .kitchLabelSizeMenu').forEach(x=>{if(x!==menu)x.remove()});
+ const form=menu.querySelector('#kitchLabelCustomForm');if(form)form.hidden=true;
+ document.body.appendChild(menu);menu.hidden=false;button.setAttribute('aria-expanded','true');kitchLabelMenuPosition();
+}
+document.addEventListener('pointerdown',function(event){
+ const menu=document.getElementById('kitchLabelSizeMenu');
+ if(menu&&!menu.hidden&&!menu.contains(event.target)&&!document.getElementById('kitchLabelSizeButton')?.contains(event.target))kitchLabelCloseMenu();
+});
+document.addEventListener('keydown',function(event){if(event.key==='Escape')kitchLabelCloseMenu()});
+window.addEventListener('resize',kitchLabelMenuPosition);
+window.addEventListener('scroll',kitchLabelMenuPosition,true);
+function kitchLabelChooseSize(key){
+ const found=kitchLabelSizes().find(s=>s.w+'x'+s.h===key);if(!found)return;
+ kitchLabelSizeChosen=key;
+ const title=document.getElementById('kitchLabelSizeCurrent');if(title)title.textContent=kitchLabelSizeText(found);
+ kitchLabelCloseMenu();
+ document.querySelectorAll('[data-kitch-label-size]').forEach(btn=>{const chosen=btn.getAttribute('data-kitch-label-size')===key;btn.classList.toggle('active',chosen);btn.setAttribute('aria-checked',String(chosen));});
+}
+function kitchLabelRevealCustom(){
+ const form=document.getElementById('kitchLabelCustomForm');
+ if(form){form.hidden=false;kitchLabelMenuPosition();document.getElementById('kitchLabelCustomWidth')?.focus();}
+}
+function kitchLabelSaveCustom(event){
+ if(event)event.preventDefault();
+ const w=Number(document.getElementById('kitchLabelCustomWidth')?.value),h=Number(document.getElementById('kitchLabelCustomHeight')?.value);
+ if(!Number.isInteger(w)||!Number.isInteger(h)||w<20||w>150||h<15||h>100){alert('Enter whole millimetres: width 20–150 mm and height 15–100 mm.');return false;}
+ const list=kitchLabelSizes().filter(s=>!KITCH_LABEL_DEFAULTS.some(d=>d.w===s.w&&d.h===s.h));
+ if(!list.some(s=>s.w===w&&s.h===h))list.push({w,h});
+ try{localStorage.setItem(KITCH_LABEL_SIZE_KEY,JSON.stringify(list));}catch(e){alert('Custom sizes could not be saved in this browser.');}
+ kitchLabelSizeChosen=w+'x'+h;kitchLabelCloseMenu();
+ const picker=document.getElementById('kitchLabelSizePicker');if(picker)picker.outerHTML=kitchLabelSizePickerHTML();
+ return false;
+}
+function kitchLabelSizePickerHTML(){
+ const size=kitchLabelSize();
+ return '<div class="kitchLabelPicker" id="kitchLabelSizePicker"><button type="button" id="kitchLabelSizeButton" class="kitchLabelSizeButton" onclick="kitchLabelToggleMenu()" aria-haspopup="true" aria-expanded="false" aria-controls="kitchLabelSizeMenu"><span class="kitchLabelSizeIcon">▣</span><span class="kitchLabelSizeText"><small>LABEL SIZE</small><b id="kitchLabelSizeCurrent">'+kitchLabelSizeText(size)+'</b></span><span class="kitchLabelChevron">⌄</span></button><div class="kitchLabelSizeMenu" id="kitchLabelSizeMenu" hidden role="group" aria-label="Available sticker sizes"><div class="kitchLabelMenuHeading">Choose label size</div>'+
+ kitchLabelSizes().map(s=>{const key=s.w+'x'+s.h;return '<button type="button" role="checkbox" aria-checked="'+(key===kitchLabelSizeChosen)+'" data-kitch-label-size="'+key+'" class="kitchLabelSizeOption'+(key===kitchLabelSizeChosen?' active':'')+'" onclick="kitchLabelChooseSize(\''+key+'\')"><span>'+kitchLabelSizeText(s)+'</span><span class="kitchLabelCheck">✓</span></button>'}).join('')+
+ '<button type="button" class="kitchLabelAddSize" onclick="kitchLabelRevealCustom()">＋ Add custom size</button><form id="kitchLabelCustomForm" hidden onsubmit="return kitchLabelSaveCustom(event)"><div class="kitchLabelSizeInputs"><label>Width (mm)<input id="kitchLabelCustomWidth" type="number" min="20" max="150" step="1" required value="50"></label><label>Height (mm)<input id="kitchLabelCustomHeight" type="number" min="15" max="100" step="1" required value="30"></label></div><button class="kitchLabelSaveSize" type="submit">Save size</button></form></div></div>';
+}
+function kitchLabelSetSelected(id,selected){
+ const key=String(id);if(selected)kitchLabelSelectedIds.add(key);else kitchLabelSelectedIds.delete(key);
+ const count=document.getElementById('kitchLabelSelectedCount');if(count)count.textContent=kitchLabelSelectedIds.size+' selected';
+ const all=document.getElementById('kitchLabelAll');
+ if(all){const ids=kitchApprovedLabels().map(x=>String(x.id));all.checked=ids.length>0&&ids.every(x=>kitchLabelSelectedIds.has(x));all.indeterminate=ids.some(x=>kitchLabelSelectedIds.has(x))&&!all.checked;}
+}
+function kitchLabelSelectAll(checked){
+ kitchApprovedLabels().forEach(x=>{const id=String(x.id);if(checked)kitchLabelSelectedIds.add(id);else kitchLabelSelectedIds.delete(id)});
+ document.querySelectorAll('.kitchLabelRowCheck').forEach(cb=>cb.checked=checked);
+ const count=document.getElementById('kitchLabelSelectedCount');if(count)count.textContent=kitchLabelSelectedIds.size+' selected';
+}
+function kitchLabelPrintSelected(){
+ const rows=kitchApprovedLabels().filter(x=>kitchLabelSelectedIds.has(String(x.id)));
+ if(!rows.length)return alert('Select at least one approved label to print.');
+ kitchPrintLabelSheet(rows,kitchLabelSize());
+}
 function kitchLabelMarkup(x,small){
  const p=v=>esc(String(v??''));
  return '<div class="kitchLabelSticker'+(small?' compact':'')+'"><div class="kitchLabelTop"><b>KITCH</b><b>'+p(x.code)+'</b></div>'+
@@ -3653,30 +3745,32 @@ function kitchLabelMarkup(x,small){
  'Temp: '+p(x.qc_temp_c??'—')+'°C</div><div class="kitchLabelTop"><span>'+p(x.qc_serial)+'</span><span>QC APPROVED</span></div></div>';
 }
 function kitchProductionLabelQueue(){
- const rows=kitchApprovedLabels();
+ const rows=kitchApprovedLabels(),current=new Set(rows.map(x=>String(x.id)));
+ kitchLabelSelectedIds=new Set([...kitchLabelSelectedIds].filter(x=>current.has(x)));
  return '<div class="panel kitchProductionLedger"><h2>Saved Production Labels</h2><p class="muted">All QC-approved production labels, ready to preview or print later. Printing does not change production records or inventory.</p>'+
- '<div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>PRODUCTION</th><th>RECIPE</th><th>MADE</th><th>EXPIRY</th><th>QC</th><th>ACTIONS</th></tr>'+
- (rows.map(x=>'<tr><td>'+esc(x.code)+'</td><td><b>'+esc(x.recipe)+'</b></td><td>'+esc(x.production_date||'—')+'</td><td>'+esc(x.expiry_date||'—')+'</td><td><span class="ok">Approved</span></td><td><button class="btn" onclick="kitchPreviewLabel('+Number(x.id)+')">Preview</button> <button class="btn" onclick="printQCLabel('+Number(x.id)+')">Print</button></td></tr>').join('')||
- '<tr><td colspan="6">No QC-approved labels yet. Completed and approved production labels will appear here automatically.</td></tr>')+
+ '<div class="kitchLabelToolbar">'+kitchLabelSizePickerHTML()+'<button type="button" class="kitchLabelPrintButton" onclick="kitchLabelPrintSelected()">Print Selected</button><span id="kitchLabelSelectedCount" class="kitchLabelSelectedCount">'+kitchLabelSelectedIds.size+' selected</span></div>'+
+ '<div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th class="kitchLabelCheckCell"><input id="kitchLabelAll" type="checkbox" aria-label="Select all labels" onchange="kitchLabelSelectAll(this.checked)" '+(rows.length&&rows.every(x=>kitchLabelSelectedIds.has(String(x.id)))?'checked':'')+'></th><th>PRODUCTION</th><th>RECIPE</th><th>MADE</th><th>EXPIRY</th><th>QC</th><th>ACTIONS</th></tr>'+
+ (rows.map(x=>'<tr><td class="kitchLabelCheckCell"><input class="kitchLabelRowCheck" type="checkbox" aria-label="Select '+esc(x.code)+'" onchange="kitchLabelSetSelected('+Number(x.id)+',this.checked)" '+(kitchLabelSelectedIds.has(String(x.id))?'checked':'')+'></td><td>'+esc(x.code)+'</td><td><b>'+esc(x.recipe)+'</b></td><td>'+esc(x.production_date||'—')+'</td><td>'+esc(x.expiry_date||'—')+'</td><td><span class="ok">Approved</span></td><td><button class="btn" onclick="kitchPreviewLabel('+Number(x.id)+')">Preview</button> <button class="btn" onclick="printQCLabel('+Number(x.id)+')">Print</button></td></tr>').join('')||
+ '<tr><td colspan="7">No QC-approved labels yet. Completed and approved production labels will appear here automatically.</td></tr>')+
  '</table></div></div>';
 }
 function kitchPreviewLabel(id){
  const x=kitchApprovedLabels().find(r=>String(r.id)===String(id));
  if(!x)return alert('Saved QC-approved production label not found.');
- modal('<div class="modalHead"><h2>Label Preview</h2><button class="close" onclick="closeModal()">×</button></div>'+
- '<div class="kitchLabelPreview">'+kitchLabelMarkup(x,kitchLabelFormat()==='40')+'</div>'+
+ const size=kitchLabelSize();
+ modal('<div class="modalHead"><h2>Label Preview · '+kitchLabelSizeText(size)+'</h2><button class="close" onclick="closeModal()">×</button></div>'+
+ '<div class="kitchLabelPreview"><div class="kitchLabelPreviewCanvas" style="--label-w:'+size.w+'mm;--label-h:'+size.h+'mm">'+kitchLabelMarkup(x,size.w<=40||size.h<=20)+'</div></div>'+
  '<div class="actions"><button class="btn" onclick="closeModal()">Close</button><button class="btn black" onclick="printQCLabel('+Number(x.id)+')">Print Label</button></div>');
 }
 function printQCLabel(id){
  const run=kitchApprovedLabels().find(r=>String(r.id)===String(id));
  if(!run)return alert('QC approval is required before printing.');
- const choice=window.prompt('Label size: 1 = 70 × 32 mm, 2 = 40 × 20 mm','1');
- if(choice===null)return;
- if(choice!=='1'&&choice!=='2')return alert('Choose 1 or 2.');
- kitchPrintLabelSheet([run],choice==='2'?'40':'70');
+ kitchPrintLabelSheet([run],kitchLabelSize());
 }
-function kitchPrintLabelSheet(rows,size='70'){
- const small=size==='40',w=small?40:70,h=small?20:32;
+function kitchPrintLabelSheet(rows,size={w:70,h:32}){
+ const chosen=typeof size==='string'?(size==='40'?{w:40,h:20}:{w:70,h:32}):size;
+ const w=Number(chosen.w),h=Number(chosen.h),small=w<=40||h<=20;
+ if(!rows?.length||!Number.isInteger(w)||!Number.isInteger(h)||w<20||w>150||h<15||h>100)return;
  document.getElementById('kitchPrintArea')?.remove();
  document.getElementById('kitchPrintStyles')?.remove();
  const style=document.createElement('style');style.id='kitchPrintStyles';
@@ -4493,3 +4587,5 @@ sb.auth.onAuthStateChange((event,authSession)=>{
    localStorage.removeItem('kitch_demo_staff_v2');
  }
 });
+
+(function(){const style=document.createElement('style');style.id='kitchLabelLivePickerCSS';style.textContent="\n.kitchLabelToolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0 20px}\n.kitchLabelPicker{position:relative;z-index:5}\n.kitchLabelSizeButton{display:flex;align-items:center;gap:11px;min-width:190px;min-height:46px;padding:7px 13px;border-radius:14px;border:1px solid #e8e8e8;background:#fff;color:#1b1b1b;cursor:pointer;font-family:inherit;box-shadow:0 2px 7px rgba(0,0,0,.025);text-align:left}\n.kitchLabelSizeButton:hover{border-color:#aaa;background:#fafafa}\n.kitchLabelSizeIcon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#f5f5f5;color:#232323;font-size:17px}\n.kitchLabelSizeText{display:flex;flex-direction:column;gap:1px;flex:1;line-height:1.15}\n.kitchLabelSizeText small{font-size:9px;color:#888;font-weight:750;letter-spacing:.08em}\n.kitchLabelSizeText b{font-size:13px;font-weight:800;letter-spacing:0}\n.kitchLabelChevron{font-size:22px;color:#666;line-height:1}\n.kitchLabelSizeMenu{position:fixed;top:0;left:0;width:280px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow-y:auto;overscroll-behavior:contain;box-sizing:border-box;background:#fff;border:1px solid #e8e8e8;border-radius:16px;padding:9px;box-shadow:0 18px 40px rgba(0,0,0,.18);z-index:2147483000}\n.kitchLabelSizeMenu[hidden],#kitchLabelCustomForm[hidden]{display:none!important}\n.kitchLabelMenuHeading{font-size:11px;font-weight:800;color:#777;padding:7px 9px 9px}\n.kitchLabelSizeOption{width:100%;display:flex;align-items:center;justify-content:space-between;padding:11px 12px;margin:1px 0;border:0;border-radius:10px;background:#fff;color:#242424;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;text-align:left}\n.kitchLabelSizeOption:hover{background:#f5f5f5}.kitchLabelSizeOption.active{background:#f0f0f0;font-weight:800}.kitchLabelCheck{color:#191919;opacity:0}.kitchLabelSizeOption.active .kitchLabelCheck{opacity:1}\n.kitchLabelAddSize{display:block;width:100%;text-align:left;border:1px dashed #d5d5d5;background:#fafafa;color:#222;padding:12px;border-radius:11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:7px}\n.kitchLabelAddSize:hover{border-color:#333}\n.kitchLabelSizeInputs{display:flex;gap:8px;margin-top:10px}.kitchLabelSizeInputs label{font-size:10px;font-weight:700;font-family:inherit;color:#666;min-width:0;flex:1}\n.kitchLabelSizeInputs input{box-sizing:border-box;width:100%;margin-top:5px;padding:10px;border:1px solid #ddd;border-radius:9px;font-size:13px}\n.kitchLabelSaveSize{width:100%;margin-top:9px;padding:11px;border:0;border-radius:10px;background:#151515;color:#fff;font-size:12px;font-weight:800;cursor:pointer}\n.kitchLabelPrintButton{min-height:46px;border:0;border-radius:999px;background:#151515;color:#fff;padding:0 21px;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer}.kitchLabelPrintButton:hover{background:#363636}\n.kitchLabelSelectedCount{font-size:12px;color:#777;font-weight:700;white-space:nowrap}\n.kitchLabelCheckCell{width:36px;text-align:center!important}.kitchLabelCheckCell input{width:16px;height:16px;accent-color:#191919;cursor:pointer}\n.kitchLabelPreviewCanvas .kitchLabelSticker{width:var(--label-w);height:var(--label-h)}\n#kitchPrintArea{display:none}\n.kitchLabelPreview{display:flex;justify-content:center;padding:35px 12px;background:#f3f3f3;margin:14px 0;overflow:auto}\n.kitchLabelSticker{width:70mm;height:32mm;box-sizing:border-box;padding:2mm;background:#fff;color:#000;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;font:7pt/1.2 Arial,sans-serif}\n.kitchLabelSticker.compact{width:40mm;height:20mm;padding:1mm;font-size:5pt}\n.kitchLabelTop{display:flex;justify-content:space-between;gap:2mm;font-size:7pt}\n.kitchLabelSticker.compact .kitchLabelTop{font-size:5pt}\n.kitchLabelName{font-size:10pt;line-height:1.1}\n.kitchLabelSticker.compact .kitchLabelName{font-size:7pt}\n.kitchLabelDates{font-size:7pt}.kitchLabelSticker.compact .kitchLabelDates{font-size:5pt}\n@media(max-width:550px){.kitchLabelPicker{width:100%}.kitchLabelSizeButton{width:100%}.kitchLabelPrintButton{flex:1}}\n";document.head.appendChild(style);})();
