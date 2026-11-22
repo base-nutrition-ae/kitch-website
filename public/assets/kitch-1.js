@@ -1571,6 +1571,13 @@ async function confirmImport(){
    // Yield to the browser periodically so progress and controls stay responsive.
    if(completed%5===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
+  if(replaceMode){
+   const {data:masterSet,error:masterError}=await sb.rpc('kitch_team_current_master',{
+    p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+    p_action:'replace',p_keep_names:importRows.map(x=>x.name)
+   });
+   if(masterError||!Array.isArray(masterSet?.current_ids))throw Error('Ingredients imported but visible master was not switched: '+(masterError?.message||'Cloud confirmation missing'));
+  }
   await cloudLoadIngredients();
   if(window.__kitchInventoryLoadError)throw Error('Imported, but stock could not reload: '+window.__kitchInventoryLoadError);
   if(teamCloudAuth?.pin){
@@ -1615,13 +1622,6 @@ async function confirmImport(){
     p_ingredient_id:saved.cloud_id,p_supplier_name:row.supplier
    });
    if(linkError)throw Error('Supplier '+row.supplier+' was saved, but ingredient link for '+row.name+' could not sync: '+linkError.message);
-  }
-  if(replaceMode){
-   const {data:masterSet,error:masterError}=await sb.rpc('kitch_team_current_master',{
-    p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
-    p_action:'replace',p_keep_names:importRows.map(x=>x.name)
-   });
-   if(masterError||!Array.isArray(masterSet?.current_ids))throw Error('Ingredients imported but visible master was not switched: '+(masterError?.message||'Cloud confirmation missing'));
   }
   await cloudLoadIngredients();
   if(window.__kitchInventoryLoadError)throw Error('Inventory refresh failed: '+window.__kitchInventoryLoadError);
