@@ -71,3 +71,43 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
   body #app .side{width:min(320px,90vw)!important;max-width:90vw!important}
   body #app.mobileMenuOpen #appMobileMenu.appMobileMenu{right:calc(min(320px,90vw) - 47px)!important;width:38px!important;min-width:38px!important;height:38px!important}
 }
+
+
+/* KITCH MOBILE MODAL CONTROLS 2026-11-22
+   Modals have their own close button. Do not cover it with the workspace hamburger. */
+@media screen and (max-width:850px){
+  body.modal-open #app #appMobileMenu.appMobileMenu{
+    display:none!important;
+    visibility:hidden!important;
+    pointer-events:none!important;
+  }
+  body.modal-open #modal .modalHead,
+  body.modal-open #modal .productionStartHead{
+    box-sizing:border-box!important;
+    max-width:100%!important;
+    min-width:0!important;
+    display:flex!important;
+    align-items:flex-start!important;
+    justify-content:space-between!important;
+    gap:12px!important;
+  }
+  body.modal-open #modal .modalHead>h2,
+  body.modal-open #modal .productionStartHead>h2,
+  body.modal-open #modal .modalHead>div:first-child{
+    flex:1 1 auto!important;
+    min-width:0!important;
+    overflow-wrap:anywhere!important;
+  }
+  body.modal-open #modal .modalHead>.close,
+  body.modal-open #modal .productionStartHead>.close{
+    position:relative!important;
+    top:auto!important;right:auto!important;left:auto!important;
+    flex:0 0 40px!important;
+    width:40px!important;height:40px!important;
+    min-width:40px!important;
+    display:grid!important;place-items:center!important;
+    padding:0!important;
+    border-radius:50%!important;
+    z-index:5!important;
+  }
+}
