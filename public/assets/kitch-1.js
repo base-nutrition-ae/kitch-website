@@ -1548,6 +1548,60 @@ function viewSupplierProfile(id){
 }
 function openSupplier(){modal(`<div class="modalHead"><h2>Add Supplier</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid"><div class="field"><label>SUPPLIER NAME</label><input id="sName"></div><div class="field"><label>CONTACT PERSON</label><input id="sContact"></div><div class="field"><label>PHONE NUMBER</label><input id="sPhone"></div><div class="field"><label>EMAIL</label><input id="sEmail" type="email"></div><div class="field"><label>TRN / VAT NUMBER</label><input id="sTrn"></div><div class="field"><label>PAYMENT TERMS</label><input id="sTerms" placeholder="e.g. 30 days"></div><div class="field"><label>DELIVERY DAYS</label><input id="sDays" placeholder="e.g. Sun, Tue, Thu"></div><div class="field"><label>MINIMUM ORDER AED</label><input id="sMin" type="number" min="0" step=".01"></div><div class="field"><label>ADDRESS / LOCATION</label><input id="sAddress"></div><div class="field"><label>LEAD TIME DAYS</label><input id="sLead" type="number" min="0"></div></div><div class="field"><label>NOTES</label><input id="sNotes"></div><button class="primary" onclick="saveSupplier()">Create Supplier</button>`) }
 function saveSupplier(){let name=sName.value.trim();if(!name)return alert('Enter supplier name.');let a=getArr(SUP_KEY);if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert('Supplier already exists.');a.push({id:Date.now(),name,contact:sContact.value.trim(),phone:sPhone.value.trim(),email:sEmail.value.trim(),trn:sTrn.value.trim(),terms:sTerms.value.trim(),days:sDays.value.trim(),min_order:Number(sMin.value||0),address:sAddress.value.trim(),lead_time:sLead.value.trim(),notes:sNotes.value.trim()});setArr(SUP_KEY,a);closeModal();openPage('Suppliers & Purchasing')}
+/* Supplier controls: browser-local master only. Existing KITCH form and table styling retained. */
+function editSupplier(id){
+ const x=getArr(SUP_KEY).find(v=>String(v.id)===String(id));
+ if(!x)return alert('Supplier not found.');
+ openSupplier();
+ const head=document.querySelector('.modalHead h2');if(head)head.textContent='Edit Supplier';
+ const fields={sName:'name',sContact:'contact',sPhone:'phone',sEmail:'email',sTrn:'trn',sTerms:'terms',sDays:'days',sMin:'min_order',sAddress:'address',sLead:'lead_time',sNotes:'notes'};
+ Object.entries(fields).forEach(([el,key])=>{const input=document.getElementById(el);if(input)input.value=x[key]??''});
+ const submit=document.querySelector('#modalRoot button.primary[onclick="saveSupplier()"]')||document.querySelector('button.primary[onclick="saveSupplier()"]');
+ if(submit){submit.textContent='Save Changes';submit.onclick=()=>saveSupplierEdit(id)}
+}
+function saveSupplierEdit(id){
+ const su=getArr(SUP_KEY),x=su.find(v=>String(v.id)===String(id));
+ if(!x)return alert('Supplier not found.');
+ const name=document.getElementById('sName')?.value.trim()||'';
+ if(!name)return alert('Enter supplier name.');
+ if(su.some(v=>String(v.id)!==String(id)&&String(v.name||'').trim().toLowerCase()===name.toLowerCase()))return alert('Supplier name already exists.');
+ const min=Number(document.getElementById('sMin')?.value||0),lead=Number(document.getElementById('sLead')?.value||0);
+ if(!Number.isFinite(min)||min<0||!Number.isFinite(lead)||lead<0)return alert('Minimum order and lead time must be valid non-negative numbers.');
+ const old=x.name;
+ const changes={name,contact:sContact.value.trim(),phone:sPhone.value.trim(),email:sEmail.value.trim(),trn:sTrn.value.trim(),terms:sTerms.value.trim(),days:sDays.value.trim(),min_order:min,address:sAddress.value.trim(),lead_time:String(sLead.value||'').trim(),notes:sNotes.value.trim()};
+ const sp=supplierProducts(),master=ingredients();
+ if(name.toLowerCase()!==String(old).toLowerCase()){
+  // Local supplier links remain valid after a rename; no stock amount/cost is altered.
+  sp.forEach(p=>{if(String(p.supplier||'').trim().toLowerCase()===String(old).trim().toLowerCase())p.supplier=name});
+  master.forEach(i=>{if(String(i.supplier||i.supplier_name||'').trim().toLowerCase()===String(old).trim().toLowerCase()){if(i.supplier)i.supplier=name;if(i.supplier_name)i.supplier_name=name}});
+ }
+ Object.assign(x,changes);
+ // Prepare all records first; local persistence can fail if browser quota is exceeded.
+ try{
+  if(name.toLowerCase()!==String(old).toLowerCase()){
+   setSupplierProducts(sp);saveIngredients(master);
+  }
+  setArr(SUP_KEY,su);
+ }catch(err){alert('Supplier update could not be saved: '+(err.message||err));return}
+ closeModal();openPage('Suppliers & Purchasing');
+}
+function deleteSupplier(id){
+ const su=getArr(SUP_KEY),x=su.find(v=>String(v.id)===String(id));
+ if(!x)return alert('Supplier not found.');
+ const name=String(x.name||''),norm=name.trim().toLowerCase();
+ const relatedOrders=getArr(PO_KEY).filter(o=>String(o.supplier||'').trim().toLowerCase()===norm);
+ const mapped=ingredients().filter(i=>String(i.supplier||i.supplier_name||'').trim().toLowerCase()===norm);
+ if(relatedOrders.length||mapped.length){
+  return alert('Cannot delete '+name+': '+relatedOrders.length+' saved purchase order line(s) and '+mapped.length+' Master List ingredient(s) still reference this supplier. Reassign these records first.');
+ }
+ const linked=supplierProducts().filter(p=>String(p.supplier||'').trim().toLowerCase()===norm);
+ if(!confirm('Delete supplier "'+name+'" and its '+linked.length+' linked supplier product(s)? This removes browser-local supplier records and cannot be undone. Cloud purchasing/receiving history is not deleted.'))return;
+ try{
+  setSupplierProducts(supplierProducts().filter(p=>String(p.supplier||'').trim().toLowerCase()!==norm));
+  setArr(SUP_KEY,su.filter(v=>String(v.id)!==String(id)));
+ }catch(err){alert('Could not delete supplier: '+(err.message||err));return}
+ closeModal();openPage('Suppliers & Purchasing');
+}
 function openSupplierProduct(){const su=getArr(SUP_KEY);if(!su.length)return alert('Create a supplier first.');modal(`<div class="modalHead"><h2>Add Supplier Product</h2><button class="close" onclick="closeModal()">×</button></div><div class="formGrid"><div class="field"><label>SUPPLIER</label><select id="spSup">${su.map(x=>`<option>${esc(x.name)}</option>`).join('')}</select></div><div class="field"><label>PRODUCT / INGREDIENT</label><input id="spName"></div><div class="field"><label>SUPPLIER SKU</label><input id="spSku"></div><div class="field"><label>UNIT</label><select id="spUnit"><option>kg</option><option>g</option><option>ltr</option><option>ml</option><option>pcs</option></select></div><div class="field"><label>PRICE AED</label><input id="spPrice" type="number" min="0" step=".01"></div></div><button class="primary" onclick="saveSupplierProduct()">Save Product</button>`)}
 function saveSupplierProduct(){const name=spName.value.trim(),price=Number(spPrice.value||0);if(!name||price<0)return alert('Complete product and price.');let a=supplierProducts();a.push({id:Date.now(),supplier:spSup.value,name,sku:spSku.value.trim(),unit:spUnit.value,price,previous_price:price,updated_at:new Date().toISOString()});setSupplierProducts(a);closeModal();openPage('Suppliers & Purchasing')}
 function openSupplierExcel(){modal(`<div class="modalHead"><h2>Import Supplier Excel</h2><button class="close" onclick="closeModal()">×</button></div><div class="note">Supported: Supplier, Contact Person, Phone Number, Email, TRN / VAT Number, Payment Terms, Delivery Days, Minimum Order AED, Address / Location, Product, Supplier SKU, Unit, Agreed Price AED, Lead Time Days, Notes. Re-importing updates existing suppliers/products — it does not duplicate them.</div><label class="filePick">Choose Excel file<input id="supplierExcel" type="file" accept=".xlsx,.xls" style="display:none" onchange="importSupplierExcel(this.files[0])"></label>`) }
