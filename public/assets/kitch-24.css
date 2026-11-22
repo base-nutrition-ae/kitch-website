@@ -772,3 +772,31 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
  body #app #appMobileMenu.appMobileMenu::after{content:"☰"!important;font-size:18px!important;line-height:1!important}
  body #app .main .top{padding-left:51px!important}
 }
+
+
+/* KITCH SOFT SAGE-GRAY APP PALETTE */
+body:has(#app.app:not(.hidden)){background:#f2f4f3!important}
+body #app.app:not(.hidden){background:#f2f4f3!important;color:#2b3836!important}
+body #app .main{background:#f3f5f4!important}
+body #app .main .top{border-color:#e1e6e3!important}
+body #app .side,body #app .kitchIconRail{background:#ebefed!important;color:#31413c!important;border-color:#dfe5e2!important}
+body #app .side .sideLogoWrap{border-color:#dfe5e2!important}
+body #app .side .nav>button{color:#43524e!important}
+body #app .side .nav>button:hover{background:#dfe6e2!important}
+body #app .side .nav>button.active{background:#d9e1dd!important;color:#243a34!important}
+body #app .side .user{background:#e2e8e5!important;border-color:#d9e1dd!important}
+body #app .side .sideUtility{border-color:#d9e1dd!important}
+body #app .kitchRailButton.active,body #app .kitchRailButton:hover{background:#dce4df!important;color:#243a34!important}
+body #app .k26-metric,body #app .k26-panel,body #app .panel,body #app .card{
+ background:#fcfdfc!important;border-color:#e1e7e3!important;
+ box-shadow:0 1px 4px rgba(24,45,36,.025)!important
+}
+body #app .k26-metric>small,body #app .k26-metric>em{color:#85918b!important}
+body #app .k26-metric>strong{color:#2b3935!important}
+body #app .k26-heading p{color:#8a958e!important}
+body #app .k26-heading h2{color:#273a35!important}
+@media(max-width:850px){
+ body #app #appMobileMenu.appMobileMenu{background:#fcfdfc!important;border-color:#dce3df!important;color:#2c3e38!important}
+ body #app .side{background:#edf0ee!important}
+ body #app .main{background:#f3f5f4!important}
+}
