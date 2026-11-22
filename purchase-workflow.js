@@ -271,3 +271,72 @@ function installOffice(){
 officeFrame.addEventListener('load',installOffice);
 if(officeFrame.contentDocument?.getElementById('officeApp'))installOffice();
 })();
+
+// KITCH supplier catalogue guard for the "Order from External Supplier" dialog.
+// Works with legacy modal markup; restricts existing options without changing the Master List.
+(function(){
+ const allowed={
+  'gpfruit llc':new Set('cabbage|carrot|cucumber|tomato|cherry tomato|lettuce|rocket leaves|baby spinach|red onion|broccoli|lime|fresh coriander'.split('|')),
+  'butcher llc':new Set('chicken breast|chicken thigh'.split('|')),
+  'seaplus llc':new Set([]),
+  'urs llc':new Set('meal container 750 ml|meal container 1000 ml|clear salad bowl 1000 ml|salad bowl lid|paper takeaway bag|paper cup 12 oz|coffee cup lid 12 oz|wooden fork|wooden spoon|napkins|sauce cup 2 oz|sauce cup lid 2 oz|chicken breast|chicken thigh|brown rice|white rice|quinoa|soy sauce|sesame oil|olive oil|salt|black pepper|oats|honey'.split('|'))
+ };
+ const norm=x=>String(x||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+ function supplierKey(name){
+  const n=norm(name);return Object.keys(allowed).find(k=>n===k)||null;
+ }
+ function productName(option){
+  // Units can be in the displayed label, e.g. "Chicken breast (kg)".
+  return norm(option.textContent).replace(/\s+(?:kg|g|ltr|l|ml|pcs|pkt|pack|unit|units|each)$/,'').trim();
+ }
+ function selectFromLabel(root,kind){
+  const labels=Array.from(root.querySelectorAll('label'));
+  const l=labels.find(x=>norm(x.textContent).startsWith(kind) && x.querySelector('select'));
+  if(l)return l.querySelector('select');
+  const e=labels.find(x=>norm(x.textContent)===kind);
+  return e?.parentElement?.querySelector('select')||null;
+ }
+ function modalRoot(h){
+  let n=h;
+  while(n && n!==document.body){
+   if(n.querySelectorAll && n.querySelectorAll('select').length>=2 && /supplier/i.test(n.textContent||'') && /ingredient/i.test(n.textContent||''))return n;
+   n=n.parentElement;
+  }
+  return null;
+ }
+ function apply(root){
+  const supplier=selectFromLabel(root,'supplier');
+  if(!supplier)return;
+  const key=supplierKey(supplier.selectedOptions?.[0]?.textContent||supplier.value);
+  const all=Array.from(root.querySelectorAll('select'));
+  const ingredients=all.filter(sel=>sel!==supplier && !!sel.closest('label') && norm(sel.closest('label').textContent).startsWith('ingredient'));
+  if(!ingredients.length)return;
+  // Fail closed for unconfigured suppliers; no mixing unrelated products.
+  ingredients.forEach(sel=>{
+   if(!sel.__kitchAllOptions)sel.__kitchAllOptions=Array.from(sel.options).map(o=>o.cloneNode(true));
+   const original=sel.value;
+   const candidates=sel.__kitchAllOptions.filter(o=>!o.value|| (key && allowed[key].has(productName(o))));
+   const signature=(key||'none')+'|'+candidates.map(o=>o.value).join('|');
+   if(sel.dataset.kitchSupplierScope===signature)return;
+   sel.replaceChildren(...candidates.map(o=>o.cloneNode(true)));
+   if(Array.from(sel.options).some(o=>o.value===original))sel.value=original;
+   else sel.selectedIndex=0;
+   if(sel.selectedIndex>=0 && sel.value && !allowed[key]?.has(productName(sel.selectedOptions[0])))sel.value='';
+   sel.dataset.kitchSupplierScope=signature;
+  });
+  if(!supplier.__kitchSupplierListener){
+   supplier.__kitchSupplierListener=true;
+   supplier.addEventListener('change',()=>{for(const sel of ingredients)sel.dataset.kitchSupplierScope='';apply(root)});
+  }
+ }
+ let scheduled=false;
+ function scan(){
+  scheduled=false;
+  const h=Array.from(document.querySelectorAll('h1,h2,h3,[role="heading"]')).find(x=>/order from external supplier/i.test(x.textContent||''));
+  if(!h)return;
+  const root=modalRoot(h);
+  if(root)apply(root);
+ }
+ new MutationObserver(()=>{if(scheduled)return;scheduled=true;queueMicrotask(scan)}).observe(document.body,{childList:true,subtree:true});
+ scan();
+})();
