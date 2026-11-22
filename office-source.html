@@ -454,8 +454,8 @@ async function officePurchaseLoad(){
    const exists=orders.some(o=>o.request_id===r.id&&o.status!=='cancelled');
    const actions=status==='pending_approval'
     ?'<button class="btn" data-po-action="approve" data-id="'+safe(r.id)+'">Approve</button> <button class="btn" data-po-action="reject" data-id="'+safe(r.id)+'">Reject</button>'
-    :'View only';
-   return '<tr><td>'+safe(r.request_no)+'</td><td>'+r.lines.map(l=>safe(l.ingredient)).join(', ')+'</td><td>'+r.lines.map(l=>safe(l.quantity)+' '+safe(l.unit)).join(' · ')+'</td><td>'+safe(status.replaceAll('_',' '))+'</td><td>'+actions+'</td></tr>';
+    :'<button type="button" class="btn" data-po-action="view" data-id="'+safe(r.id)+'">View details</button>';
+   return '<tr><td><button type="button" class="officeRequestLink" data-po-action="view" data-id="'+safe(r.id)+'">'+safe(r.request_no)+'</button></td><td>'+r.lines.map(l=>safe(l.ingredient)).join(', ')+'</td><td>'+r.lines.map(l=>safe(l.quantity)+' '+safe(l.unit)).join(' · ')+'</td><td>'+safe(status.replaceAll('_',' '))+'</td><td>'+actions+'</td></tr>';
   }).join('')||'<tr><td colspan="5">No cloud purchase requests yet.</td></tr>';
   officePurchaseEl('officePurchaseOrders').innerHTML=[...groups.values()].map(o=>
    '<tr><td>'+safe(o.po_no)+'</td><td>'+safe(o.supplier)+'</td><td>'+safe(o.status)+'</td><td>'+money(o.total)+'</td></tr>'
@@ -496,9 +496,61 @@ async function officePurchaseDo(action,id){
  finally{officePurchaseBusy=false}
 }
 officePurchaseEl('officePurchaseRefresh').addEventListener('click',officePurchaseLoad);
+/* Read-only Main Office purchase request viewer. */
+function officeShowRequestDetails(id){
+ const r=(officePurchaseState.requestGroups||[]).find(x=>String(x.id)===String(id));
+ if(!r)return officePurchaseStatus('Request not found. Refresh the list.');
+ const lines=r.lines||[];
+ const details=document.createElement('div');
+ details.id='officeRequestDetailOverlay';
+ details.setAttribute('role','presentation');
+ details.innerHTML='<div class="officeRequestDetailCard" role="dialog" aria-modal="true" aria-label="Purchase request details" tabindex="-1">'+
+  '<div class="officeRequestDetailHeader"><div><small>PURCHASING · MAIN OFFICE · VIEW ONLY</small><h2>Purchase Request Details</h2><p>'+safe(r.request_no||r.id)+'</p></div><button type="button" class="officeRequestDetailClose" aria-label="Close request details">×</button></div>'+
+  '<div class="officeRequestDetailBody"><div class="officeRequestDetailMeta"><div><span>STATUS</span><strong>'+safe(String(r.status||'Unknown').replaceAll('_',' '))+'</strong></div><div><span>INGREDIENTS</span><strong>'+lines.length+'</strong></div><div><span>REQUEST</span><strong>'+safe(r.request_no||'—')+'</strong></div></div>'+
+  '<h3>Full ingredient list</h3><div class="officeRequestDetailTable"><table><thead><tr><th>#</th><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>'+
+  lines.map((line,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+safe(line.ingredient||line.name||'—')+'</b></td><td>'+safe(line.quantity??'—')+'</td><td>'+safe(line.unit||'—')+'</td></tr>').join('')+
+  '</tbody></table></div><div class="officeRequestDetailNotes"><span>NOTES</span><p>'+safe(r.notes||r.note||r.request_notes||'No notes provided')+'</p></div><p class="officeRequestDetailHint">This request is read-only. Main Office can approve or reject pending requests from the request list. Inventory changes only after Receiving.</p></div>'+
+  '<div class="officeRequestDetailFooter"><button type="button" class="btn officeRequestDetailDone">Close</button></div></div>';
+ const close=()=>{document.removeEventListener('keydown',escape);details.remove()};
+ const escape=e=>{if(e.key==='Escape')close()};
+ document.getElementById('officeRequestDetailOverlay')?.remove();
+ details.addEventListener('click',e=>{if(e.target===details||e.target.closest('.officeRequestDetailClose,.officeRequestDetailDone'))close()});
+ document.addEventListener('keydown',escape);
+ document.body.appendChild(details);
+ details.querySelector('.officeRequestDetailCard')?.focus();
+}
+const officeRequestDetailCSS=document.createElement('style');
+officeRequestDetailCSS.id='office-request-detail-styles';
+officeRequestDetailCSS.textContent=`
+.officeRequestLink{border:0;background:transparent;padding:4px 0;color:#151515;font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+#officeRequestDetailOverlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:999999;display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box}
+.officeRequestDetailCard{background:white;border-radius:24px;max-width:840px;width:100%;max-height:calc(100vh - 36px);overflow:auto;box-shadow:0 24px 75px #0004;color:#181818}
+.officeRequestDetailHeader{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:27px 30px 20px;border-bottom:1px solid #eee}
+.officeRequestDetailHeader small{color:#888;font-size:10px;font-weight:800;letter-spacing:.12em}
+.officeRequestDetailHeader h2{font-size:24px;letter-spacing:-.035em;margin:7px 0}
+.officeRequestDetailHeader p{font-size:12px;color:#777;margin:0}
+.officeRequestDetailClose{width:38px;height:38px;border:0;border-radius:50%;background:#f1f1f1;color:#222;font-size:22px;cursor:pointer}
+.officeRequestDetailBody{padding:22px 30px}.officeRequestDetailMeta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.officeRequestDetailMeta>div{background:#f6f6f6;padding:17px;border-radius:14px;min-width:0;overflow-wrap:anywhere}
+.officeRequestDetailMeta span,.officeRequestDetailNotes span{display:block;font-size:10px;font-weight:800;color:#888;letter-spacing:.08em;margin-bottom:9px}
+.officeRequestDetailMeta strong{display:block;font-size:14px;text-transform:capitalize}
+.officeRequestDetailBody h3{font-size:16px;margin:25px 0 12px}
+.officeRequestDetailTable{overflow-x:auto;border:1px solid #eee;border-radius:14px}
+.officeRequestDetailTable table{border-collapse:collapse;width:100%;min-width:450px}
+.officeRequestDetailTable th{background:#f8f8f8;text-align:left;font-size:11px;color:#777;padding:14px}
+.officeRequestDetailTable td{padding:16px 14px;font-size:13px;border-top:1px solid #eee}
+.officeRequestDetailNotes{padding:17px;margin-top:17px;background:#f6f6f6;border-radius:14px}
+.officeRequestDetailNotes p{margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.officeRequestDetailHint{font-size:12px;color:#777;line-height:1.6;margin:18px 0 0}
+.officeRequestDetailFooter{padding:18px 30px 24px;border-top:1px solid #eee;display:flex;justify-content:flex-end}
+.officeRequestDetailFooter button{border-radius:99px!important;background:#181818!important;color:#fff!important;padding:11px 25px!important}
+@media(max-width:600px){.officeRequestDetailHeader,.officeRequestDetailBody,.officeRequestDetailFooter{padding-left:16px;padding-right:16px}.officeRequestDetailMeta{grid-template-columns:1fr 1fr}.officeRequestDetailCard{border-radius:17px}}
+`;
+document.head.appendChild(officeRequestDetailCSS);
 officePurchaseEl('officePurchaseRequests').addEventListener('click',e=>{
  const button=e.target.closest('[data-po-action]');
  if(!button)return;
+ if(button.dataset.poAction==='view')return officeShowRequestDetails(button.dataset.id);
  officePurchaseDo(button.dataset.poAction,button.dataset.id);
 });
 function officePOUpdateTotal(){
