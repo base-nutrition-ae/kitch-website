@@ -20,6 +20,27 @@ function openKitchMainOffice(){
     .replace('label class="btn" style="cursor:pointer">Import Excel / CSV','label class="btn" style="display:none">Import Excel / CSV')
     .replace(".eq('restaurant_id',officeRid).order('name');\n if(error){ig('officeIngredientCount')",".eq('restaurant_id',officeRid).eq('is_active',true).eq('is_current_master',true).order('name');\n if(error){ig('officeIngredientCount')");
   html=kitchOfficeApplyChatNavigation(html);
+  // Recovery: do not leave Main Office on a permanent loading screen.
+  const loader=document.getElementById('kitchOfficeLoading');
+  if(loader)loader.textContent='Opening Main Office…';
+  const officeTimeout=setTimeout(()=>{
+    try{
+      const doc=frame.contentDocument;
+      const boot=doc?.getElementById('officeBoot');
+      if(boot){
+        boot.remove();
+        const auth=doc?.getElementById('officeAuth');
+        if(auth)auth.classList.remove('officeHidden');
+        const msg=doc?.getElementById('officeAuthMessage');
+        if(msg)msg.textContent='Main Office is taking too long to connect. Check your connection and reload the page.';
+      }
+      if(loader)loader.setAttribute('aria-hidden','true');
+    }catch(e){if(loader)loader.textContent='Main Office did not finish opening. Refresh to retry.';}
+  },14000);
+  frame.addEventListener('load',()=>{
+    clearTimeout(officeTimeout);
+    if(loader)loader.setAttribute('aria-hidden','true');
+  },{once:true});
   frame.srcdoc=html;frame.dataset.initialized='yes'
 }).catch(e=>{
   console.error('Main Office loading failed',e);frame.dataset.initialized='';
