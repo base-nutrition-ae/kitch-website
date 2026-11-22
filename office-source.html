@@ -477,7 +477,7 @@ async function refreshIngredients(){
  if(!db||!officeRid){ig('officeIngredientCount').textContent='Sign in required';return;}
  ig('officeIngredientCount').textContent='Refreshing…';
  ig('officeIngredientStatus').textContent='Loading ingredients…';
- const {data,error}=await db.from('ingredients').select('id,name,base_unit,category,supplier_name,receiving_type,last_unit_cost,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',officeRid).order('name');
+ const {data,error}=await db.from('ingredients').select('id,name,base_unit,category,supplier_name,receiving_type,last_unit_cost,reference_cost,par_target,minimum_stock,is_active').eq('restaurant_id',officeRid).eq('is_active',true).eq('is_current_master',true).order('name');
  if(error){ig('officeIngredientCount').textContent='Load failed';ig('officeIngredientStatus').textContent='Unable to load: '+error.message;throw error;}
  officeIngredients=data||[];ig('officeIngredientStatus').textContent='';renderIngredients();
 }

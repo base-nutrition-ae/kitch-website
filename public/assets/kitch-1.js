@@ -266,7 +266,18 @@ async function cloudLoadIngredients(){
      }
    });
  }
- localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+  const visible=await sb.rpc('kitch_team_current_master',{
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_action:'read'
+  });
+  if(visible.error){window.__kitchInventoryLoadError='Master catalog unavailable: '+visible.error.message;return;}
+  if(!Array.isArray(visible.data?.current_ids)) {window.__kitchInventoryLoadError='Master catalog response was incomplete';return;}
+  const keep=new Set(visible.data.current_ids.map(String));
+  window.__kitchLegacyMaster=Array.isArray(visible.data.legacy)?visible.data.legacy:[];
+  localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a.filter(x=>keep.has(String(x.cloud_id)))));
+ }else{
+  localStorage.setItem('kitch_demo_ingredients_v1',JSON.stringify(a));
+ }
 }
 async function ensureSupabaseAuth(){
  // Supabase-js already persists and refreshes sessions. getUser() validates the
@@ -1183,10 +1194,12 @@ function inventoryPage(){
  if(a.length===0&&(manage||storeMaster)){
   return '<div class="panel" style="max-width:940px;margin:28px auto;padding:38px;text-align:center;border-radius:24px"><div class="sub" style="font-size:11px;letter-spacing:.15em;color:#777">KITCH · FIRST-TIME SETUP</div><h2 style="font-size:30px;margin:12px 0">Start with your Master Excel</h2><p class="muted" style="max-width:650px;margin:0 auto 24px;line-height:1.7">Import one Excel to create ingredients, suppliers, categories, units, prices and supplier contact details. This company has no active ingredients yet.</p><div class="actions" style="justify-content:center"><button class="btn black" onclick="openImport()">Import Master Excel</button><button class="btn" onclick="openIngredient()">+ Add Ingredient Manually</button></div><p class="muted" style="font-size:12px;margin-top:18px">Opening stock stays at zero unless verified quantities are included. Existing records are not deleted.</p></div>';
  }
+ const previous=Array.isArray(window.__kitchLegacyMaster)?window.__kitchLegacyMaster:[];
+ const legacyNotice=previous.length?'<div style="text-align:right;margin:0 0 12px"><button class="btn" onclick="kitchShowPreviousStockHistory()">Previous Inventory History ('+previous.length+')</button></div>':'';
  const storeLocationEmpty=Boolean(window.__kitchInventoryEmptyLocation);
  const emptyStoreNotice=storeLocationEmpty?'<div class="kitchStoreOpeningNotice"><div><b>No opening stock recorded at this location</b><p>Ingredient records are available, but stock balances have not been established here. Receive a real supplier delivery or import verified opening stock before relying on shortage figures.</p></div><button type="button" class="btn black" onclick="openPage(\'Receiving\')">Go to Receiving</button></div>':'';
  const rows=a.map(x=>{const qty=contextStockCanonical(x);const status=storeLocationEmpty?'NOT RECORDED':qty<=0?'OUT':fromCanonical(qty,x.base_unit)<Number(x.minimum||0)?'LOW':'OK';const latest=Number(x.latest_cost)>0?x.latest_cost:x.reference_cost;const edit=(manage||storeMaster)?'<button class="btn" onclick="openEditIngredient(decodeURIComponent(&quot;'+encodeURIComponent(String(x.cloud_id||x.name))+'&quot;))">Edit</button>':'—';return `<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${kitchQuantityLabel(qty,x.base_unit)}</td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(latest,x.base_unit)}</td><td>AED ${kitchStockValue(x).toFixed(2)}</td><td>${esc(status)}</td><td>${edit}</td></tr>`;}).join('');
- return `<div class="kitchInventory"><div class="kitchStoreLocationEyebrow">${session==='store'?'CENTRAL STORE · INVENTORY':'KITCHEN · INVENTORY'}</div>${emptyStoreNotice}<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>${storeLocationEmpty?'STOCK RECORDS':'LOW / OUT'}</span><b>${storeLocationEmpty?'Not entered':a.filter(x=>fromCanonical(contextStockCanonical(x),x.base_unit)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
+ return `<div class="kitchInventory"><div class="kitchStoreLocationEyebrow">${session==='store'?'CENTRAL STORE · INVENTORY':'KITCHEN · INVENTORY'}</div>${legacyNotice}${emptyStoreNotice}<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>${storeLocationEmpty?'STOCK RECORDS':'LOW / OUT'}</span><b>${storeLocationEmpty?'Not entered':a.filter(x=>fromCanonical(contextStockCanonical(x),x.base_unit)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
  <div class="panel kitchStoreInventoryPanel"><h2>${session==='store'?'Central Store Inventory':'Unified Company Ingredient Master & Location Inventory'}</h2><p class="muted">One shared ingredient catalog per company. Every location sees the same SKUs, units and suppliers, while quantities remain separate by location. Kitchen managers can manage ingredients here. Changes are company-wide; stock stays location-specific. <b><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
  <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster)?'<button class="btn" onclick="openImport()">Import Master Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
@@ -1312,6 +1325,13 @@ async function saveIngredient(){
  let x={sku:'ING-'+String(a.length+1).padStart(3,'0'),name,category:iCat.value.trim(),supplier:iSupplier.value.trim(),receiving_type:iReceivingType.value||'Room Temperature',base_unit:iUnit.value,cost:Number(iCost.value||0),reference_cost:Number(iCost.value||0),latest_cost:Number(iCost.value||0),par:Number(iPar.value||0),minimum:Number(iMin.value||0),stock:0,stock_canonical:0,stock_location:stockLocation()};
  try{
  await cloudUpsertIngredient(x);
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+  if(!x.cloud_id)throw Error('Ingredient saved but cloud ID was not returned');
+  const include=await sb.rpc('kitch_team_include_current_item',{
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:x.cloud_id
+  });
+  if(include.error||include.data!==true)throw Error('Ingredient saved but current master was not updated: '+(include.error?.message||'not confirmed'));
+ }
  // Manual additions must use the same shared supplier mapping as Excel import.
  if(x.supplier&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
   const profile=await sb.rpc('kitch_team_import_supplier_master',{
@@ -1362,9 +1382,14 @@ function openImport(){
  /* Authorized staff writes checked by Supabase RPC. */
  if(session!=='manager' && session!=='store')return;
  const freshAccount=ingredients().length===0;
- modal(`<div class="modalHead"><h2>${freshAccount?'Set Up Ingredient Master':'Import Master Excel'}</h2><button class="close" onclick="closeModal()">×</button></div><p class="muted">${freshAccount?'First step: upload your Excel with ingredients, suppliers, categories, units, prices and contacts. Review before saving.':'One Excel updates ingredients, suppliers, categories, supplier contacts and purchasing data. Stock movements and purchase history stay unchanged. Review the preview before confirming.'}</p><label class="filePick"><b>Choose Excel file</b><br><small>.xlsx, .xls or .csv</small><input id="excelFile" type="file" accept=".xlsx,.xls,.csv" hidden onchange="readExcel(this.files[0])"></label><div id="preview"></div>${freshAccount?'':'<div id="kitchLegacyReconcile" style="margin-top:12px"></div>'}`); if(!freshAccount)kitchRenderSupplierReconcileEntry();
+ modal(`<div class="modalHead"><h2>${freshAccount?'Set Up Ingredient Master':'Import Master Excel'}</h2><button class="close" onclick="closeModal()">×</button></div><p class="muted">${freshAccount?'First step: upload your Excel with ingredients, suppliers, categories, units, prices and contacts. Review before saving.':'One Excel updates ingredients, suppliers, categories, supplier contacts and purchasing data. Stock movements and purchase history stay unchanged. Review the preview before confirming.'}</p><label class="filePick"><b>Choose Excel file</b><br><small>.xlsx, .xls or .csv</small><input id="excelFile" type="file" accept=".xlsx,.xls,.csv" hidden onchange="readExcel(this.files[0])"></label><div id="preview"></div>`);
 }
 
+function kitchShowPreviousStockHistory(){
+ const legacy=Array.isArray(window.__kitchLegacyMaster)?window.__kitchLegacyMaster:[];
+ const rows=legacy.map(x=>'<tr><td>'+esc(x.name||'')+'</td><td>'+esc(Number(x.stock||0))+'</td><td>Historical record retained</td></tr>').join('');
+ modal('<div class="modalHead"><h2>Earlier Inventory Records</h2><button class="close" onclick="closeModal()">×</button></div><p class="muted">These ingredients are not in the current Excel master. Their historical inventory movements and orders are retained, and any remaining stock must be reconciled separately. Quantities below are net recorded movements across locations, not a new stock adjustment.</p><div style="max-height:420px;overflow:auto"><table><tr><th>INGREDIENT</th><th>NET MOVEMENT QTY</th><th>STATUS</th></tr>'+rows+'</table></div>');
+}
 function kitchSupplierReconcileCandidates(){
  const active=new Set(ingredients().map(x=>String(x.name||'').trim().toLowerCase()));
  const grouped=new Map(),invalid=[],ambiguous=[],ready=[];
@@ -1478,25 +1503,15 @@ async function readExcel(file){
     const fmt=v=>Number(v.toFixed(3)).toString();
     return n>=1000?fmt(n/1000)+(liquid?' L':' kg'):fmt(n)+(liquid?' ml':' g');
   };
-  preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Choose Update / add to retain other ingredients, or Replace Active Master to keep only Excel ingredients. Replace first checks existing stock and open orders, and preserves history.</div><div class="field"><label>IMPORT MODE</label><select id="kitchImportMode" onchange="kitchImportModeChanged()" style="width:100%;height:48px;border:1px solid #ddd;border-radius:12px;padding:0 12px"><option value="update">${ingredients().length===0?'Create Master from Excel':'Update / add ingredients'}</option>${ingredients().length===0?'':`<option value="replace">Replace Active Master (${importRows.length} ingredients)</option>`}</select></div><div id="kitchImportWarning" class="note" style="display:none;background:#fff6e7">Reviewing the replacement. Old items with outstanding balances or open orders cannot be archived. History is retained.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${shortImportQty(x.par,x.base_unit)}</td><td>${shortImportQty(x.minimum,x.base_unit)}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Master Rows</button>`;
+  preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Choose Update / add to retain other ingredients, or Replace Active Master to show only the Excel ingredients. Previous stock and orders remain safely in history.</div><div class="field"><label>IMPORT MODE</label><select id="kitchImportMode" onchange="kitchImportModeChanged()" style="width:100%;height:48px;border:1px solid #ddd;border-radius:12px;padding:0 12px"><option value="update">${ingredients().length===0?'Create Master from Excel':'Update / add ingredients'}</option>${ingredients().length===0?'':`<option value="replace">Replace Active Master (${importRows.length} ingredients)</option>`}</select></div><div id="kitchImportWarning" class="note" style="display:none;background:#fff6e7">Your Excel will become the visible working master. Existing legacy stock and orders remain safely recorded in the history.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${shortImportQty(x.par,x.base_unit)}</td><td>${shortImportQty(x.minimum,x.base_unit)}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Master Rows</button>`;
  }catch(e){preview.innerHTML='<div class="note bad">Excel import stopped: '+esc(String(e.message||e))+'</div>'}
 }
-async function kitchImportModeChanged(){
+function kitchImportModeChanged(){
  const mode=document.getElementById('kitchImportMode')?.value;
- const warning=document.getElementById('kitchImportWarning');if(!warning)return;
- if(mode!=='replace'){warning.style.display='none';return}
- warning.style.display='block';
- warning.textContent='Checking old stock and open orders before replacing the active master…';
- if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin){
-  warning.textContent='Replace Active Master needs an authorized Kitchen Manager staff login. Sign in and try again.';return;
- }
- try{
-  const preview=await kitchPreviewMasterReplacement();
-  const blocked=Array.isArray(preview.protected)?preview.protected:[];
-  const safe=Array.isArray(preview.safe_to_archive)?preview.safe_to_archive:[];
-  warning.innerHTML='<b>'+safe.length+' old items can be archived.</b> '+blocked.length+' old items have stock or open purchase orders and must be resolved first.'+
-   (blocked.length?'<div style="margin-top:8px;color:#9b3131">'+blocked.map(x=>esc(x.name)+' (balance '+Number(x.stock||0)+')').join(', ')+'</div>':'<div style="margin-top:8px">You will confirm the final replacement before any data is changed.</div>');
- }catch(e){warning.textContent='Replacement safety check failed: '+String(e.message||e)}
+ const note=document.getElementById('kitchImportWarning');
+ if(!note)return;
+ note.style.display=mode==='replace'?'block':'none';
+ if(mode==='replace')note.textContent='Only the ingredients in this Excel will appear in Inventory and supplier selections. Older stock and purchase history remain stored separately and are not deleted.';
 }
 async function kitchPreviewMasterReplacement(){
  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Kitchen Manager staff sign-in required');
@@ -1516,12 +1531,9 @@ async function confirmImport(){
  if(ingredientImportBusy)return;
  if(!importRows.length)return alert('Choose an Excel file first.');
  const replaceMode=document.getElementById('kitchImportMode')?.value==='replace';
- if(replaceMode&&(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin))return alert('Sign in as an authorized Kitchen Manager for Replace Active Master.');
  if(replaceMode){
-  let preview;
-  try{preview=await kitchPreviewMasterReplacement()}catch(e){return alert('Replacement blocked: '+e.message)}
-  if(preview.protected.length)return alert('Replacement blocked. These old ingredients have existing stock or open orders: '+preview.protected.map(x=>x.name+' ('+Number(x.stock||0)+')').join(', ')+'. Reconcile these balances before replacing the master. No changes made.');
-  if(!confirm('REPLACE ACTIVE MASTER: Keep exactly '+importRows.length+' ingredients from this Excel and archive '+preview.safe_to_archive.length+' unmatched inactive-use ingredients? Historical records remain saved.'))return;
+  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Sign in as Kitchen Manager to replace the visible master.');
+  if(!confirm('Replace the visible Ingredient Master with '+importRows.length+' Excel items? Older stock and purchase history will be kept safely in the legacy record, not deleted.'))return;
  }
  document.getElementById('ingredientImportStatus')?.remove();
 
@@ -1567,16 +1579,11 @@ async function confirmImport(){
    if(completed%5===0)await new Promise(resolve=>setTimeout(resolve,0));
   }
   if(replaceMode){
-   // Recheck server state after the import. Any newly protected item blocks archiving.
-   const {data:archiveResult,error:archiveError}=await sb.rpc('kitch_team_replace_master_archive',{
+   const {data:masterSet,error:masterError}=await sb.rpc('kitch_team_current_master',{
     p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
-    p_keep_names:importRows.map(x=>x.name),p_preview:false
+    p_action:'replace',p_keep_names:importRows.map(x=>x.name)
    });
-   if(archiveError)throw Error('Ingredients were saved but replacement was NOT completed: '+archiveError.message);
-   if(!archiveResult||archiveResult.protected_count>0)throw Error('Replacement was not verified; old stocked ingredients were protected.');
-   const keep=new Set(importRows.map(x=>x.name.trim().toLowerCase()));
-   for(let i=a.length-1;i>=0;i--)if(!keep.has(a[i].name.trim().toLowerCase()))a.splice(i,1);
-   saveIngredients(a);
+   if(masterError||!Array.isArray(masterSet?.current_ids))throw Error('Ingredients imported but visible master was not switched: '+(masterError?.message||'Cloud confirmation missing'));
   }
   await cloudLoadIngredients();
   if(window.__kitchInventoryLoadError)throw Error('Imported, but stock could not reload: '+window.__kitchInventoryLoadError);
@@ -1623,13 +1630,13 @@ async function confirmImport(){
    });
    if(linkError)throw Error('Supplier '+row.supplier+' was saved, but ingredient link for '+row.name+' could not sync: '+linkError.message);
   }
+  await cloudLoadIngredients();
+  if(window.__kitchInventoryLoadError)throw Error('Inventory refresh failed: '+window.__kitchInventoryLoadError);
   syncSupplierMasterFromIngredients();
   kitchMergeSupplierDetailsFromImport(importRows);
   if(replaceMode){
-   await cloudLoadIngredients();
-   if(window.__kitchInventoryLoadError)throw Error('Could not verify replaced inventory: '+window.__kitchInventoryLoadError);
    const active=ingredients(),expected=new Set(importRows.map(x=>x.name.trim().toLowerCase()));
-   if(active.length!==expected.size||active.some(x=>!expected.has(x.name.trim().toLowerCase())))throw Error('Import finished but the active cloud master does not match the Excel. Check Inventory before making orders.');
+   if(active.length!==expected.size||active.some(x=>!expected.has(x.name.trim().toLowerCase())))throw Error('Cloud master did not match the '+importRows.length+' imported rows. Contact support; historical stock is safe.');
   }
   importRows=[];
   if(status)status.innerHTML='<b style="color:#26733a">✓ Unified import complete</b><div style="margin-top:6px">'+added+' added · '+updated+' updated · '+supplierMap.size+' supplier(s) synchronized to cloud purchasing</div>';
@@ -1713,7 +1720,7 @@ function openUnifiedMasterImport(){
  const p=document.querySelector('.modalBox p.muted');if(p)p.textContent='One Excel file updates Ingredient Master, Supplier Master and supplier contact details in the cloud. Review before confirming. Stock history is preserved.';
 }
 function purchasingPage(){
- const clean=syncSupplierMasterFromIngredients(),su=clean.su;
+ const clean=syncSupplierMasterFromIngredients(),su=clean.su.filter(x=>ingredients().some(i=>String(i.supplier||'').trim().toLowerCase()===String(x.name||'').trim().toLowerCase()));
  const master=ingredients(),assigned=master.filter(x=>String(x.supplier||'').trim());
  const counts=new Map();
  for(const x of assigned){const key=String(x.supplier).trim().toLowerCase();counts.set(key,(counts.get(key)||0)+1);}
@@ -1877,7 +1884,10 @@ async function kitchRefreshCloudPurchases(){
   if(supplierError)throw Error('Could not load supplier details: '+supplierError.message);
   kitchCloudPurchaseCatalog={
     role:String(data?.role||''),
-    ingredients:Array.isArray(data?.ingredients)?data.ingredients:[],
+    ingredients:(Array.isArray(data?.ingredients)?data.ingredients:[]).filter(x=>{
+     const selected=ingredients();
+     return selected.some(i=>String(i.cloud_id||'')===String(x.id||'')||String(i.name||'').trim().toLowerCase()===String(x.name||'').trim().toLowerCase());
+    }),
     suppliers:Array.isArray(supplierExtras?.suppliers)?supplierExtras.suppliers:[],
     requestSuppliers:Array.isArray(supplierExtras?.request_suppliers)?supplierExtras.request_suppliers:[],
     requests:Array.isArray(data?.requests)?data.requests:[],
