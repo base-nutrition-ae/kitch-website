@@ -5,6 +5,34 @@ const E=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const AED=v=>'AED '+Number(v||0).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
 let staffCache=null,staffKey='',staffLoading=false,staffError='';
 const listOpt=(items,empty)=>'<option value="">'+E(empty)+'</option>'+items.map(x=>'<option value="'+E(x.id)+'">'+E(x.name)+(x.unit?' ('+E(x.unit)+')':'')+'</option>').join('');
+// Supplier-scoped catalogue: use explicit imported supplier links when present; otherwise use ingredient category.
+function norm(v){return String(v??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function supplierType(s){const n=norm(s?.name);return n.includes('gpfruit')?'produce':n.includes('butcher')?'meat':n.includes('seaplus')?'seafood':n==='urs llc'||n.startsWith('urs ')?'general':null}
+function itemCategory(i){const c=norm(i.category||i.item_category||i.group||i.product_category||i.category_name||'');if(/fruit|vegetab|produce|fresh veg/.test(c))return 'produce';if(/seafood|fish|shellfish|prawn|shrimp/.test(c))return 'seafood';if(/meat|beef|lamb|poultry|chicken|turkey/.test(c))return 'meat';return c?'other':null}
+function itemSupplierLinks(i){const v=[i.supplier_id,i.supplier_name,i.supplier,i.supplier_ids,i.suppliers,i.supplier_names].filter(x=>x!=null&&x!=='');return v.flatMap(x=>Array.isArray(x)?x:[x]).flatMap(x=>typeof x==='object'?[x.id,x.name].filter(Boolean):String(x).split(/[;,|]/)).map(norm).filter(Boolean)}
+function supplierItems(ingredients,supplier){
+ if(!supplier)return [];
+ const type=supplierType(supplier),sid=norm(supplier.id),name=norm(supplier.name);
+ return ingredients.filter(i=>{
+  const links=itemSupplierLinks(i),category=itemCategory(i);
+  if(links.length)return links.includes(sid)||links.includes(name);
+  if(type==='produce'||type==='meat'||type==='seafood')return category===type;
+  if(type==='general')return category!=='produce'&&category!==null;
+  return false; // Unknown supplier needs explicit product assignments from Excel.
+ });
+}
+function supplierOptions(){return listOpt(staffCache?.suppliers||[],'Choose supplier')}
+function refreshSupplierIngredients(){
+ const supplier=(staffCache?.suppliers||[]).find(x=>String(x.id)===document.getElementById('cloudRequestSupplier')?.value);
+ const items=supplierItems(staffCache?.ingredients||[],supplier);
+ document.querySelectorAll('#cloudPurchaseItems .kitch-ingredient').forEach(sel=>{
+  const previous=sel.value;sel.innerHTML=listOpt(items,'Choose supplier product');
+  if(items.some(i=>String(i.id)===previous))sel.value=previous;
+ });
+ const hint=document.getElementById('cloudSupplierItemCount');
+ if(hint)hint.textContent=supplier?items.length+' products available from '+supplier.name:'Select a supplier to view products';
+}
+window.kitchRefreshSupplierIngredients=refreshSupplierIngredients;
 function groupLines(rows){const m=new Map();for(const r of rows){if(!m.has(r.id))m.set(r.id,{...r,lines:[]});m.get(r.id).lines.push(r)}return [...m.values()]}
 function itemRows(items){return '<div class="kitch-lines"><div class="kitch-line" style="display:grid;grid-template-columns:minmax(0,1fr) 110px 35px;gap:8px;align-items:end;margin-bottom:12px"><label>Ingredient<select class="kitch-ingredient">'+listOpt(items,'Choose ingredient')+'</select></label><label>Quantity<input class="kitch-quantity" type="number" min="0.001" step="any" placeholder="Qty"></label><button type="button" class="kitch-remove" style="height:44px;width:34px;display:flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;padding:0!important;border:0!important;background:transparent!important;background-color:transparent!important;color:#555!important;font-size:22px;font-weight:400;border-radius:0!important;box-shadow:none!important;cursor:pointer;appearance:none!important;-webkit-appearance:none!important">×</button></div></div>'}
 function readItems(root,ingredients){const rows=[...root.querySelectorAll('.kitch-line')];if(!rows.length||rows.length>50)throw Error('Add 1 to 50 ingredients');const ids=new Set();return rows.map(r=>{const item=ingredients.find(i=>i.id===r.querySelector('.kitch-ingredient')?.value);const qtyField=r.querySelector('.kitch-quantity'),qty=Number(qtyField?.value);if(!item||!qtyField?.value||!Number.isFinite(qty)||qty<=0||qty>100000)throw Error('Complete each ingredient and quantity');if(ids.has(item.id))throw Error('Combine duplicate ingredients');ids.add(item.id);return {ingredient_id:item.id,quantity:qty,unit:item.unit}})}
@@ -41,11 +69,11 @@ async function staffAct(action,extra){
  }catch(e){alert('Purchasing: '+e.message)}
 }
 window.kitchCloudRefresh=()=>staffRefresh(true);
-window.kitchAddLine=()=>{const root=document.querySelector('#cloudPurchaseItems .kitch-lines');if(!root)return;if(root.children.length>=50)return alert('Maximum 50 items');const line=root.firstElementChild.cloneNode(true);line.querySelector('select').value='';line.querySelector('input').value='';root.appendChild(line)};
+window.kitchAddLine=()=>{const root=document.querySelector('#cloudPurchaseItems .kitch-lines');if(!root)return;if(root.children.length>=50)return alert('Maximum 50 items');const line=root.firstElementChild.cloneNode(true);line.querySelector('select').value='';line.querySelector('input').value='';root.appendChild(line);refreshSupplierIngredients()};
 document.addEventListener('click',e=>{if(e.target.closest('#cloudPurchaseItems .kitch-remove')){const line=e.target.closest('.kitch-line');if(line.parentElement.children.length>1)line.remove()}});
-window.kitchCloudCreateRequest=()=>{try{const p_items=readItems(document.getElementById('cloudPurchaseItems'),staffCache?.ingredients||[]);staffAct('create',{p_items,p_notes:document.getElementById('cloudPrNotes')?.value||''})}catch(e){alert(e.message)}};
+window.kitchCloudCreateRequest=()=>{try{const supplier=(staffCache?.suppliers||[]).find(x=>String(x.id)===document.getElementById('cloudRequestSupplier')?.value);if(!supplier)throw Error('Select a supplier first');const allowed=supplierItems(staffCache?.ingredients||[],supplier);if(!allowed.length)throw Error('No products assigned to this supplier. Check the Excel supplier catalogue');const p_items=readItems(document.getElementById('cloudPurchaseItems'),allowed);const note=document.getElementById('cloudPrNotes')?.value||'';staffAct('create',{p_items,p_notes:'Supplier: '+supplier.name+(note?' | '+note:'')})}catch(e){alert(e.message)}};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-create-po]');if(b)window.kitchCloudMakeOrder(b.dataset.createPo)});
-window.kitchCloudMakeOrder=id=>{try{const p_supplier_id=document.getElementById('cloudSupplier_'+id)?.value;if(!p_supplier_id)throw Error('Choose approved supplier');const p_items=readPrices(document,id);staffAct('create_order',{p_request_id:id,p_supplier_id,p_items})}catch(e){alert(e.message)}};
+window.kitchCloudMakeOrder=id=>{try{const p_supplier_id=document.getElementById('cloudSupplier_'+id)?.value;if(!p_supplier_id)throw Error('Choose approved supplier');const supplier=(staffCache?.suppliers||[]).find(x=>String(x.id)===p_supplier_id);const request=groupLines(staffCache?.requests||[]).find(x=>String(x.id)===String(id));const allowed=new Set(supplierItems(staffCache?.ingredients||[],supplier).map(x=>String(x.id)));if(!request||request.lines.some(x=>!allowed.has(String(x.ingredient_id))))throw Error('This supplier does not sell all requested items. Select the correct supplier');const p_items=readPrices(document,id);staffAct('create_order',{p_request_id:id,p_supplier_id,p_items})}catch(e){alert(e.message)}};
 if(typeof roles!=='undefined' && roles.store && !roles.store.nav.includes('Suppliers & Purchasing')){
  roles.store.nav.splice(1,0,'Suppliers & Purchasing');
 }
