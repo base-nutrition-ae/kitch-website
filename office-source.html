@@ -340,20 +340,24 @@ async function loadOwner(){
  if(!members?.length){setVisible(false);say('Your email is signed in but has not been assigned as a KITCH Main Office owner. Ask the administrator to link your account.');return;}
  const rid=members[0].restaurant_id;officeRid=rid; // Ingredient Master is always initialized for the owner, not only on a hash route.
  refreshIngredients().catch(err=>{const status=document.getElementById('officeIngredientStatus');if(status)status.textContent='Ingredient load failed: '+err.message;});
- const [r,b,staff,inventory,ings,recipes,receipts,production]=await Promise.all([
+ const [r,b,staff,inventory,ings,recipes,receipts,production,purchaseRequests,purchaseOrders,purchaseOrderItems]=await Promise.all([
  db.from('restaurants').select('name,currency').eq('id',rid).single(),
  db.from('branches').select('id,name,code,branch_type,is_active').eq('restaurant_id',rid),
  db.from('staff_access').select('id,staff_name,role,section,branch_id,is_active').eq('restaurant_id',rid),
  db.from('kitch_office_inventory_read').select('ingredient_id,quantity_on_hand,indicative_unit_cost,branch_id').eq('restaurant_id',rid),
- db.from('ingredients').select('id,name,minimum_stock,is_active').eq('restaurant_id',rid),
+ db.from('ingredients').select('id,name,minimum_stock,is_active,is_current_master').eq('restaurant_id',rid).eq('is_active',true).eq('is_current_master',true),
  db.rpc('kitch_owner_operations_summary'),
  db.from('kitch_receiving_entries').select('id,branch_id,delivered_qty,rejected_qty,unit_price,received_at,invoice_filename').eq('restaurant_id',rid).gte('received_at',new Date(new Date().getFullYear(),new Date().getMonth(),1).toISOString()),
- Promise.resolve({data:null,error:null}) // Production runs are summarized securely by owner RPC above
+ Promise.resolve({data:null,error:null}), // Production runs are summarized securely by owner RPC above
+ db.from('purchase_requests').select('id,request_no,status,branch_id,requested_at,created_at,supplier_id').eq('restaurant_id',rid),
+ db.from('purchase_orders').select('id,po_no,status,branch_id,ordered_at,created_at,supplier_id').eq('restaurant_id',rid),
+ db.from('purchase_order_items').select('purchase_order_id,ordered_qty,unit_price').eq('restaurant_id',rid)
  ]);
  const errors=[r,b,staff,inventory,ings].filter(x=>x.error).map(x=>x.error.message);if(errors.length){setVisible(false);say('Data access needs attention: '+errors.join('; '));return;} if(recipes.error){setVisible(false);say('Recipe access needs attention: '+recipes.error.message);return;}
  officeRestaurantName=String(r.data?.name||'').trim();
  setVisible(true);
- const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=inventory.data||[];officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();
+ const currentIds=new Set((ings.data||[]).map(x=>String(x.id)));
+ const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=(inventory.data||[]).filter(x=>currentIds.has(String(x.ingredient_id)));officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();
  const val=bal.reduce((s,x)=>s+Number(x.quantity_on_hand||0)*Number(x.indicative_unit_cost||0),0);
  if(!bal.length){const note=document.querySelector('#overview .notice');if(note)note.textContent='No inventory rows are visible to this account yet. Check owner inventory permissions before interpreting AED 0.00 as a real balance.';}
  setKpi('Active Locations',String(branches.length).padStart(2,'0'));
@@ -389,29 +393,42 @@ async function loadOwner(){
  updateSummary('Low-stock ingredients',String(lows.length));
  updateSummary('Receiving requiring review',receivingConnected?String(received.filter(x=>Number(x.rejected_qty||0)>0).length)+' with rejected quantity':'Not connected');
  updateSummary('Production cost this month',ownerOps?money(Number(ownerOps.production_cost_this_month||0))+' · stock usage':'Not available');
- // Purchase orders are currently stored only in this browser's localStorage.
- // Show these records explicitly as device-local; never describe them as group-wide live data.
- let localOrders=[];
- try{const rows=JSON.parse(localStorage.getItem('kitch_demo_pos_v1')||'[]');if(Array.isArray(rows))localOrders=rows;}catch(e){}
- const groups=new Map();
- for(const row of localOrders){const key=String(row.po||row.request_id||row.id||'');if(!groups.has(key))groups.set(key,[]);groups.get(key).push(row);}
- const orders=[...groups.entries()].map(([id,lines])=>({id,lines,status:String(lines[0].status||'Pending Approval'),date:lines[0].created_at||'',supplier:lines[0].supplier||'',total:lines.reduce((sum,x)=>sum+Number(x.qty||0)*Number(x.price||0),0)}));
- const waiting=orders.filter(x=>x.status==='Pending Approval');
- const outstanding=orders.filter(x=>['Approved','Open','Sent'].includes(x.status));
- updateSummary('Pending purchase orders',String(waiting.length)+' on this device');
+
+ // Read the shared cloud purchasing ledger, not browser-only demo purchase orders.
+ const purchasingReady=!purchaseRequests.error&&!purchaseOrders.error&&!purchaseOrderItems.error;
+ const reqs=purchasingReady?(purchaseRequests.data||[]):[];
+ const sharedOrders=purchasingReady?(purchaseOrders.data||[]):[];
+ const sharedLines=purchasingReady?(purchaseOrderItems.data||[]):[];
+ const orderTotals=new Map();
+ for(const line of sharedLines){
+  const key=String(line.purchase_order_id);
+  orderTotals.set(key,(orderTotals.get(key)||0)+Number(line.ordered_qty||0)*Number(line.unit_price||0));
+ }
+ const waiting=reqs.filter(x=>String(x.status).toLowerCase()==='pending_approval');
+ const outstanding=sharedOrders.filter(x=>['approved','open','sent'].includes(String(x.status).toLowerCase()));
+ updateSummary('Pending purchase orders',purchasingReady?String(waiting.length)+' purchase requests':'Cloud purchasing unavailable');
  const purchasingCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Monthly Purchasing');
  const currentMonth=new Date().toISOString().slice(0,7);
- const monthly=orders.filter(x=>String(x.date).slice(0,7)===currentMonth&&['Approved','Open','Sent','Received','Closed'].includes(x.status));
- if(purchasingCard){purchasingCard.querySelector('.number').textContent=money(monthly.reduce((sum,x)=>sum+x.total,0));purchasingCard.querySelector('.foot').textContent='PO commitments · This browser only';}
+ const monthly=sharedOrders.filter(x=>String(x.ordered_at||x.created_at||'').slice(0,7)===currentMonth&&!['cancelled','rejected'].includes(String(x.status).toLowerCase()));
+ if(purchasingCard){
+  purchasingCard.querySelector('.number').textContent=purchasingReady?money(monthly.reduce((sum,x)=>sum+Number(orderTotals.get(String(x.id))||0),0)):'—';
+  purchasingCard.querySelector('.foot').textContent=purchasingReady?'Shared cloud purchase orders · Current month':'Cloud purchasing read unavailable';
+ }
  const summaryRoot=el('overview').querySelector('.summary-rows');
  let pendingDeliveries=el('ownerPendingDeliveries');if(!pendingDeliveries&&summaryRoot){pendingDeliveries=document.createElement('div');pendingDeliveries.id='ownerPendingDeliveries';summaryRoot.appendChild(pendingDeliveries);}
- if(pendingDeliveries)pendingDeliveries.innerHTML='<span>Orders awaiting delivery (this device)</span><strong>'+outstanding.length+'</strong>';
+ if(pendingDeliveries)pendingDeliveries.innerHTML='<span>Orders awaiting delivery (cloud)</span><strong>'+(purchasingReady?outstanding.length:'—')+'</strong>';
  const activityTable=[...el('overview').querySelectorAll('.titleline')].find(x=>x.querySelector('h2')?.textContent.trim()==='Recent Activity')?.parentElement?.querySelector('tbody');
- if(activityTable){const recent=orders.sort((a,b)=>String(b.date).localeCompare(String(a.date))).slice(0,8);activityTable.innerHTML=recent.map(x=>'<tr><td>'+safe(x.id)+' · '+safe(x.supplier)+'</td><td>Current browser</td><td>Not recorded</td><td>'+safe(x.status)+'</td><td>'+safe(String(x.date).slice(0,10)||'—')+'</td></tr>').join('')||'<tr><td colspan="5">No purchase orders saved in this browser. Orders on other staff devices are not visible here.</td></tr>';}
-
+ if(activityTable){
+  const activities=[
+   ...reqs.map(x=>({name:x.request_no||'Purchase request',branch_id:x.branch_id,status:x.status,date:x.requested_at||x.created_at})),
+   ...sharedOrders.map(x=>({name:x.po_no||'Purchase order',branch_id:x.branch_id,status:x.status,date:x.ordered_at||x.created_at}))
+  ].sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,8);
+  const locationName=id=>branches.find(x=>String(x.id)===String(id))?.name||'—';
+  activityTable.innerHTML=purchasingReady?(activities.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(locationName(x.branch_id))+'</td><td>Cloud</td><td>'+safe(x.status)+'</td><td>'+safe(String(x.date||'').slice(0,10)||'—')+'</td></tr>').join('')||'<tr><td colspan="5">No shared purchase requests or orders recorded yet.</td></tr>'):'<tr><td colspan="5">Cloud purchasing temporarily unavailable. No browser-only orders shown.</td></tr>';
+ }
  // Receipts are real spending evidence, but not a complete purchasing ledger.
 
- const notes=el('overview').querySelector('.note');if(notes)notes.textContent='Live inventory, recipes and low-stock alerts are connected. '+(receivingConnected?'Receiving entries are now read from saved deliveries. ':'Receiving entries need owner read permission. ')+'Purchasing is shown from this browser only (not shared between devices). Production stock usage is read from the cloud ledger; final production completion and billing are not yet cloud-connected.';
+ const notes=el('overview').querySelector('.note');if(notes)notes.textContent='Live inventory, recipes and low-stock alerts are connected. '+(receivingConnected?'Receiving entries are now read from saved deliveries. ':'Receiving entries need owner read permission. ')+(purchasingReady?'Purchase requests and purchase orders are read from the shared cloud. ':'Cloud purchasing could not be read; values are not shown as zero. ')+'Production stock usage is read from the cloud ledger; final production completion and billing are not yet cloud-connected.';
 
  const prodSummaryId='ownerProductionSummary';
  let prodSummary=el(prodSummaryId);
