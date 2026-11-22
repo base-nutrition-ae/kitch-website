@@ -1666,20 +1666,25 @@ function openUnifiedMasterImport(){
  const p=document.querySelector('.modalBox p.muted');if(p)p.textContent='One Excel file updates Ingredient Master, Supplier Master and supplier contact details in the cloud. Review before confirming. Stock history is preserved.';
 }
 function purchasingPage(){
- const clean=syncSupplierMasterFromIngredients(),su=clean.su,po=getArr(PO_KEY),sp=clean.sp;
- const activeMaster=ingredients(),matchedSupplier=activeMaster.filter(x=>String(x.supplier||'').trim()),reconcile=kitchSupplierReconcileCandidates();
+ const clean=syncSupplierMasterFromIngredients(),su=clean.su;
+ const master=ingredients(),assigned=master.filter(x=>String(x.supplier||'').trim());
+ const counts=new Map();
+ for(const x of assigned){const key=String(x.supplier).trim().toLowerCase();counts.set(key,(counts.get(key)||0)+1);}
  setTimeout(kitchRefreshCloudPurchases,80);
- const pending=po.filter(x=>purchaseStatus(x)==='Pending Approval').length,open=po.filter(x=>['Approved','Open'].includes(purchaseStatus(x))).length;
- const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
- return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>ACTIVE MASTER INGREDIENTS</span><b>${activeMaster.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
- <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
- <div class="note" style="margin:14px 0">Active Inventory: ${activeMaster.length} ingredients; ${matchedSupplier.length} assigned to suppliers. ${reconcile.ready.length} missing items remain in the older browser supplier catalog. Use <b>Inventory → Import Master Excel → Review Missing Ingredients</b> to add them safely with zero opening stock.</div><div class="note" style="margin:14px 0"><b id="kitchCloudPurchaseRole">Cloud Purchasing</b> · External supplier orders require Main Office approval before a purchase order is sent. Existing browser-only orders remain separate; cloud purchase orders do not deduct or receive stock.</div><div class="actions"><button id="kitchCloudRequestCreate" class="btn black" hidden onclick="kitchNewCloudPurchaseRequest()" title="External supplier purchase; Main Office approval required">+ Order from Supplier (Cloud)</button><button id="kitchCloudSupplierCreate" class="btn" hidden onclick="kitchNewCloudSupplier()">+ Cloud Supplier</button><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Refresh Cloud Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
- <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${activeMaster.filter(p=>String(p.supplier||'').trim().toLowerCase()===String(x.name||'').trim().toLowerCase()).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button> <button class="btn" onclick="editSupplier('${String(x.id).replace(/'/g,"\'")}')">Edit</button> <button class="btn" onclick="deleteSupplier('${String(x.id).replace(/'/g,"\'")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
+ return '<div class="grid"><div class="card"><span>SUPPLIERS</span><b>'+su.length+'</b></div><div class="card"><span>MASTER INGREDIENTS</span><b>'+master.length+'</b></div><div class="card"><span>SUPPLIER-LINKED</span><b>'+assigned.length+'</b></div><div class="card"><span>CLOUD ORDERS</span><b id="kitchCloudOrderCount">—</b></div></div>'+
+ '<div class="panel"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><h2 style="margin-bottom:5px">Purchasing</h2><p class="muted" style="margin:0">Kitchen request → Main Office approval → Purchase order → Receiving</p></div><button class="btn" onclick="openPage(\'Receiving\')">Receiving →</button></div>'+
+ '<div class="actions" style="margin:18px 0"><button id="kitchCloudRequestCreate" class="btn black" hidden onclick="kitchNewCloudPurchaseRequest()">+ Order from Supplier</button><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Refresh Orders</button></div>'+
+ '<div id="kitchCloudPurchaseRole" class="muted" style="font-size:12px;margin:0 0 9px">Loading cloud purchasing…</div>'+
+ '<div style="overflow:auto;margin:12px 0"><table style="min-width:760px"><thead><tr><th>REQUEST / PO</th><th>SUPPLIER</th><th>ITEMS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Loading shared orders…</td></tr></tbody></table></div>'+
+ '<h3 style="margin-top:28px">Supplier Master</h3><div class="actions" style="margin:8px 0 16px"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openPage(\'Inventory\')">Manage Ingredients / Import Excel</button></div>'+
+ '<div style="overflow-x:auto"><table style="min-width:850px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>INGREDIENTS</th><th>DETAILS</th></tr>'+
+ su.map(x=>'<tr><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.contact||'—')+'</td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.email||'—')+'</td><td>'+(counts.get(String(x.name||'').trim().toLowerCase())||0)+'</td><td><button class="btn" onclick="viewSupplierProfile('+JSON.stringify(String(x.id)).replace(/"/g,'&quot;')+')">View</button> <button class="btn" onclick="editSupplier('+JSON.stringify(String(x.id)).replace(/"/g,'&quot;')+')">Edit</button> <button class="btn" onclick="deleteSupplier('+JSON.stringify(String(x.id)).replace(/"/g,'&quot;')+')">Delete</button></td></tr>').join('')+
+ '</table></div></div>';
 }
 
 function viewSupplierProfile(id){
  const su=getArr(SUP_KEY),x=su.find(v=>String(v.id)===String(id));if(!x)return alert('Supplier not found.');
- const products=supplierProducts().filter(p=>String(p.supplier||'').toLowerCase()===String(x.name||'').toLowerCase());
+ const products=ingredients().filter(p=>String(p.supplier||'').trim().toLowerCase()===String(x.name||'').trim().toLowerCase()).map(p=>({name:p.name,sku:p.sku||'',unit:p.base_unit||'kg',price:Number(p.reference_cost||p.cost||0),supplier:x.name}));
  const detail=(label,value,cls='')=>`<div class="kitchSupplierDetail ${cls}"><span>${label}</span><strong title="${esc(value)}">${esc(value)}</strong></div>`;
  modal(`<style>
  .kitchSupplierProfile{min-width:0;color:#191919}
@@ -1854,6 +1859,8 @@ async function kitchRefreshCloudPurchases(){
    '<tr><td colspan="5" class="empty">No cloud purchase records yet.</td></tr>';
   const label=document.getElementById('kitchCloudPurchaseRole');
   if(label)label.textContent='Cloud workspace · '+(data?.role||'staff')+' · '+requests.length+' requests · '+grouped.size+' purchase orders';
+  const counter=document.getElementById('kitchCloudOrderCount');
+  if(counter)counter.textContent=String(grouped.size);
   const create=document.getElementById('kitchCloudRequestCreate');
   if(create)create.hidden=!['owner','kitchen_manager','executive_chef','production_staff'].includes(kitchCloudPurchaseCatalog.role);
   const supplierButton=document.getElementById('kitchCloudSupplierCreate');
