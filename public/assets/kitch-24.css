@@ -757,3 +757,18 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
  }
  body #app.app.mobileMenuOpen:not(.hidden)>.side{transform:translate3d(0,0,0)!important}
 }
+
+
+/* KITCH compact staff mobile menu button */
+@media screen and (max-width:850px){
+ body #app #appMobileMenu.appMobileMenu{
+   width:38px!important;min-width:38px!important;height:38px!important;
+   top:calc(17px + env(safe-area-inset-top,0px))!important;
+   left:16px!important;right:auto!important;
+   border-radius:11px!important;border:1px solid #e3e3e3!important;
+   background:#fff!important;color:#202020!important;
+   box-shadow:0 2px 8px rgba(0,0,0,.05)!important;
+ }
+ body #app #appMobileMenu.appMobileMenu::after{content:"☰"!important;font-size:18px!important;line-height:1!important}
+ body #app .main .top{padding-left:51px!important}
+}
