@@ -253,7 +253,7 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 </div>
 <div class="overview-panels">
 <div class="card"><div class="titleline"><h2>Operations Summary</h2><span class="ghost">All locations</span></div><div class="summary-rows">
-<div><span>Stock on hand</span><strong>Awaiting live data</strong></div><div><span>Low-stock ingredients</span><strong>—</strong></div><div><span>Pending purchase orders</span><strong>—</strong></div><div><span>Receiving requiring review</span><strong>—</strong></div><div><span>Production cost this month</span><strong>—</strong></div></div></div>
+<div><span>Stock on hand</span><strong>Awaiting live data</strong></div><div><span>Low / Out · Current Master</span><strong>—</strong></div><div><span>Pending purchase orders</span><strong>—</strong></div><div><span>Receiving requiring review</span><strong>—</strong></div><div><span>Production cost this month</span><strong>—</strong></div></div></div>
 <div class="card"><div class="titleline"><h2>Location Performance</h2><span class="ghost">Branch comparison</span></div><div class="overview-scroll"><table><thead><tr><th>Location</th><th>Inventory</th><th>Purchasing</th><th>Production</th><th>Status</th></tr></thead><tbody><tr><td class="empty" colspan="5">Locations and branch totals will appear after secure connection.</td></tr></tbody></table></div></div>
 <div class="card"><div class="titleline"><h2>Recent Activity</h2><span class="ghost">Receiving · Production · Purchasing</span></div><div class="overview-scroll"><table><thead><tr><th>Activity</th><th>Location</th><th>Staff</th><th>Status</th><th>Date</th></tr></thead><tbody><tr><td class="empty" colspan="5">No live activity connected yet. No transactions have been invented for this preview.</td></tr></tbody></table></div></div>
 <div class="card"><div class="titleline"><h2>Main Office Controls</h2><span class="ghost">Workspace</span></div><div class="overview-links"><button class="btn light" data-page="locations">Locations →</button><button class="btn light" data-page="staff">Staff &amp; Permissions →</button><button class="btn light" data-page="reports">Reports →</button><button class="btn light" data-page="settings">Company Account →</button></div><p class="overview-help">Access permissions, location limits and all financial totals must be enforced server-side before launch.</p></div>
@@ -386,11 +386,11 @@ async function loadOwner(){
  // Low stock is based on the ingredient's minimum stock threshold across all locations.
  // Ignore ingredients with no positive minimum threshold; compare only active ingredients.
  const totals=new Map();for(const x of bal)totals.set(x.ingredient_id,(totals.get(x.ingredient_id)||0)+Number(x.quantity_on_hand||0));
- const lows=(ings.data||[]).filter(x=>x.is_active!==false && Number(x.minimum_stock)>0 && (totals.get(x.id)||0)<Number(x.minimum_stock));
+ const lows=(ings.data||[]).filter(x=>x.is_active!==false && (totals.get(x.id)||0)<=Number(x.minimum_stock||0));
  const summary=[...document.querySelectorAll('#overview .summary-rows > div')];
  const updateSummary=(label,value)=>{const row=summary.find(x=>x.querySelector('span')?.textContent.trim()===label);if(row)row.querySelector('strong').textContent=value;};
  updateSummary('Stock on hand',String(bal.filter(x=>Number(x.quantity_on_hand)>0).length)+' stocked ingredient balances');
- updateSummary('Low-stock ingredients',String(lows.length));
+ updateSummary('Low / Out · Current Master',String(lows.length));
  updateSummary('Receiving requiring review',receivingConnected?String(received.filter(x=>Number(x.rejected_qty||0)>0).length)+' with rejected quantity':'Not connected');
  updateSummary('Production cost this month',ownerOps?money(Number(ownerOps.production_cost_this_month||0))+' · stock usage':'Not available');
 
