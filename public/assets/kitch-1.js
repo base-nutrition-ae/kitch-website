@@ -540,15 +540,31 @@ function renderNav(){
  const preferred=session==='store'?['Dashboard','Receiving','Inventory','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
  const mainItems=preferred.filter(x=>items.includes(x)).slice(0,4);
  for(const x of items){if(mainItems.length>=4)break;if(!mainItems.includes(x))mainItems.push(x)}
- const extra=items.filter(x=>!mainItems.includes(x) && !(items.includes('Suppliers & Purchasing') && x==='Receiving'));
- const makeButton=x=>{const b=document.createElement('button');b.type='button';b.textContent=x;b.addEventListener('click',()=>{document.getElementById('kitchMoreMenu')?.remove();openPage(x)});return b};
- // On phones show one flat list: no More popover, no nested scrolling.
- if(window.innerWidth<=850){
-  document.getElementById('kitchMoreMenu')?.remove();
-  nav.replaceChildren(...[...mainItems,...extra].map(makeButton));
- }else{
- nav.replaceChildren(...mainItems.map(makeButton));
- if(extra.length){const more=document.createElement('button');more.type='button';more.textContent='More ▾';more.className='kitchMoreTrigger';more.setAttribute('aria-haspopup','true');more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls','kitchMoreMenu');more.addEventListener('click',e=>{e.stopPropagation();let menu=document.getElementById('kitchMoreMenu');if(menu){menu.remove();more.setAttribute('aria-expanded','false');return}menu=document.createElement('div');menu.id='kitchMoreMenu';menu.className='kitchMoreMenu';extra.forEach(x=>menu.appendChild(makeButton(x)));if(window.innerWidth<=850){menu.classList.add('kitchMoreInline');more.insertAdjacentElement('afterend',menu);more.setAttribute('aria-expanded','true');requestAnimationFrame(()=>{more.scrollIntoView({block:'nearest',behavior:'smooth'});});}else{document.body.appendChild(menu);const r=more.getBoundingClientRect();menu.style.top=(r.bottom+8)+'px';menu.style.left=Math.max(12,Math.min(r.left,innerWidth-270))+'px';more.setAttribute('aria-expanded','true');}});nav.appendChild(more)}
+ const extra=items.filter(x=>!mainItems.includes(x)&&!(items.includes('Suppliers & Purchasing')&&x==='Receiving'));
+ const ordered=[...mainItems,...extra];
+ const makeButton=x=>{
+   const b=document.createElement('button');
+   b.type='button';b.textContent=x;b.title=x;
+   b.dataset.short=({'Dashboard':'⌂','Inventory':'▦','Suppliers & Purchasing':'⇄','Production':'▤','Recipes':'▣','Label':'▧','Receiving':'↓','Stock Requests':'↗','Stock Transfer':'⇄','Waste & Adjustments':'◌','Reports':'▥','Notifications':'◉'}[x]||x.slice(0,1).toUpperCase());
+   b.setAttribute('aria-label',x);
+   b.addEventListener('click',()=>{openPage(x)});
+   return b;
+ };
+ document.getElementById('kitchMoreMenu')?.remove();
+ nav.replaceChildren(...ordered.map(makeButton));
+ const side=document.querySelector('#app .side');
+ if(side){
+  const brand=side.querySelector('.sideLogoWrap');
+  if(brand&&!brand.querySelector('.kitchSidebarCollapse')){
+   const btn=document.createElement('button');btn.type='button';btn.className='kitchSidebarCollapse';
+   btn.setAttribute('aria-label','Collapse sidebar');btn.title='Collapse sidebar';btn.textContent='☰';
+   btn.addEventListener('click',()=>{
+    const appEl=document.getElementById('app');const collapsed=appEl.classList.toggle('kitchSidebarCollapsed');
+    btn.setAttribute('aria-label',collapsed?'Expand sidebar':'Collapse sidebar');
+    btn.title=collapsed?'Expand sidebar':'Collapse sidebar';
+   });
+   brand.appendChild(btn);
+  }
  }
  const u=document.getElementById('upgradeNav');if(u)u.innerHTML=(session==='owner'&&packageType()==='restaurant')?'<button onclick="openPage(\'Subscription Setup\')">Upgrade Subscription</button>':''
 }
@@ -598,21 +614,16 @@ function priceAlertsPage(){
 function toggleAppMobileMenu(open){
  const a=document.getElementById('app');
  if(!a)return;
- // Staff mobile drawer has its own close control in the drawer header.
  const brand=a.querySelector('.side .sideLogoWrap');
  if(brand&&!brand.querySelector('.kitchDrawerClose')){
-  const close=document.createElement('button');
-  close.type='button';close.className='kitchDrawerClose';
-  close.setAttribute('aria-label','Close navigation');
-  close.textContent='×';
-  close.addEventListener('click',()=>toggleAppMobileMenu(false));
-  brand.appendChild(close);
+  const close=document.createElement('button');close.type='button';
+  close.className='kitchDrawerClose';close.setAttribute('aria-label','Close navigation');
+  close.textContent='×';close.addEventListener('click',()=>toggleAppMobileMenu(false));brand.appendChild(close);
  }
  const trigger=document.getElementById('appMobileMenu');
  if(trigger){trigger.setAttribute('aria-expanded',String(!!open));trigger.setAttribute('aria-label',open?'Close navigation':'Open menu');}
  a.classList.toggle('mobileMenuOpen',!!open);
- const more=document.getElementById('kitchMoreMenu');
- if(!open&&more){more.remove();document.querySelector('.kitchMoreTrigger')?.setAttribute('aria-expanded','false');}
+ document.getElementById('kitchMoreMenu')?.remove();
  document.body.style.overflow=open?'hidden':'';
 }
 
