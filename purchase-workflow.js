@@ -70,13 +70,47 @@ if(typeof purchasingPage==='function'){
      r.lines.map(x=>E(x.quantity)+' '+E(x.unit)).join(', ')+'</td><td>'+E(r.status)+'</td><td>'+action+'</td></tr>';
   }).join('');
   const orderRows=orderGroups.map(o=>'<tr><td>'+E(o.po_no)+'</td><td>'+E(o.supplier)+'</td><td>'+E(o.status)+'</td><td>'+AED(o.lines.reduce((sum,x)=>sum+Number(x.total||0),0))+'</td></tr>').join('');
-  return '<div class="panel"><h2>Cloud Purchasing</h2><p class="muted">Kitchen request → Main Office approval → Store Manager order → Store receiving. Purchase approvals never change inventory.</p><div class="actions"><button class="btn" onclick="kitchCloudRefresh()">Refresh from cloud</button></div>'+
-   (canReq?'<h3>Request Ingredients</h3><div id="cloudPurchaseItems">'+itemRows(ingredients)+'</div><div class="actions"><button class="btn" onclick="kitchAddLine()">+ Add ingredient</button><input id="cloudPrNotes" maxlength="300" placeholder="Notes (optional)"><button class="btn black" onclick="kitchCloudCreateRequest()">Submit all items</button></div>':'')+
-   (canPO&&!suppliers.length?'<p class="note">No approved suppliers available. Ask Main Office to register a supplier before preparing an order.</p>':'')+
+  return '<div class="panel kitch-chef-purchasing"><div class="kitch-chef-top"><div><h2>Kitchen Purchasing</h2><p class="muted">Create one combined ingredient request. Main Office reviews and approves. No stock change until receiving.</p></div>'+(canReq?'<button type="button" class="btn black" onclick="kitchOpenChefRequest()">+ New Purchase Request</button>':'')+'</div>'+
+   (canReq?'<div id="kitchChefRequestModal" class="kitch-chef-overlay" style="display:none"><div class="kitch-chef-dialog" role="dialog" aria-modal="true" aria-label="New Purchase Request"><div class="kitch-chef-dialog-head"><div><div class="kitch-chef-eyebrow">PURCHASING · MAIN KITCHEN</div><h2>New Purchase Request</h2><p class="muted">Select ingredients and quantities. Main Office will review and approve the request.</p></div><button type="button" class="kitch-chef-close" onclick="kitchCloseChefRequest()" aria-label="Close">×</button></div><div class="kitch-chef-dialog-body"><div class="kitch-chef-items-head"><strong>Ingredients & quantities</strong><span>Up to 50 items in one request</span></div><div id="cloudPurchaseItems">'+itemRows(ingredients)+'</div><button type="button" class="btn kitch-chef-add" onclick="kitchAddLine()">+ Add Ingredient</button><div class="kitch-chef-summary"><span><b id="kitchChefCount">1 ingredient</b> in this request</span><span>Stock is updated only after receiving</span></div><label class="kitch-chef-note">NOTES (OPTIONAL)<input id="cloudPrNotes" maxlength="300" placeholder="Delivery date or special instructions"></label></div><div class="kitch-chef-dialog-foot"><button type="button" class="btn" onclick="kitchCloseChefRequest()">Cancel</button><button type="button" class="btn black" onclick="kitchCloudCreateRequest()">Submit Entire Request</button></div></div></div>':'')+
+   '<div class="actions"><button class="btn" onclick="kitchCloudRefresh()">Refresh requests</button></div>'+
    '<h3>Purchase Requests</h3><div style="overflow:auto"><table><tr><th>Request</th><th>Ingredient</th><th>Quantity</th><th>Status</th><th>Action</th></tr>'+reqRows+'</table></div>'+
    '<h3>Purchase Orders</h3><div style="overflow:auto"><table><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Amount</th></tr>'+orderRows+'</table></div></div>';
  };
 }
+window.kitchOpenChefRequest=()=>{const modal=document.getElementById('kitchChefRequestModal');if(modal){modal.style.display='flex';updateChefCount();modal.querySelector('.kitch-ingredient')?.focus()}};
+window.kitchCloseChefRequest=()=>{const modal=document.getElementById('kitchChefRequestModal');if(modal)modal.style.display='none'};
+function updateChefCount(){const count=document.querySelectorAll('#cloudPurchaseItems .kitch-line').length;const target=document.getElementById('kitchChefCount');if(target)target.textContent=count+' ingredient'+(count===1?'':'s')}
+document.addEventListener('click',e=>{if(e.target.id==='kitchChefRequestModal')kitchCloseChefRequest();if(e.target.closest('#cloudPurchaseItems .kitch-remove')||e.target.closest('.kitch-chef-add'))queueMicrotask(updateChefCount)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')kitchCloseChefRequest()});
+const chefModalStyle=document.createElement('style');
+chefModalStyle.id='kitch-chef-purchasing-dialog-style';
+chefModalStyle.textContent=`
+.kitch-chef-top{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:20px}
+.kitch-chef-overlay{position:fixed!important;inset:0!important;z-index:999999!important;align-items:center;justify-content:center;background:rgba(0,0,0,.58);padding:20px;box-sizing:border-box;overflow-y:auto}
+.kitch-chef-dialog{width:min(900px,100%);max-height:calc(100vh - 40px);overflow:auto;box-sizing:border-box;border-radius:24px;background:white;box-shadow:0 24px 90px #0003;color:#161616}
+.kitch-chef-dialog-head{padding:28px 30px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:15px;border-bottom:1px solid #eee}
+.kitch-chef-eyebrow{font-size:10px;font-weight:800;letter-spacing:.15em;color:#888;margin-bottom:9px}
+.kitch-chef-dialog-head h2{font-size:25px;letter-spacing:-.04em;margin:0 0 8px}
+.kitch-chef-dialog-head p{font-size:12px;margin:0}
+.kitch-chef-close{height:36px;width:36px;flex:0 0 36px;border:0;border-radius:50%;background:#f2f2f2;color:#111;font-size:22px;cursor:pointer}
+.kitch-chef-dialog-body{padding:24px 30px}
+.kitch-chef-items-head{display:flex;justify-content:space-between;gap:15px;margin-bottom:12px;font-size:13px}
+.kitch-chef-items-head span{font-size:11px;color:#888}
+.kitch-chef-dialog #cloudPurchaseItems{max-width:none!important;border:1px solid #ececec!important;border-radius:16px!important;padding:14px!important;background:white!important;margin:0!important}
+.kitch-chef-dialog #cloudPurchaseItems .kitch-line{grid-template-columns:minmax(0,1fr) 160px 54px!important;gap:14px!important;margin:0 0 12px!important;align-items:end!important}
+.kitch-chef-dialog #cloudPurchaseItems .kitch-line:last-child{margin-bottom:0!important}
+.kitch-chef-dialog #cloudPurchaseItems label{font-size:11px!important;color:#666!important;font-weight:700!important}
+.kitch-chef-dialog #cloudPurchaseItems select,.kitch-chef-dialog #cloudPurchaseItems input{height:46px!important;font-size:14px!important;border:1px solid #dedede!important;border-radius:12px!important;background:#fff!important}
+.kitch-chef-dialog #cloudPurchaseItems button.kitch-remove{width:54px!important;height:43px!important;border:1px solid #e5e5e5!important;border-radius:99px!important;font-size:16px!important}
+.kitch-chef-add{margin:12px 0!important;border-radius:99px!important;background:#fff!important;color:#171717!important;border:1px solid #e0e0e0!important;min-height:36px!important}
+.kitch-chef-summary{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:#f5f5f5;border:1px solid #eaeaea;border-radius:13px;padding:15px 18px;color:#666;font-size:12px;margin:8px 0 22px}
+.kitch-chef-note{display:block;font-size:11px;font-weight:800;color:#666;letter-spacing:.025em}
+.kitch-chef-note input{display:block;box-sizing:border-box;width:100%;height:48px;margin-top:8px;padding:0 15px;border:1px solid #ddd;border-radius:12px;background:#fff;font-size:14px}
+.kitch-chef-dialog-foot{border-top:1px solid #eee;padding:18px 30px 24px;display:flex;justify-content:flex-end;gap:10px}
+.kitch-chef-dialog-foot .btn{border-radius:99px!important;min-height:44px!important;padding:11px 20px!important}
+@media(max-width:600px){.kitch-chef-overlay{padding:8px}.kitch-chef-dialog{max-height:calc(100vh - 16px);border-radius:17px}.kitch-chef-dialog-head,.kitch-chef-dialog-body,.kitch-chef-dialog-foot{padding-left:16px;padding-right:16px}.kitch-chef-dialog #cloudPurchaseItems .kitch-line{grid-template-columns:minmax(0,1fr) 92px 34px!important;gap:6px!important}.kitch-chef-dialog #cloudPurchaseItems button.kitch-remove{width:34px!important}}
+`;
+document.head.appendChild(chefModalStyle);
 /* Match the clean Main Office purchasing look for chefs, without touching stock logic. */
 const chefStyle=document.createElement('style');
 chefStyle.id='kitch-kitchen-request-ui';
