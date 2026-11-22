@@ -239,7 +239,7 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 <div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;justify-content:space-between;align-items:center"><p style="font-size:12px;color:#777;margin:0">Saved supplier profiles automatically fill in order contact details.</p><button class="btn black" id="officeSupplierAdd" type="button">+ Add Supplier</button></div>
 <p id="officeSupplierMessage" role="status" style="margin:8px 0;font-size:12px;min-height:16px"></p><div id="officeSuppliers" class="officeSupplierCards">Loading…</div></div>
 <div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
-<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden>
+<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>SUPPLIER</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="6">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden>
   <div class="kitchPOHead">
     <div><div class="kitchPOEyebrow">PURCHASING · MAIN OFFICE</div><h3>Send Kitchen Purchase Request</h3><p id="officePOComposerSummary"></p></div>
     <button type="button" class="kitchPOClose" id="officePOClose" aria-label="Close order preview">×</button>
@@ -461,7 +461,7 @@ function normalizeImportRows(rows){
 ig('officeIngredientImport').onchange=async e=>{const file=e.target.files[0];if(!file)return;let done=0;try{await refreshIngredients();let rows;if(/\.xlsx?$/i.test(file.name)){const reader=window.parent.XLSX;if(!reader)throw Error('Excel reader unavailable. Check connection and retry.');const wb=reader.read(await file.arrayBuffer(),{type:'array'});rows=reader.utils.sheet_to_json(wb.Sheets[wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0]],{defval:''});}else{const csv=parseCSV(await file.text());if(!csv.length)throw Error('Empty file');const headers=csv.shift();rows=csv.map(r=>Object.fromEntries(headers.map((k,i)=>[k,r[i]??''])));}const items=normalizeImportRows(rows);if(!items.length||items.length>500)throw Error('Import must contain 1–500 ingredients');if(!confirm('Import '+items.length+' ingredients? Prices are AED per listed base unit. Missing fields on existing ingredients will be preserved. Stock quantities will not change.'))return;for(const x of items){await saveIngredient(x);done++;ig('officeIngredientStatus').textContent='Imported '+done+' of '+items.length;}await refreshIngredients();alert('Imported and verified '+done+' ingredients.');}catch(err){ig('officeIngredientStatus').textContent='Import stopped after '+done+' verified rows: '+err.message;}finally{e.target.value='';}};
 const oldShowPage=showPage;showPage=function(page){oldShowPage(page);if(page==='ingredients'&&officeRid)refreshIngredients().catch(err=>{ig('officeIngredientCount').textContent='Load failed';ig('officeIngredientStatus').textContent=err.message;});};
 
-const officePurchaseState={requests:[],orders:[],suppliers:[],dispatches:[]};
+const officePurchaseState={requests:[],orders:[],suppliers:[],dispatches:[],requestSuppliers:[]};
 let officeSupplierProfileEditing=null;
 let officePurchaseBusy=false;
 const officePurchaseEl=id=>document.getElementById(id);
@@ -484,6 +484,9 @@ async function officePurchaseLoad(){
   if(profileError)throw Error('Supplier Master unavailable: '+profileError.message);
   const suppliers=Array.isArray(profileRows)?profileRows.filter(x=>x.is_approved&&x.is_active):[];
   officePurchaseState.requests=requests;officePurchaseState.orders=orders;officePurchaseState.suppliers=suppliers;
+  const {data:supplierLinks,error:supplierLinksError}=await db.rpc('kitch_purchase_supplier_view',{p_restaurant_id:officeRid});
+  if(supplierLinksError)throw Error('Could not load chef-selected suppliers: '+supplierLinksError.message);
+  officePurchaseState.requestSuppliers=Array.isArray(supplierLinks?.request_suppliers)?supplierLinks.request_suppliers:[];
   const {data:sentRows,error:sentError}=await db.from('kitch_supplier_order_dispatches').select('request_id,supplier_id,recipient_email,sent_at').eq('restaurant_id',officeRid);
   if(sentError)throw Error('Supplier dispatch history unavailable: '+sentError.message);
   officePurchaseState.dispatches=sentRows||[];
@@ -493,6 +496,11 @@ async function officePurchaseLoad(){
    requestGroups.get(item.id).lines.push(item);
   }
   officePurchaseState.requestGroups=[...requestGroups.values()];
+  for(const req of officePurchaseState.requestGroups){
+    const link=officePurchaseState.requestSuppliers.find(x=>String(x.request_id)===String(req.id));
+    req.chef_supplier_id=link?.supplier_id||null;
+    req.chef_supplier_name=link?.supplier_name||null;
+  }
   officePurchaseEl('officeSupplierCount').textContent=suppliers.length+' approved';
   officePurchaseEl('officeRequestCount').textContent=requestGroups.size+' requests';
   const groups=new Map();
@@ -514,8 +522,8 @@ async function officePurchaseLoad(){
     ?'<div class="officeRequestActions"><button type="button" class="officeRequestAction muted" data-po-action="create_order" data-id="'+safe(r.id)+'">View Order</button></div>'
     :'<div class="officeRequestActions"><button type="button" class="officeRequestAction muted" data-po-action="view" data-id="'+safe(r.id)+'">View Order</button></div>';
    const statusLabel=dispatch?'<span class="officeRequestStatus sent">Sent</span>':status==='approved'?'<span class="officeRequestStatus approved">Approved</span>':status==='pending_approval'?'<span class="officeRequestStatus pending">Pending</span>':'<span class="officeRequestStatus">'+safe(status.replaceAll('_',' '))+'</span>';
-   return '<tr><td><button type="button" class="officeRequestLink" data-po-action="view" data-id="'+safe(r.id)+'">'+safe(r.request_no)+'</button></td><td>'+r.lines.map(l=>safe(l.ingredient)).join(', ')+'</td><td>'+r.lines.map(l=>safe(l.quantity)+' '+safe(l.unit)).join(' · ')+'</td><td>'+statusLabel+'</td><td>'+actions+'</td></tr>';
-  }).join('')||'<tr><td colspan="5">No cloud purchase requests yet.</td></tr>';
+   return '<tr><td><button type="button" class="officeRequestLink" data-po-action="view" data-id="'+safe(r.id)+'">'+safe(r.request_no)+'</button></td><td><b>'+safe(r.chef_supplier_name||'Not selected')+'</b></td><td>'+r.lines.map(l=>safe(l.ingredient)).join(', ')+'</td><td>'+r.lines.map(l=>safe(l.quantity)+' '+safe(l.unit)).join(' · ')+'</td><td>'+statusLabel+'</td><td>'+actions+'</td></tr>';
+  }).join('')||'<tr><td colspan="6">No cloud purchase requests yet.</td></tr>';
   officePurchaseEl('officePurchaseOrders').innerHTML=[...groups.values()].map(o=>
    '<tr><td>'+safe(o.po_no)+'</td><td>'+safe(o.supplier)+'</td><td>'+safe(o.status)+'</td><td>'+money(o.total)+'</td></tr>'
   ).join('')||'<tr><td colspan="4">No cloud purchase orders yet.</td></tr>';
@@ -530,8 +538,12 @@ function officePOShow(id){
  officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredient'+(req.lines.length===1?'':'s');
  const opts=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
  officePurchaseEl('officePOSupplier').innerHTML='<option value="">Select supplier</option>'+opts;
- const defaultSupplier=officePurchaseState.suppliers.find(x=>req.lines.some(l=>String(l.supplier||'').toLowerCase()===String(x.name||'').toLowerCase()));
+ const defaultSupplier=req.chef_supplier_id
+  ?officePurchaseState.suppliers.find(x=>String(x.id)===String(req.chef_supplier_id))
+  :officePurchaseState.suppliers.find(x=>req.lines.some(l=>String(l.supplier||'').toLowerCase()===String(x.name||'').toLowerCase()));
  if(defaultSupplier)officePurchaseEl('officePOSupplier').value=defaultSupplier.id;
+ officePurchaseEl('officePOSupplier').disabled=!!req.chef_supplier_id;
+ officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredients · '+(req.chef_supplier_name||'Legacy request: choose supplier');
  officePurchaseEl('officePOSupplierEmail').value='';
  officePurchaseEl('officePOLines').innerHTML=req.lines.map((l,i)=>'<div class="kitchPOLine" style="display:flex;justify-content:space-between;align-items:center;gap:15px"><div><strong>'+(i+1)+'. '+safe(l.ingredient)+'</strong><small>Requested by kitchen</small></div><b style="font-size:14px;white-space:nowrap">'+safe(l.quantity)+' '+safe(l.unit)+'</b></div>').join('');
  officePurchaseEl('officePORequestNo').textContent=req.request_no||req.id;
@@ -575,7 +587,7 @@ function officeShowRequestDetails(id){
  details.setAttribute('role','presentation');
  details.innerHTML='<div class="officeRequestDetailCard" role="dialog" aria-modal="true" aria-label="Purchase request details" tabindex="-1">'+
   '<div class="officeRequestDetailHeader"><div><small>PURCHASING · MAIN OFFICE · VIEW ONLY</small><h2>Purchase Request Details</h2><p>'+safe(r.request_no||r.id)+'</p></div><button type="button" class="officeRequestDetailClose" aria-label="Close request details">×</button></div>'+
-  '<div class="officeRequestDetailBody"><div class="officeRequestDetailMeta"><div><span>STATUS</span><strong>'+safe(String(r.status||'Unknown').replaceAll('_',' '))+'</strong></div><div><span>INGREDIENTS</span><strong>'+lines.length+'</strong></div><div><span>REQUEST</span><strong>'+safe(r.request_no||'—')+'</strong></div></div>'+
+  '<div class="officeRequestDetailBody"><div class="officeRequestDetailMeta"><div><span>STATUS</span><strong>'+safe(String(r.status||'Unknown').replaceAll('_',' '))+'</strong></div><div><span>INGREDIENTS</span><strong>'+lines.length+'</strong></div><div><span>SUPPLIER</span><strong>'+safe(r.chef_supplier_name||'Legacy request: not assigned')+'</strong></div></div>'+
   '<h3>Full ingredient list</h3><div class="officeRequestDetailTable"><table><thead><tr><th>#</th><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>'+
   lines.map((line,i)=>'<tr><td>'+(i+1)+'</td><td><b>'+safe(line.ingredient||line.name||'—')+'</b></td><td>'+safe(line.quantity??'—')+'</td><td>'+safe(line.unit||'—')+'</td></tr>').join('')+
   '</tbody></table></div><div class="officeRequestDetailNotes"><span>NOTES</span><p>'+safe(r.notes||r.note||r.request_notes||'No notes provided')+'</p></div><p class="officeRequestDetailHint">This request is read-only. Main Office can approve or reject pending requests from the request list. Inventory changes only after Receiving.</p></div>'+
@@ -643,6 +655,7 @@ function officeCurrentKitchenOrder(){
  if(!req||req.status!=='approved'){officePurchaseEl('officePOInlineMessage').textContent='Request not approved or missing. Refresh and try again.';return null}
  const supplier=officePurchaseState.suppliers.find(x=>String(x.id)===String(officePurchaseEl('officePOSupplier').value));
  if(!supplier){officePurchaseEl('officePOInlineMessage').textContent='Select the supplier first.';return null}
+ if(req.chef_supplier_id&&String(supplier.id)!==String(req.chef_supplier_id)){officePurchaseEl('officePOInlineMessage').textContent='This request must go to the supplier selected by the chef.';return null}
  return {req,supplier};
 }
 officePurchaseEl('officePOSupplier').addEventListener('change',officePOUpdateSupplier);
