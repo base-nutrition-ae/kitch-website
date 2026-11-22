@@ -1305,7 +1305,24 @@ async function saveIngredient(){
  const name=iName.value.trim();if(!name)return alert('Enter ingredient name.');
  let a=ingredients();if(a.some(x=>x.name.toLowerCase()===name.toLowerCase()))return alert('This ingredient already exists.');
  let x={sku:'ING-'+String(a.length+1).padStart(3,'0'),name,category:iCat.value.trim(),supplier:iSupplier.value.trim(),receiving_type:iReceivingType.value||'Room Temperature',base_unit:iUnit.value,cost:Number(iCost.value||0),reference_cost:Number(iCost.value||0),latest_cost:Number(iCost.value||0),par:Number(iPar.value||0),minimum:Number(iMin.value||0),stock:0,stock_canonical:0,stock_location:stockLocation()};
- try{await cloudUpsertIngredient(x);a.push(x);saveIngredients(a);await cloudLoadIngredients();closeModal();openPage('Inventory')}catch(e){alert('KITCH Cloud: '+e.message)}
+ try{
+ await cloudUpsertIngredient(x);
+ // Manual additions must use the same shared supplier mapping as Excel import.
+ if(x.supplier&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+  const profile=await sb.rpc('kitch_team_import_supplier_master',{
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+   p_suppliers:[{name:x.supplier}]
+  });
+  if(profile.error)throw Error('Ingredient saved but supplier sync failed: '+profile.error.message);
+  if(!x.cloud_id)throw Error('Ingredient saved, but cloud ID is missing. Refresh Inventory.');
+  const link=await sb.rpc('kitch_team_set_ingredient_supplier_by_staff',{
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+   p_ingredient_id:x.cloud_id,p_supplier_name:x.supplier
+  });
+  if(link.error)throw Error('Ingredient saved but supplier mapping failed: '+link.error.message);
+ }
+ a.push(x);saveIngredients(a);await cloudLoadIngredients();closeModal();openPage('Inventory');
+ }catch(e){alert('KITCH Cloud: '+e.message)}
 }
 function openEditIngredient(sku){
  const x=ingredients().find(i=>String(i.cloud_id||i.name)===String(sku));if(!x)return;
@@ -1655,9 +1672,9 @@ function purchasingPage(){
  const pending=po.filter(x=>purchaseStatus(x)==='Pending Approval').length,open=po.filter(x=>['Approved','Open'].includes(purchaseStatus(x))).length;
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>ACTIVE MASTER INGREDIENTS</span><b>${activeMaster.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
- <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
+ <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
  <div class="note" style="margin:14px 0">Active Inventory: ${activeMaster.length} ingredients; ${matchedSupplier.length} assigned to suppliers. ${reconcile.ready.length} missing items remain in the older browser supplier catalog. Use <b>Inventory → Import Master Excel → Review Missing Ingredients</b> to add them safely with zero opening stock.</div><div class="note" style="margin:14px 0"><b id="kitchCloudPurchaseRole">Cloud Purchasing</b> · External supplier orders require Main Office approval before a purchase order is sent. Existing browser-only orders remain separate; cloud purchase orders do not deduct or receive stock.</div><div class="actions"><button id="kitchCloudRequestCreate" class="btn black" hidden onclick="kitchNewCloudPurchaseRequest()" title="External supplier purchase; Main Office approval required">+ Order from Supplier (Cloud)</button><button id="kitchCloudSupplierCreate" class="btn" hidden onclick="kitchNewCloudSupplier()">+ Cloud Supplier</button><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Refresh Cloud Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
- <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button> <button class="btn" onclick="editSupplier('${String(x.id).replace(/'/g,"\'")}')">Edit</button> <button class="btn" onclick="deleteSupplier('${String(x.id).replace(/'/g,"\'")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
+ <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${activeMaster.filter(p=>String(p.supplier||'').trim().toLowerCase()===String(x.name||'').trim().toLowerCase()).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button> <button class="btn" onclick="editSupplier('${String(x.id).replace(/'/g,"\'")}')">Edit</button> <button class="btn" onclick="deleteSupplier('${String(x.id).replace(/'/g,"\'")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
 }
 
 function viewSupplierProfile(id){
