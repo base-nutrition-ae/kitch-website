@@ -1325,6 +1325,13 @@ async function saveIngredient(){
  let x={sku:'ING-'+String(a.length+1).padStart(3,'0'),name,category:iCat.value.trim(),supplier:iSupplier.value.trim(),receiving_type:iReceivingType.value||'Room Temperature',base_unit:iUnit.value,cost:Number(iCost.value||0),reference_cost:Number(iCost.value||0),latest_cost:Number(iCost.value||0),par:Number(iPar.value||0),minimum:Number(iMin.value||0),stock:0,stock_canonical:0,stock_location:stockLocation()};
  try{
  await cloudUpsertIngredient(x);
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+  if(!x.cloud_id)throw Error('Ingredient saved but cloud ID was not returned');
+  const include=await sb.rpc('kitch_team_include_current_item',{
+   p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:x.cloud_id
+  });
+  if(include.error||include.data!==true)throw Error('Ingredient saved but current master was not updated: '+(include.error?.message||'not confirmed'));
+ }
  // Manual additions must use the same shared supplier mapping as Excel import.
  if(x.supplier&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
   const profile=await sb.rpc('kitch_team_import_supplier_master',{
