@@ -1183,7 +1183,7 @@ function inventoryPage(){
  const rows=a.map(x=>{const qty=contextStockCanonical(x);const status=storeLocationEmpty?'NOT RECORDED':qty<=0?'OUT':fromCanonical(qty,x.base_unit)<Number(x.minimum||0)?'LOW':'OK';const latest=Number(x.latest_cost)>0?x.latest_cost:x.reference_cost;const edit=(manage||storeMaster)?'<button class="btn" onclick="openEditIngredient(decodeURIComponent(&quot;'+encodeURIComponent(String(x.cloud_id||x.name))+'&quot;))">Edit</button>':'—';return `<tr class="ingredientRow" data-name="${esc(x.name.toLowerCase())}" data-category="${esc((x.category||'').toLowerCase())}"><td>${esc(x.sku)}</td><td><b>${esc(x.name)}</b></td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${kitchQuantityLabel(qty,x.base_unit)}</td><td>${kitchQuantityLabel(kitchLegacyParCanonical(x),x.base_unit)}</td><td>${kitchCostLabel(x.reference_cost,x.base_unit)}</td><td>${kitchCostLabel(latest,x.base_unit)}</td><td>AED ${kitchStockValue(x).toFixed(2)}</td><td>${esc(status)}</td><td>${edit}</td></tr>`;}).join('');
  return `<div class="kitchInventory"><div class="kitchStoreLocationEyebrow">${session==='store'?'CENTRAL STORE · INVENTORY':'KITCHEN · INVENTORY'}</div>${emptyStoreNotice}<div class="grid"><div class="card"><span>ACTIVE INGREDIENTS</span><b>${a.length}</b></div><div class="card"><span>${storeLocationEmpty?'STOCK RECORDS':'LOW / OUT'}</span><b>${storeLocationEmpty?'Not entered':a.filter(x=>fromCanonical(contextStockCanonical(x),x.base_unit)<=Number(x.minimum||0)).length}</b></div><div class="card"><span>INVENTORY VALUE</span><b>AED ${a.reduce((t,x)=>t+kitchStockValue(x),0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div><div class="card"><span>PAR CONTROL</span><b>${a.filter(x=>Number(x.par)>0).length}</b></div></div>
  <div class="panel kitchStoreInventoryPanel"><h2>${session==='store'?'Central Store Inventory':'Unified Company Ingredient Master & Location Inventory'}</h2><p class="muted">One shared ingredient catalog per company. Every location sees the same SKUs, units and suppliers, while quantities remain separate by location. Kitchen managers can manage ingredients here. Changes are company-wide; stock stays location-specific. <b><b>Stock Location: ${esc(hasCentralStore()?(session==='store'?'Central Store':assignedLocationName()):assignedLocationName())}</b> · ${manage?'Kitchen Manager / Executive Chef manages the approved Ingredient Master.':storeMaster?'Central Store Manager manages the approved company Ingredient Master.':hasCentralStore()&&session==='manager'?'Branch Kitchen Manager uses the approved company Ingredient Master.':'Team can view and download the approved Ingredient Master.'}</p>
- <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster)?'<button class="btn" onclick="openImport()">Upload / Import Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
+ <div class="actions">${(manage||storeMaster)?'<button class="btn black" onclick="openIngredient()">+ Ingredient</button>':''}${(manage||storeMaster)?'<button class="btn" onclick="openImport()">Import Master Excel</button>':''}${hasCentralStore()&&session==='manager'?'<button class="btn black" onclick="openBranchOpeningStock()">Set Restaurant Opening Stock</button>':''}<button class="btn" onclick="downloadMaster()">Download Master List</button></div>
  <div style="margin-top:18px"><input id="ingredientSearch" oninput="filterIngredients()" placeholder="Search ingredient..." style="width:min(430px,100%);height:48px;border:1px solid #ddd;border-radius:999px;padding:0 18px;font:inherit"></div>
  <div class="inventoryTableWrap"><table><tr><th>SKU</th><th>INGREDIENT</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>BASE UNIT</th><th>STOCK</th><th>PAR</th><th>REFERENCE COST</th><th>LATEST COST</th><th>STOCK VALUE</th><th>STATUS</th><th>ACTION</th></tr>${rows||'<tr><td colspan="12" class="empty">No ingredients yet. Import your Excel master list or add an ingredient.</td></tr>'}</table></div></div></div>`;
 }
@@ -1339,7 +1339,7 @@ async function archiveIngredient(sku){
 function openImport(){
  /* Authorized staff writes checked by Supabase RPC. */
  if(session!=='manager' && session!=='store')return;
- modal(`<div class="modalHead"><h2>Import Ingredient Master</h2><button class="close" onclick="closeModal()">×</button></div><p class="muted">Choose the KITCH ingredient Excel. Nothing is imported until you confirm the preview.</p><label class="filePick"><b>Choose Excel file</b><br><small>.xlsx, .xls or .csv</small><input id="excelFile" type="file" accept=".xlsx,.xls,.csv" hidden onchange="readExcel(this.files[0])"></label><div id="preview"></div>`);
+ modal(`<div class="modalHead"><h2>Import Master Excel</h2><button class="close" onclick="closeModal()">×</button></div><p class="muted">One Excel updates ingredients, suppliers, categories, supplier contacts and purchasing data. Stock movements and purchase history stay unchanged. Review the preview before confirming.</p><label class="filePick"><b>Choose Excel file</b><br><small>.xlsx, .xls or .csv</small><input id="excelFile" type="file" accept=".xlsx,.xls,.csv" hidden onchange="readExcel(this.files[0])"></label><div id="preview"></div>`);
 }
 let importRows=[];
 async function readExcel(file){
@@ -1383,7 +1383,7 @@ async function readExcel(file){
     const fmt=v=>Number(v.toFixed(3)).toString();
     return n>=1000?fmt(n/1000)+(liquid?' L':' kg'):fmt(n)+(liquid?' ml':' g');
   };
-  preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Choose whether to update existing items or replace the active list. Replacement archives ingredients missing from the Excel, without deleting stock history.</div><div class="field"><label>IMPORT MODE</label><select id="kitchImportMode" onchange="kitchImportModeChanged()" style="width:100%;height:48px;border:1px solid #ddd;border-radius:12px;padding:0 12px"><option value="update">Update / add ingredients</option>${teamCloudAuth?.pin?'':'<option value="replace">Replace active ingredient list ('+importRows.length+' ingredients)</option>'}</select></div><div id="kitchImportWarning" class="note" style="display:none;background:#fff6e7">This will archive all existing ingredients not in the uploaded Excel. Historical stock movements remain stored. Review the list before continuing.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${shortImportQty(x.par,x.base_unit)}</td><td>${shortImportQty(x.minimum,x.base_unit)}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Ingredients</button>`;
+  preview.innerHTML=`<div class="note"><b>${importRows.length} ingredients found.</b> Choose whether to update existing items or replace the active list. Replacement archives ingredients missing from the Excel, without deleting stock history.</div><div class="field"><label>IMPORT MODE</label><select id="kitchImportMode" onchange="kitchImportModeChanged()" style="width:100%;height:48px;border:1px solid #ddd;border-radius:12px;padding:0 12px"><option value="update">Update / add ingredients</option>${teamCloudAuth?.pin?'':'<option value="replace">Replace active ingredient list ('+importRows.length+' ingredients)</option>'}</select></div><div id="kitchImportWarning" class="note" style="display:none;background:#fff6e7">This will archive all existing ingredients not in the uploaded Excel. Historical stock movements remain stored. Review the list before continuing.</div><div style="max-height:320px;overflow:auto"><table><tr><th>INGREDIENT</th><th>CATEGORY</th><th>SUPPLIER</th><th>RECEIVING TYPE</th><th>UNIT</th><th>OPENING STOCK</th><th>OPENING COST</th><th>PAR</th><th>MIN</th><th>RESULT</th></tr>${importRows.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.category)}</td><td>${esc(x.supplier||'—')}</td><td>${esc(correctedReceivingType(x.name,x.receiving_type))}</td><td>${esc(x.base_unit)}</td><td>${Number(x.opening_stock||0)}</td><td>AED ${Number(x.opening_unit_cost||x.cost||0).toFixed(2)}</td><td>${shortImportQty(x.par,x.base_unit)}</td><td>${shortImportQty(x.minimum,x.base_unit)}</td><td>${existing.some(e=>e.name.toLowerCase()===x.name.toLowerCase())?'<span class="warn">UPDATE</span>':'<span class="ok">NEW</span>'}</td></tr>`).join('')}</table></div><button class="primary" onclick="confirmImport()">Import ${importRows.length} Master Rows</button>`;
  }catch(e){preview.innerHTML='<div class="note bad">Could not read this Excel file.</div>'}
 }
 function kitchImportModeChanged(){const mode=document.getElementById('kitchImportMode')?.value;const warning=document.getElementById('kitchImportWarning');if(warning)warning.style.display=mode==='replace'?'block':'none';}
@@ -1461,23 +1461,47 @@ async function confirmImport(){
     if(!saved||!(contextStockCanonical(saved)>0))throw Error('Opening stock was not saved for '+row.name);
    }
   }
+  // After ingredients have been saved, atomically sync each distinct supplier
+  // to the company Cloud Supplier Master through the role-checked staff RPC.
+  // This is the SAME Excel import: no separate Main Office sync step.
+  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin){
+   throw Error('Ingredients were imported. Supplier cloud synchronization requires Kitchen Manager staff sign-in. Re-sign in and retry the same Excel; ingredients will be updated, not duplicated.');
+  }
+  const supplierMap=new Map();
+  for(const row of importRows){
+   const name=String(row.supplier||'').trim();
+   if(!name)continue;
+   const key=name.toLowerCase(),prev=supplierMap.get(key)||{};
+   const data={
+    name,contact:String(row.supplier_contact||'').trim(),
+    email:String(row.supplier_email||'').trim(),phone:String(row.supplier_phone||'').trim(),
+    address:String(row.supplier_address||'').trim(),trn:String(row.supplier_trn||'').trim(),
+    notes:String(row.supplier_notes||'').trim()
+   };
+   // Supplier contact values are consolidated across ingredient rows.
+   supplierMap.set(key,Object.fromEntries(Object.entries(data).map(([k,v])=>[k,v||prev[k]||''])));
+  }
+  if(supplierMap.size){
+   const {data:result,error:supplierError}=await sb.rpc('kitch_team_import_supplier_master',{
+    p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+    p_suppliers:[...supplierMap.values()]
+   });
+   if(supplierError)throw Error('Ingredient import completed but supplier cloud sync failed: '+supplierError.message);
+   if(!result?.saved)throw Error('Supplier cloud sync was not confirmed');
+  }
+  for(const row of importRows.filter(x=>x.supplier)){
+   const saved=ingredients().find(x=>x.name.toLowerCase()===row.name.toLowerCase());
+   if(!saved?.cloud_id)continue;
+   const {error:linkError}=await sb.rpc('kitch_team_set_ingredient_supplier_by_staff',{
+    p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+    p_ingredient_id:saved.cloud_id,p_supplier_name:row.supplier
+   });
+   if(linkError)throw Error('Supplier '+row.supplier+' was saved, but ingredient link for '+row.name+' could not sync: '+linkError.message);
+  }
   syncSupplierMasterFromIngredients();
   kitchMergeSupplierDetailsFromImport(importRows);
-  // Staff-authorized update: save the supplier name in the shared Ingredient Master.
-  // Supplier profiles (email/contact/phone) still require owner approval in Main Office.
-  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
-   for(const row of importRows.filter(x=>x.supplier)){
-    const saved=ingredients().find(x=>x.name.toLowerCase()===row.name.toLowerCase());
-    if(!saved?.cloud_id)continue;
-    const {error:linkError}=await sb.rpc('kitch_team_set_ingredient_supplier_by_staff',{
-     p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
-     p_ingredient_id:saved.cloud_id,p_supplier_name:row.supplier
-    });
-    if(linkError)throw Error('Ingredient imported; supplier link for '+row.name+' could not sync: '+linkError.message);
-   }
-  }
   importRows=[];
-  if(status)status.innerHTML='<b style="color:#26733a">✓ Import complete</b><div style="margin-top:6px">'+added+' added · '+updated+' updated</div>';
+  if(status)status.innerHTML='<b style="color:#26733a">✓ Unified import complete</b><div style="margin-top:6px">'+added+' added · '+updated+' updated · '+supplierMap.size+' supplier(s) synchronized to cloud purchasing</div>';
   if(button){button.textContent='Import complete';button.style.opacity='1'}
   await new Promise(resolve=>setTimeout(resolve,650));
   closeModal();openPage('Inventory');
@@ -1555,7 +1579,7 @@ function kitchMergeSupplierDetailsFromImport(rows){
 function openUnifiedMasterImport(){
  openImport();
  const h=document.querySelector('.modalHead h2');if(h)h.textContent='Import Unified Ingredient & Supplier Master';
- const p=document.querySelector('.modalBox p.muted');if(p)p.textContent='One Excel file updates Ingredient Master, Supplier Master and supplier products. Review the preview before confirming. Existing inventory movements are preserved.';
+ const p=document.querySelector('.modalBox p.muted');if(p)p.textContent='One Excel file updates Ingredient Master, Supplier Master and supplier contact details in the cloud. Review before confirming. Stock history is preserved.';
 }
 function purchasingPage(){
  const clean=syncSupplierMasterFromIngredients(),su=clean.su,po=getArr(PO_KEY),sp=clean.sp;
@@ -1563,7 +1587,7 @@ function purchasingPage(){
  const pending=po.filter(x=>purchaseStatus(x)==='Pending Approval').length,open=po.filter(x=>['Approved','Open'].includes(purchaseStatus(x))).length;
  const commit=po.filter(x=>!['Rejected','Received','Closed'].includes(purchaseStatus(x))).reduce((t,x)=>t+Number(x.qty||0)*Number(x.price||0),0);
  return `<div class="grid"><div class="card"><span>SUPPLIERS</span><b>${su.length}</b></div><div class="card"><span>SUPPLIER PRODUCTS</span><b>${sp.length}</b></div><div class="card"><span>AWAITING APPROVAL</span><b>${pending}</b></div><div class="card"><span>OPEN COMMITMENTS</span><b>AED ${commit.toFixed(2)}</b></div></div>
- <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn black" onclick="openUnifiedMasterImport()">Import Unified Master</button><button class="btn" onclick="openSupplierExcel()">Import Supplier Excel</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
+ <div class="panel"><h2>Purchasing Control</h2><p class="muted">Purchase Request → Manager Approval → Purchase Order → Supplier → Receiving → Invoice Matching.</p><div class="note warn" style="margin:12px 0">Purchasing suppliers, products and purchase orders are currently saved in this browser only. Cloud Receiving is separate and does not automatically link to a local purchase order. Do not use invoice approval as proof of a matched delivery until cloud purchase order linking is completed.</div><div class="actions"><button class="btn" onclick="openSupplier()">+ Supplier</button><button class="btn" onclick="openSupplierProduct()">+ Supplier Product</button><button class="btn" onclick="openPage('Receiving')">Receiving →</button></div>
  <div class="note" style="margin:14px 0"><b id="kitchCloudPurchaseRole">Cloud Purchasing</b> · External supplier orders require Main Office approval before a purchase order is sent. Existing browser-only orders remain separate; cloud purchase orders do not deduct or receive stock.</div><div class="actions"><button id="kitchCloudRequestCreate" class="btn black" hidden onclick="kitchNewCloudPurchaseRequest()" title="External supplier purchase; Main Office approval required">+ Order from Supplier (Cloud)</button><button id="kitchCloudSupplierCreate" class="btn" hidden onclick="kitchNewCloudSupplier()">+ Cloud Supplier</button><button class="btn" onclick="kitchRefreshCloudPurchases()">↻ Refresh Cloud Orders</button></div><div style="overflow:auto;margin:12px 0"><table style="min-width:780px"><thead><tr><th>ORDER</th><th>SUPPLIER</th><th>PRODUCTS</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="kitchCloudPOBody"><tr><td colspan="5" class="empty">Select Load Cloud Purchase Orders to check shared records.</td></tr></tbody></table></div><h3>Browser-local Purchase Requests & Orders</h3><table><tr><th>PO / REQUEST</th><th>SUPPLIER</th><th>ITEM</th><th>ORDERED</th><th>UNIT PRICE</th><th>TOTAL</th><th>DELIVERY</th><th>STATUS</th><th>ACTION</th></tr>${purchaseOrderRows(po)}</table>
  <h3 style="margin-top:28px">Supplier Master</h3><div style="overflow-x:auto"><table style="min-width:900px"><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>PRODUCTS</th><th>DETAILS</th></tr>${su.map(x=>`<tr><td><b>${esc(x.name)}</b></td><td>${esc(x.contact||'—')}</td><td>${esc(x.phone||'—')}</td><td>${esc(x.email||'—')}</td><td>${sp.filter(p=>p.supplier===x.name).length}</td><td><button class="btn" onclick="viewSupplierProfile('${String(x.id).replace(/'/g,"\'")}')">View</button> <button class="btn" onclick="editSupplier('${String(x.id).replace(/'/g,"\'")}')">Edit</button> <button class="btn" onclick="deleteSupplier('${String(x.id).replace(/'/g,"\'")}')">Delete</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">No suppliers yet.</td></tr>'}</table></div></div>`;
 }
