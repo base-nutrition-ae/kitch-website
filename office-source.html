@@ -153,7 +153,18 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 .kitchPOBtn:disabled{opacity:.6;cursor:not-allowed}
 @media(max-width:700px){.kitchPOComposer{padding:20px 16px;border-radius:18px}.kitchPOFields{grid-template-columns:1fr}.kitchPOSummaryRows{gap:13px}.kitchPOActions{display:grid;grid-template-columns:1fr 1fr}.kitchPOBtn{padding:0 12px}.kitchPOTotal strong{font-size:21px}}
 </style>
-</head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="purchasing">Purchasing</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
+<style id="kitchPOGroupedLines">
+#purchasing .kitchPOComposer input[type=number]::-webkit-inner-spin-button,#purchasing .kitchPOComposer input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+#purchasing .kitchPOComposer input[type=number]{-moz-appearance:textfield;appearance:textfield}
+.kitchPOLine{display:grid;grid-template-columns:minmax(140px,1.5fr) minmax(170px,1fr) auto;gap:14px;align-items:center;padding:14px 16px;border:1px solid #ebebeb;border-radius:13px;background:#fff}
+.kitchPOLine>div{display:flex;flex-direction:column;gap:5px}
+.kitchPOLine strong{font-size:13px}
+.kitchPOLine small{font-size:11px;color:#777}
+.kitchPOLine label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:700}
+.kitchPOLine input{height:41px;border:1px solid #dedede;border-radius:9px;padding:0 12px;font:600 13px Inter,Arial,sans-serif;box-sizing:border-box;width:100%}
+.kitchPOLine b.officePOLineTotal{font-size:13px;min-width:90px;text-align:right}
+@media(max-width:650px){.kitchPOLine{grid-template-columns:1fr 1fr}.kitchPOLine>div{grid-column:1/-1}}
+</style></head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="purchasing">Purchasing</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
 <section class="section active" id="overview">
 <div class="hero"><div><h1>Main Office Overview</h1><p>All your restaurant operations in one place.</p></div><span class="tag">Main Office · Owner View</span></div>
 <div class="note">Live inventory and cloud-synced recipe counts are shown where available. Production stock deductions and costs come from the cloud ledger; final completion and purchasing are not yet fully cloud-connected.</div>
@@ -191,15 +202,16 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
   </div>
   <div class="kitchPOFields">
     <label class="kitchPOField"><span>Approved Supplier <b>*</b></span><select id="officePOSupplier"></select></label>
-    <label class="kitchPOField"><span>Unit Price <b>*</b></span><span class="kitchPOInputGroup"><span>AED</span><input id="officePOPrice" type="number" min="0" step="any" inputmode="decimal" placeholder="0.00" aria-describedby="officePOPriceHelp"></span><small id="officePOPriceHelp">Price per <span id="officePOUnitLabel">unit</span></small></label>
+    <div class="kitchPOField"><span>Items and unit prices</span><small>Review every ingredient and price before confirming the order.</small></div>
   </div>
+  <div id="officePOLines" style="display:grid;gap:8px;margin:0 0 18px"></div>
   <div class="kitchPOSummary">
     <div class="kitchPOSummaryTitle">Order Summary</div>
     <div class="kitchPOSummaryRows">
-      <div><span>Ingredient</span><strong id="officePOItem">—</strong></div>
-      <div><span>Quantity</span><strong id="officePOQuantity">—</strong></div>
+      <div><span>Ingredients</span><strong id="officePOItem">—</strong></div>
+      <div><span>Requested quantities</span><strong id="officePOQuantity">—</strong></div>
       <div><span>Supplier</span><strong id="officePOSupplierText">—</strong></div>
-      <div><span>Unit price</span><strong id="officePOUnitPriceText">AED 0.00</strong></div>
+      <div><span>Pricing</span><strong id="officePOUnitPriceText">Enter a price for each ingredient</strong></div>
     </div>
     <div class="kitchPOTotal"><span>Estimated PO Total</span><strong id="officePOTotal" aria-live="polite">AED 0.00</strong></div>
   </div>
@@ -422,8 +434,14 @@ async function officePurchaseLoad(){
   const orders=Array.isArray(d.orders)?d.orders:[];
   const suppliers=Array.isArray(d.suppliers)?d.suppliers:[];
   officePurchaseState.requests=requests;officePurchaseState.orders=orders;officePurchaseState.suppliers=suppliers;
+  const requestGroups=new Map();
+  for(const item of requests){
+   if(!requestGroups.has(item.id))requestGroups.set(item.id,{...item,lines:[]});
+   requestGroups.get(item.id).lines.push(item);
+  }
+  officePurchaseState.requestGroups=[...requestGroups.values()];
   officePurchaseEl('officeSupplierCount').textContent=suppliers.length+' approved';
-  officePurchaseEl('officeRequestCount').textContent=requests.length+' requests';
+  officePurchaseEl('officeRequestCount').textContent=requestGroups.size+' requests';
   const groups=new Map();
   for(const o of orders){
    if(!groups.has(o.id))groups.set(o.id,{...o,total:0});
@@ -431,15 +449,15 @@ async function officePurchaseLoad(){
   }
   officePurchaseEl('officePOCount').textContent=groups.size+' orders';
   officePurchaseEl('officeSuppliers').textContent=suppliers.map(s=>s.name).join(' · ')||'No approved cloud suppliers yet.';
-  officePurchaseEl('officePurchaseRequests').innerHTML=requests.map(r=>{
+  officePurchaseEl('officePurchaseRequests').innerHTML=[...requestGroups.values()].map(r=>{
    const status=String(r.status||'');
    const exists=orders.some(o=>o.request_id===r.id&&o.status!=='cancelled');
    const actions=status==='pending_approval'
-     ?'<button class="btn" data-po-action="approve" data-id="'+safe(r.id)+'">Approve</button> <button class="btn" data-po-action="reject" data-id="'+safe(r.id)+'">Reject</button>'
-     :status==='approved'&&!exists
-      ?'<button class="btn" data-po-action="create_order" data-id="'+safe(r.id)+'">Create PO</button>'
-      :'-';
-   return '<tr><td>'+safe(r.request_no)+'</td><td>'+safe(r.ingredient)+'</td><td>'+safe(r.quantity)+' '+safe(r.unit)+'</td><td>'+safe(status.replaceAll('_',' '))+'</td><td>'+actions+'</td></tr>';
+    ?'<button class="btn" data-po-action="approve" data-id="'+safe(r.id)+'">Approve</button> <button class="btn" data-po-action="reject" data-id="'+safe(r.id)+'">Reject</button>'
+    :status==='approved'&&!exists
+    ?'<button class="btn" data-po-action="create_order" data-id="'+safe(r.id)+'">Create PO</button>'
+    :'—';
+   return '<tr><td>'+safe(r.request_no)+'</td><td>'+r.lines.map(l=>safe(l.ingredient)).join(', ')+'</td><td>'+r.lines.map(l=>safe(l.quantity)+' '+safe(l.unit)).join(' · ')+'</td><td>'+safe(status.replaceAll('_',' '))+'</td><td>'+actions+'</td></tr>';
   }).join('')||'<tr><td colspan="5">No cloud purchase requests yet.</td></tr>';
   officePurchaseEl('officePurchaseOrders').innerHTML=[...groups.values()].map(o=>
    '<tr><td>'+safe(o.po_no)+'</td><td>'+safe(o.supplier)+'</td><td>'+safe(o.status)+'</td><td>'+money(o.total)+'</td></tr>'
@@ -448,17 +466,16 @@ async function officePurchaseLoad(){
 }
 let officeSelectedPurchaseRequest=null;
 function officePOShow(id){
- const req=officePurchaseState.requests.find(x=>x.id===id);
+ const req=officePurchaseState.requestGroups.find(x=>x.id===id);
  if(!req||req.status!=='approved')return officePurchaseStatus('Refresh this request first.');
- if(!officePurchaseState.suppliers.length)return officePurchaseStatus('Add an approved cloud supplier first, using the supplier name field above.');
+ if(!officePurchaseState.suppliers.length)return officePurchaseStatus('Register an approved cloud supplier first.');
  officeSelectedPurchaseRequest=req.id;
  const panel=officePurchaseEl('officePOComposer');
- officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.ingredient+' · '+req.quantity+' '+req.unit;
+ officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredient'+(req.lines.length===1?'':'s');
  officePurchaseEl('officePOSupplier').innerHTML=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
- officePurchaseEl('officePOPrice').value='';
- officePurchaseEl('officePOItem').textContent=req.ingredient;
- officePurchaseEl('officePOQuantity').textContent=req.quantity+' '+req.unit;
- officePurchaseEl('officePOUnitLabel').textContent=req.unit;
+ officePurchaseEl('officePOLines').innerHTML=req.lines.map(l=>'<div class="kitchPOLine"><div><strong>'+safe(l.ingredient)+'</strong><small>'+safe(l.quantity)+' '+safe(l.unit)+'</small></div><label>Unit price (AED / '+safe(l.unit)+')<input class="officePOLinePrice" type="number" min="0" step="any" inputmode="decimal" placeholder="0.00" data-ingredient="'+safe(l.ingredient_id)+'" data-quantity="'+safe(l.quantity)+'"></label><b class="officePOLineTotal">AED 0.00</b></div>').join('');
+ officePurchaseEl('officePOItem').textContent=req.lines.map(x=>x.ingredient).join(', ');
+ officePurchaseEl('officePOQuantity').textContent=req.lines.map(x=>x.quantity+' '+x.unit).join(' · ');
  officePurchaseEl('officePOInlineMessage').textContent='';
  panel.hidden=false;
  officePOUpdateTotal();
@@ -487,16 +504,22 @@ officePurchaseEl('officePurchaseRequests').addEventListener('click',e=>{
  officePurchaseDo(button.dataset.poAction,button.dataset.id);
 });
 function officePOUpdateTotal(){
- const req=officePurchaseState.requests.find(x=>x.id===officeSelectedPurchaseRequest);
  const supplier=officePurchaseState.suppliers.find(x=>x.id===officePurchaseEl('officePOSupplier').value);
- const raw=officePurchaseEl('officePOPrice').value.trim();
- const price=raw===''?null:Number(raw);
- const valid=price!==null&&Number.isFinite(price)&&price>=0&&price<=10000000;
  officePurchaseEl('officePOSupplierText').textContent=supplier?.name||'Select supplier';
- officePurchaseEl('officePOUnitPriceText').textContent=valid?'AED '+price.toFixed(2):'—';
- officePurchaseEl('officePOTotal').textContent=valid&&req?'AED '+(Number(req.quantity)*price).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}):'AED 0.00';
+ let total=0,complete=true;
+ for(const row of officePurchaseEl('officePOLines').querySelectorAll('.kitchPOLine')){
+  const input=row.querySelector('.officePOLinePrice');
+  const raw=input.value.trim(),price=Number(raw);
+  const valid=raw!==''&&Number.isFinite(price)&&price>=0&&price<=10000000;
+  if(!valid)complete=false;
+  const amount=valid?price*Number(input.dataset.quantity):0;
+  total+=amount;
+  row.querySelector('.officePOLineTotal').textContent='AED '+amount.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+ }
+ officePurchaseEl('officePOUnitPriceText').textContent=complete?'All item prices entered':'Enter a price for each ingredient';
+ officePurchaseEl('officePOTotal').textContent='AED '+total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
-officePurchaseEl('officePOPrice').addEventListener('input',officePOUpdateTotal);
+officePurchaseEl('officePOLines').addEventListener('input',officePOUpdateTotal);
 officePurchaseEl('officePOSupplier').addEventListener('change',officePOUpdateTotal);
 officePurchaseEl('officePOClose').addEventListener('click',()=>officePurchaseEl('officePOCancel').click());
 officePurchaseEl('officePOCancel').addEventListener('click',()=>{
@@ -504,20 +527,28 @@ officePurchaseEl('officePOCancel').addEventListener('click',()=>{
 });
 officePurchaseEl('officePOConfirm').addEventListener('click',async()=>{
  if(officePurchaseBusy)return;
- const req=officePurchaseState.requests.find(x=>x.id===officeSelectedPurchaseRequest);
+ const req=officePurchaseState.requestGroups.find(x=>x.id===officeSelectedPurchaseRequest);
  const error=officePurchaseEl('officePOInlineMessage');
  const supplierId=officePurchaseEl('officePOSupplier').value;
- const raw=officePurchaseEl('officePOPrice').value.trim();
- const price=Number(raw);
  if(!req||req.status!=='approved'){error.textContent='Request is no longer approved. Refresh first.';return}
  if(!officePurchaseState.suppliers.some(x=>x.id===supplierId)){error.textContent='Select an approved supplier.';return}
- if(raw===''||!Number.isFinite(price)||price<0||price>10000000){error.textContent='Enter a valid price per unit.';return}
- officePurchaseBusy=true;const button=officePurchaseEl('officePOConfirm');button.disabled=true;
+ const items=[];
+ for(const row of officePurchaseEl('officePOLines').querySelectorAll('.kitchPOLine')){
+  const input=row.querySelector('.officePOLinePrice'),raw=input.value.trim(),price=Number(raw);
+  if(raw===''||!Number.isFinite(price)||price<0||price>10000000){error.textContent='Enter valid prices for all ingredients.';input.focus();return}
+  items.push({ingredient_id:input.dataset.ingredient,unit_price:price});
+ }
+ if(items.length!==req.lines.length){error.textContent='Order lines do not match the request. Refresh and retry.';return}
+ officePurchaseBusy=true;
+ const button=officePurchaseEl('officePOConfirm');button.disabled=true;
  error.textContent='Creating purchase order…';
  try{
-  await officePurchaseRpc('create_order',{p_request_id:req.id,p_supplier_id:supplierId,p_price:price});
+  const {data, error:dbError}=await db.rpc('kitch_purchase_multi',{p_action:'create_order',p_restaurant_id:officeRid,
+   p_request_id:req.id,p_supplier_id:supplierId,p_items:items});
+  if(dbError)throw Error(dbError.message);
   officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').hidden=true;
-  await officePurchaseLoad();officePurchaseStatus('Purchase order created successfully. Inventory was not changed.');
+  await officePurchaseLoad();
+  officePurchaseStatus('One purchase order created for '+items.length+' ingredients. Stock is unchanged.');
  }catch(e){error.textContent='Purchase order not created: '+e.message}
  finally{officePurchaseBusy=false;button.disabled=false}
 });
