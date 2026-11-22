@@ -253,7 +253,7 @@ const URL='https://rtovpjgrezwxuvantxgt.supabase.co';
 const KEY='sb_publishable_ERMt86IhOTqRSRXE05CQ-A_JXi27ode';
 const el=id=>document.getElementById(id);
 const msg=el('officeAuthMessage');
-let db=null;let officeRid=null,officeBranches=[],officeStaff=[];
+let db=null;let officeRid=null,officeBranches=[],officeStaff=[];let officeRestaurantName='';
 function say(t){msg.textContent=t||'';}
 function setVisible(on){el('officeAuth').classList.toggle('officeHidden',on);el('officeApp').classList.toggle('officeHidden',!on);}
 function money(n){return 'AED '+Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2,minimumFractionDigits:2});}
@@ -277,6 +277,7 @@ async function loadOwner(){
  Promise.resolve({data:null,error:null}) // Production runs are summarized securely by owner RPC above
  ]);
  const errors=[r,b,staff,inventory,ings].filter(x=>x.error).map(x=>x.error.message);if(errors.length){setVisible(false);say('Data access needs attention: '+errors.join('; '));return;} if(recipes.error){setVisible(false);say('Recipe access needs attention: '+recipes.error.message);return;}
+ officeRestaurantName=String(r.data?.name||'').trim();
  setVisible(true);
  const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=inventory.data||[];officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();
  const val=bal.reduce((s,x)=>s+Number(x.quantity_on_hand||0)*Number(x.indicative_unit_cost||0),0);
@@ -351,7 +352,7 @@ async function loadOwner(){
 
  const locRows=el('overview').querySelector('.overview-scroll tbody');if(locRows)locRows.innerHTML=branches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+money(bal.filter(y=>y.branch_id===x.id).reduce((s,y)=>s+Number(y.quantity_on_hand||0)*Number(y.indicative_unit_cost||0),0))+'</td><td>—</td><td>'+'—'+'</td><td>Active</td></tr>').join('')||'<tr><td colspan="5">No locations</td></tr>';
  const title=el('officeApp').querySelector('.profile');if(title)title.setAttribute('title',(r.data?.name||'KITCH')+' · '+user.email);
- const logout=document.createElement('button');logout.className='officeLogout';logout.textContent='Sign out';logout.onclick=async()=>{logout.disabled=true;try{const {error}=await db.auth.signOut({scope:'local'});if(error)throw error;setVisible(false);officeRid=null;officeIngredients=[];window.parent.postMessage({type:'KITCH_OFFICE_SIGNED_OUT'},'*');}catch(e){say('Sign out failed: '+e.message);}finally{logout.disabled=false;}};if(title&&!title.querySelector('.officeLogout'))title.appendChild(logout);
+ const logout=document.createElement('button');logout.className='officeLogout';logout.textContent='Sign out';logout.onclick=async()=>{logout.disabled=true;try{const {error}=await db.auth.signOut({scope:'local'});if(error)throw error;setVisible(false);officeRid=null;officeRestaurantName='';officeIngredients=[];window.parent.postMessage({type:'KITCH_OFFICE_SIGNED_OUT'},'*');}catch(e){say('Sign out failed: '+e.message);}finally{logout.disabled=false;}};if(title&&!title.querySelector('.officeLogout'))title.appendChild(logout);
 }
 
 function renderLocations(){const target=el('locations')?.querySelector('table tbody');if(!target)return;target.innerHTML=officeBranches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.branch_type==='central_store'?'Central Store':'Restaurant / Kitchen')+' · '+safe(x.code||'—')+'</td><td>'+ (x.is_active?'Active':'Inactive')+' <button type="button" class="officeMini" data-location-edit="'+safe(x.id)+'">Edit</button> <button type="button" class="officeMini" data-location-toggle="'+safe(x.id)+'">'+(x.is_active?'Deactivate':'Activate')+'</button></td></tr>').join('')||'<tr><td colspan="3">No locations found</td></tr>';target.querySelectorAll('[data-location-edit]').forEach(btn=>btn.onclick=()=>openLocation(officeBranches.find(x=>x.id===btn.dataset.locationEdit)));target.querySelectorAll('[data-location-toggle]').forEach(btn=>btn.onclick=()=>toggleLocation(btn.dataset.locationToggle));}
@@ -566,11 +567,12 @@ function officePOUpdateSupplier(){
  if(supplier?.email)officePurchaseEl('officePOSupplierEmail').value=supplier.email;
 }
 function officeKitchenOrderText(req,supplierName){
+ const restaurant=officeRestaurantName||'Restaurant';
  const items=req.lines.map((l,i)=>(i+1)+'. '+l.ingredient+' — '+l.quantity+' '+l.unit).join('\n');
- return 'KITCH — KITCHEN PURCHASE ORDER\nRequest: '+(req.request_no||req.id)+
+ return restaurant+' — PURCHASE ORDER\nRequest: '+(req.request_no||req.id)+
  '\nStatus: Approved\nSupplier: '+supplierName+'\n\nINGREDIENTS & QUANTITIES\n'+items+
  '\n\nNotes: '+(req.notes||req.note||req.request_notes||'None')+
- '\n\nPlease confirm availability and delivery details.\n\nKITCH Main Office';
+ '\n\nPlease confirm availability and delivery details.\n\n'+restaurant+' Purchasing';
 }
 function officeCurrentKitchenOrder(){
  const req=(officePurchaseState.requestGroups||[]).find(x=>String(x.id)===String(officeSelectedPurchaseRequest));
@@ -591,7 +593,7 @@ officePurchaseEl('officePOConfirm').addEventListener('click',()=>{
  if(!email||!officePurchaseEl('officePOSupplierEmail').checkValidity()){
   message.textContent='Enter a valid supplier email address to open the order email.';officePurchaseEl('officePOSupplierEmail').focus();return;
  }
- const subject='KITCH Purchase Order — '+(data.req.request_no||data.req.id);
+ const subject=(officeRestaurantName||'Restaurant')+' Purchase Order — '+(data.req.request_no||data.req.id);
  const body=officeKitchenOrderText(data.req,data.supplier.name);
  const mailto='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
  message.textContent='Your mail app will open with the exact kitchen order. Review it and press Send there. KITCH has not marked this order as sent.';
@@ -601,7 +603,7 @@ officePurchaseEl('officePOPrint').addEventListener('click',()=>{
  const data=officeCurrentKitchenOrder();if(!data)return;
  const rows=data.req.lines.map((l,i)=>'<tr><td>'+(i+1)+'</td><td>'+safe(l.ingredient)+'</td><td>'+safe(l.quantity)+'</td><td>'+safe(l.unit)+'</td></tr>').join('');
  const notes=data.req.notes||data.req.note||data.req.request_notes||'None';
- const doc='<!doctype html><html><head><meta charset="utf-8"><title>KITCH Order '+safe(data.req.request_no||data.req.id)+'</title><style>body{font:14px Arial,sans-serif;color:#111;margin:40px}h1{font-size:26px}p{line-height:1.6}.meta{margin:24px 0;padding:20px;background:#f7f7f7;border-radius:10px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}th{background:#f5f5f5}footer{margin-top:36px;color:#777;font-size:12px}@media print{body{margin:20mm}}</style></head><body><h1>KITCH · Purchase Order</h1><div class="meta"><p><b>Request:</b> '+safe(data.req.request_no||data.req.id)+'</p><p><b>Supplier:</b> '+safe(data.supplier.name)+'</p><p><b>Status:</b> Approved kitchen request</p></div><h2>Items ordered</h2><table><thead><tr><th>#</th><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>'+rows+'</tbody></table><p><b>Notes:</b> '+safe(notes)+'</p><footer>Generated from approved KITCH kitchen request. No prices entered. Inventory updates only after Receiving.</footer></body></html>';
+ const doc='<!doctype html><html><head><meta charset="utf-8"><title>'+safe(officeRestaurantName||'Restaurant')+' Order '+safe(data.req.request_no||data.req.id)+'</title><style>body{font:14px Arial,sans-serif;color:#111;margin:40px}h1{font-size:26px}p{line-height:1.6}.meta{margin:24px 0;padding:20px;background:#f7f7f7;border-radius:10px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}th{background:#f5f5f5}footer{margin-top:36px;color:#777;font-size:12px}@media print{body{margin:20mm}}</style></head><body><h1>'+safe(officeRestaurantName||'Restaurant')+' · Purchase Order</h1><div class="meta"><p><b>Request:</b> '+safe(data.req.request_no||data.req.id)+'</p><p><b>Supplier:</b> '+safe(data.supplier.name)+'</p><p><b>Status:</b> Approved kitchen request</p></div><h2>Items ordered</h2><table><thead><tr><th>#</th><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>'+rows+'</tbody></table><p><b>Notes:</b> '+safe(notes)+'</p><footer>Generated from the approved kitchen purchase request for '+safe(officeRestaurantName||'Restaurant')+'. Inventory updates only after Receiving.</footer></body></html>';
  const popup=window.open('','_blank');
  if(!popup){officePurchaseEl('officePOInlineMessage').textContent='Allow pop-ups in your browser to print or save this order as a PDF.';return}
  popup.document.open();popup.document.write(doc);popup.document.close();popup.focus();popup.print();
