@@ -195,7 +195,7 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 <div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap"><input id="officeSupplierName" maxlength="120" placeholder="Supplier name" aria-label="Supplier name" style="flex:1;min-width:220px;border:1px solid #ddd;border-radius:12px;padding:12px"><button class="btn" id="officeSupplierAdd" type="button">+ Add Cloud Supplier</button></div>
 <p id="officeSupplierMessage" role="status" style="margin:8px 0;font-size:12px;min-height:16px"></p><div id="officeSuppliers" class="muted">Loading…</div></div>
 <div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
-<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden>
+<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden style="display:none!important">
   <div class="kitchPOHead">
     <div><div class="kitchPOEyebrow">PURCHASING · MAIN OFFICE</div><h3>Create Purchase Order</h3><p id="officePOComposerSummary"></p></div>
     <button type="button" class="kitchPOClose" id="officePOClose" aria-label="Close purchase order form">×</button>
@@ -454,9 +454,7 @@ async function officePurchaseLoad(){
    const exists=orders.some(o=>o.request_id===r.id&&o.status!=='cancelled');
    const actions=status==='pending_approval'
     ?'<button class="btn" data-po-action="approve" data-id="'+safe(r.id)+'">Approve</button> <button class="btn" data-po-action="reject" data-id="'+safe(r.id)+'">Reject</button>'
-    :status==='approved'&&!exists
-    ?'<button class="btn" data-po-action="create_order" data-id="'+safe(r.id)+'">Create PO</button>'
-    :'—';
+    :'View only';
    return '<tr><td>'+safe(r.request_no)+'</td><td>'+r.lines.map(l=>safe(l.ingredient)).join(', ')+'</td><td>'+r.lines.map(l=>safe(l.quantity)+' '+safe(l.unit)).join(' · ')+'</td><td>'+safe(status.replaceAll('_',' '))+'</td><td>'+actions+'</td></tr>';
   }).join('')||'<tr><td colspan="5">No cloud purchase requests yet.</td></tr>';
   officePurchaseEl('officePurchaseOrders').innerHTML=[...groups.values()].map(o=>
@@ -486,7 +484,7 @@ async function officePurchaseDo(action,id){
  if(officePurchaseBusy)return;
  const req=officePurchaseState.requests.find(r=>r.id===id);
  if(!req)return officePurchaseStatus('Refresh requests and try again.');
- if(action==='create_order')return officePOShow(id);
+ if(action==='create_order')return officePurchaseStatus('Main Office can approve or reject only.');
  if(!['approve','reject'].includes(action)||req.status!=='pending_approval')return officePurchaseStatus('This request is not pending approval.');
  officePurchaseBusy=true;
  officePurchaseStatus('Saving '+action+'…');
