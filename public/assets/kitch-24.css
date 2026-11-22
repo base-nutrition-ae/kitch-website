@@ -998,3 +998,59 @@ body #app .main input,body #app .main select,body #app .main textarea{border-col
  body #app .k26-metrics{grid-template-columns:repeat(3,minmax(0,1fr))!important}
  body #app .k26-body{grid-template-columns:minmax(0,1fr)!important}
 }
+
+
+/* KITCH PUBLIC AUTH AND PRO VISUAL SYSTEM V10 */
+#publicModal.publicModal{background:rgba(20,23,26,.49)!important}
+#publicModal .publicBox{
+ background:#f7f8f8!important;color:#26292d!important;
+ border:1px solid #e3e5e7!important;border-radius:20px!important;
+ box-shadow:0 24px 75px #13171925!important;
+ font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important;
+}
+#publicModal .publicBrand b{font-size:23px!important;letter-spacing:-.045em!important;color:#232629!important}
+#publicModal .publicBrand span{font-size:10px!important;color:#8b9196!important;letter-spacing:.1em!important}
+#publicModal h2{font-size:clamp(27px,3vw,36px)!important;font-weight:730!important;letter-spacing:-.055em!important;line-height:1.13!important;color:#22262a!important}
+#publicModal p,#publicModal .muted{color:#82888e!important;line-height:1.55!important}
+#publicModal .field label{color:#70767c!important;font-size:10px!important;font-weight:690!important;letter-spacing:.04em!important}
+#publicModal .field input,#publicModal .field select,#publicModal input:not([type=checkbox]):not([type=radio]){
+ background:#fafafa!important;border:1px solid #dadfe1!important;
+ border-radius:11px!important;min-height:43px!important;
+ color:#25282c!important;box-shadow:none!important;font-size:13px!important;
+}
+#publicModal .loginTabs .btn{
+ min-height:37px!important;height:auto!important;padding:9px 16px!important;
+ border:1px solid #dfe2e4!important;border-radius:10px!important;
+ background:#eceeef!important;color:#32373c!important;font-size:12px!important;font-weight:650!important;
+}
+#publicModal .loginTabs .btn.black{background:#272b2e!important;color:#fff!important;border-color:#272b2e!important}
+#publicModal .btn.black,#publicModal .primary,#publicModal button[type=submit]{
+ background:#26292d!important;color:#fff!important;border-color:#26292d!important;
+ border-radius:11px!important;box-shadow:none!important;min-height:43px!important;
+ font-size:12px!important;font-weight:700!important;
+}
+#publicModal .publicBox>.closePublic{
+ background:#e8eaeb!important;color:#2a2c30!important;
+ border:1px solid #dfe1e2!important;border-radius:11px!important;
+ width:36px!important;height:36px!important;
+}
+#publicModal .kitchProPlanPage{color:#272a2d!important}
+#publicModal .kitchProBrandName{color:#25282b!important;font-size:22px!important;font-weight:800!important;letter-spacing:-.04em!important}
+#publicModal .kitchProBrandTag,#publicModal .kitchProSectionHead{color:#8c9296!important;font-size:10px!important;letter-spacing:.07em!important}
+#publicModal .kitchProIntro h2{font-size:clamp(25px,3vw,34px)!important;letter-spacing:-.05em!important}
+#publicModal .kitchProPlanCard{background:#fafafa!important;border:1px solid #e2e5e7!important;border-radius:16px!important}
+#publicModal .kitchProPromoInfo{background:#eeeff0!important;border:1px solid #e7e9ea!important;border-radius:12px!important}
+#publicModal .kitchProTopTag{background:#e7efea!important;color:#52745f!important;border-radius:9px!important}
+#publicModal .kitchProAllIn{background:#eceeef!important;color:#4b5256!important;border-radius:9px!important}
+#publicModal .kitchProChoose{background:#26292d!important;color:#fff!important;border-radius:12px!important;min-height:46px!important}
+#publicModal .kitchProPrice{color:#24282b!important}
+#publicModal .kitchProPrice .period{color:#8b9195!important}
+@media(max-width:760px){
+ #publicModal.publicModal{padding:calc(13px + env(safe-area-inset-top,0px)) 12px calc(13px + env(safe-area-inset-bottom,0px))!important}
+ #publicModal .publicBox{padding:20px 17px 19px!important;border-radius:18px!important;max-height:calc(100dvh - 26px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px))!important}
+ #publicModal h2{font-size:28px!important}
+ #publicModal .loginTabs .btn{font-size:12px!important}
+ #publicModal .kitchProPlanCard{padding:16px 13px!important}
+ #publicModal .kitchProFeatures{grid-template-columns:minmax(0,1fr)!important}
+ #publicModal .kitchProIntro h2{font-size:27px!important}
+}
