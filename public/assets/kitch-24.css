@@ -466,3 +466,28 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
    padding:18px 14px 22px!important;
  }
 }
+
+
+/* KITCH MOBILE SIGN OUT BOTTOM RIGHT */
+@media screen and (max-width:850px){
+  body #app .side .sideUtility{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:8px!important;
+    align-items:center!important;
+    border-top:1px solid #e9e9e9!important;
+    margin-top:15px!important;
+    padding-top:14px!important;
+    padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))!important;
+  }
+  body #app .side .sideUtility button:last-child{
+    grid-column:2!important;
+    justify-self:end!important;
+    width:100%!important;
+    min-width:0!important;
+    border-radius:12px!important;
+    background:#181818!important;
+    color:#fff!important;
+    font-weight:800!important;
+  }
+}
