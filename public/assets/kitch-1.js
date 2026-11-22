@@ -3403,6 +3403,7 @@ function productionPage(){
  <div class="panel kitchProductionLedger"><div role="status" style="padding:8px 0 12px;font-size:13px">${kitchProductionLoadStatus==='loading'?'Loading shared recipes and production history…':kitchProductionLoadStatus==='error'?`<span class="bad">Cloud data could not be fully loaded: ${esc(kitchProductionLoadError)}</span> <button class="btn" onclick="kitchRefreshProductionPageData()">Retry Cloud Load</button>`:kitchProductionLoadStatus==='ready'?'<span class="ok">Cloud data refreshed.</span>':''}</div><h2>Production</h2><p class="muted">Select an approved recipe and number of batches. KITCH checks Restaurant stock before production. Chef Production does not see ingredient costs or prices.</p>
  <div class="actions kitchProductionActions"><button class="btn black" onclick="openProduction()">+ Start Production</button><button class="btn" onclick="kitchSyncLocalProductionRecords()">↻ Sync Production Records</button></div>
  <div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>LOCATION</th><th>STATUS</th></tr>${runs.map(x=>`<tr class="productionHistoryRow" onclick="viewProductionDetails(${x.id})" title="View production details"><td><b>${esc(x.code)}</b><br><small>${esc((x.created_at||'').slice(0,16).replace('T',' '))}</small></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.batches)}</td><td>${x.actual_yield?esc(cleanQty(x.actual_yield)+' '+x.yield_unit):'—'}</td><td>${esc(x.location)}</td><td>${esc(x.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production recorded yet. Select <b>Start Production</b> to begin your first batch.</td></tr>'}</table></div><div class="muted" style="margin-top:12px">Click any production record to view the full audit trail and Label proof.</div></div>
+ ${kitchProductionLabelQueue()}
  <div class="panel kitchProductionLedger"><h2>Cloud Stock-Deduction History</h2><p class="muted">Read-only production inventory deductions. These entries do not establish that final yield, QC, or labels were completed. No inventory is changed by viewing them.</p><div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>REQUEST ID</th><th>DATE (DUBAI)</th><th>INGREDIENT LINES</th>${session==='production'?'':'<th>STOCK USAGE COST</th>'}<th>STATUS</th></tr>${history?cloudRows||'<tr><td colspan="5">No cloud stock-deduction runs recorded.</td></tr>':'<tr><td colspan="5">Cloud history not loaded. Open this page again or check the connection.</td></tr>'}</table></div></div>`;
 }
 
@@ -3423,7 +3424,7 @@ function viewProductionDetails(id){
  <h3 style="margin-top:24px">Labels</h3>
  ${qcDone?`<div class="qcDetails"><div class="note"><b>Expiry:</b> ${esc(x.expiry_date||'—')}</div><div class="note"><b>Temperature:</b> ${x.qc_temp_c!==''&&x.qc_temp_c!==undefined?cleanQty(x.qc_temp_c)+' °C':'—'}</div></div><div class="note"><b>QC Result:</b> <span class="${qcPassed?'ok':'bad'}">${esc(x.status)}</span>${x.qc_serial?` · <b>Serial:</b> ${esc(x.qc_serial)}`:''}<br><b>Label Note:</b> ${esc(x.qc_note||'—')}</div>`:`<div class="note warn"><b>QC:</b> ${x.status==='Label Pending'?'Pending — this production still needs QC.':'Not completed for this production record.'}</div>`}
  ${proof}
- <div class="detailActions">${(['127.0.0.1','localhost'].includes(location.hostname)&&x.status==='In Production')?`<button class="btn black" onclick="openActualYield(${x.id})">Resume Completion (no new stock deduction)</button>`:''}${qcPassed?`<button class="btn black" onclick="printQCLabel(${x.id})">Print Label</button>`:''}${x.qc_photo?`<button class="btn" onclick="openQCProof(${x.id})">View Proof</button>`:''}</div>`);
+ <div class="detailActions">${(['127.0.0.1','localhost'].includes(location.hostname)&&x.status==='In Production')?`<button class="btn black" onclick="openActualYield(${x.id})">Resume Completion (no new stock deduction)</button>`:''}${qcPassed?`<button class="btn" onclick="kitchPreviewLabel(${x.id})">Preview</button> <button class="btn black" onclick="printQCLabel(${x.id})">Print Label</button>`:''}${x.qc_photo?`<button class="btn" onclick="openQCProof(${x.id})">View Proof</button>`:''}</div>`);
 }
 function formatProductionDate(v){return v?String(v).slice(0,16).replace('T',' '):'—'}
 function openQCProof(id){
@@ -3573,7 +3574,7 @@ function openActualYield(id){
 }
 let productionProofData='';
 function previewProductionProof(file){if(!file){productionProofData='';return}const reader=new FileReader();reader.onload=e=>{productionProofData=e.target.result;const box=document.getElementById('prProofPreview');if(box)box.innerHTML=`<img src="${productionProofData}" alt="Production proof">`};reader.readAsDataURL(file)}
-async function completeProduction(id){const y=Number(prYield.value||0),productionDate=(prProductionDate.value||'').trim(),expiry=(prExpiry.value||'').trim(),temp=(prTemp.value||'').trim();if(y<=0)return alert('Enter actual finished yield.');if(!productionDate)return alert('Enter production date.');if(!expiry)return alert('Enter expiry date.');if(productionDate>expiry)return alert('Production date cannot be after expiry date.');if(temp==='')return alert('Enter finished product temperature.');if(!productionProofData)return alert('Add production proof image.');let a=getArr(PROD_KEY),x=a.find(p=>p.id===id);if(!x)return alert('Production record not found.');const updated={...x,actual_yield:y,yield_unit:prYieldUnit.value,actual_unit_cost:Number(x.production_cost||0)/y,production_date:productionDate,expiry_date:expiry,production_temp_c:Number(temp),production_proof:productionProofData,status:'Label Pending',completed_at:new Date().toISOString()};try{updated.cloud_sync_revision=await kitchCloudSaveRun(updated)}catch(e){return alert('Cloud save failed. Production completion was NOT saved: '+(e.message||e))}Object.assign(x,updated);setArr(PROD_KEY,a);productionProofData='';closeModal();openPage('Label')}
+async function completeProduction(id){const y=Number(prYield.value||0),productionDate=(prProductionDate.value||'').trim(),expiry=(prExpiry.value||'').trim(),temp=(prTemp.value||'').trim();if(y<=0)return alert('Enter actual finished yield.');if(!productionDate)return alert('Enter production date.');if(!expiry)return alert('Enter expiry date.');if(productionDate>expiry)return alert('Production date cannot be after expiry date.');if(temp==='')return alert('Enter finished product temperature.');if(!productionProofData)return alert('Add production proof image.');let a=getArr(PROD_KEY),x=a.find(p=>p.id===id);if(!x)return alert('Production record not found.');const updated={...x,actual_yield:y,yield_unit:prYieldUnit.value,actual_unit_cost:Number(x.production_cost||0)/y,production_date:productionDate,expiry_date:expiry,production_temp_c:Number(temp),production_proof:productionProofData,status:'Label Pending',completed_at:new Date().toISOString()};try{updated.cloud_sync_revision=await kitchCloudSaveRun(updated)}catch(e){return alert('Cloud save failed. Production completion was NOT saved: '+(e.message||e))}Object.assign(x,updated);setArr(PROD_KEY,a);productionProofData='';closeModal();openPage('Production')}
 function qcPage(){const a=getArr(PROD_KEY).filter(x=>x.status==='Label Pending'||x.status==='Completed').slice().reverse();return `<div class="panel"><h2>QC</h2><p class="muted">Check completed production before release. No cost or purchasing information is shown to Chef Production.</p><table><tr><th>PRODUCTION</th><th>RECIPE</th><th>BATCHES</th><th>ACTUAL YIELD</th><th>STATUS</th><th>ACTION</th></tr>${a.map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.recipe)}</td><td>${x.batches}</td><td>${esc(x.actual_yield)} ${esc(x.yield_unit)}</td><td>${esc(x.status)}</td><td>${x.status==='Label Pending'?`<button class="btn black" onclick="passQC(${x.id})">Create Label</button>`:'<span class="ok"><b>RELEASED</b></span>'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No production waiting for Label.</td></tr>'}</table></div>`}
 function passQC(id){let a=getArr(PROD_KEY),x=a.find(p=>p.id===id);if(!x)return;x.status='Completed';x.qc_at=new Date().toISOString();setArr(PROD_KEY,a);openPage('Label')}
 
@@ -3583,7 +3584,7 @@ function qcPage(){
  return `<div class="grid"><div class="card"><span>PENDING LABEL</span><b>${pending.length}</b></div><div class="card"><span>PASSED</span><b>${passed.length}</b></div><div class="card"><span>REJECTED</span><b>${rejected.length}</b></div><div class="card"><span>CONTROL</span><b style="font-size:18px">LABEL</b></div></div>
  <div class="panel"><h2>Labels</h2><p class="muted">Check completed production before release. Chef Production does not see costs or prices.</p><div class="actions"><button class="btn" onclick="kitchSyncLocalProductionRecords()">Sync Existing Labels to Cloud</button></div>
  <table><tr><th>PRODUCTION</th><th>RECIPE</th><th>YIELD</th><th>EXPIRY</th><th>TEMP</th><th>STATUS</th><th>ACTION</th></tr>
- ${runs.filter(x=>['Label Pending','Label Created','Label Rejected'].includes(x.status)).map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.actual_yield)} ${esc(x.yield_unit||'')}</td><td>${esc(x.expiry_date||'—')}</td><td>${x.qc_temp_c!==undefined?cleanQty(x.qc_temp_c)+' °C':'—'}</td><td><span class="${x.status==='Label Created'?'ok':x.status==='Label Rejected'?'bad':'warn'}"><b>${esc(x.status)}</b></span></td><td>${x.status==='Label Pending'?`<button class="btn black" onclick="openQC(${x.id})">Label Details</button>`:x.status==='Label Created'?`<button class="btn" onclick="printQCLabel(${x.id})">Print Label</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No production waiting for Label.</td></tr>'}</table></div>`;
+ ${runs.filter(x=>['Label Pending','Label Created','Label Rejected'].includes(x.status)).map(x=>`<tr><td><b>${esc(x.code)}</b></td><td>${esc(x.recipe)}</td><td>${cleanQty(x.actual_yield)} ${esc(x.yield_unit||'')}</td><td>${esc(x.expiry_date||'—')}</td><td>${x.qc_temp_c!==undefined?cleanQty(x.qc_temp_c)+' °C':'—'}</td><td><span class="${x.status==='Label Created'?'ok':x.status==='Label Rejected'?'bad':'warn'}"><b>${esc(x.status)}</b></span></td><td>${x.status==='Label Pending'?`<button class="btn black" onclick="openQC(${x.id})">Label Details</button>`:x.status==='Label Created'?`<button class="btn" onclick="kitchPreviewLabel(${x.id})">Preview</button> <button class="btn" onclick="printQCLabel(${x.id})">Print</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">No production waiting for Label.</td></tr>'}</table></div>${kitchProductionLabelQueue()}`;
 }
 let qcPhotoData='';
 function openQC(id){
@@ -3633,38 +3634,73 @@ async function finishQC(id,pass){
  if(pass)updated.qc_serial=updated.qc_serial||('QC-'+String(id).slice(-6));
  try{updated.cloud_sync_revision=await kitchCloudSaveRun(updated)}catch(e){return alert('Cloud QC save failed. Label status was NOT changed: '+(e.message||e))}
  Object.assign(run,updated);setArr(PROD_KEY,a);closeModal();openPage('Label');
- if(pass && confirm('Label created. Print the label now?'))printQCLabel(id);
-}
-function printQCLabel(id){
- const run=getArr(PROD_KEY).find(x=>x.id===id);if(!run)return;
- if(!['Label Created','Completed'].includes(run.status))return alert('Finish Label/QC approval before printing.');
- const selected=window.prompt('KITCH label size:\n1 = 70 × 32 mm\n2 = 40 × 20 mm','1');
- if(selected===null)return;
- if(selected!=='1'&&selected!=='2')return alert('Choose 1 or 2.');
- const compact=selected==='2';
- const width=compact?40:70,height=compact?20:32;
- const plain=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const w=window.open('','_blank','width=720,height=540');
- if(!w)return alert('Allow Safari pop-ups to print a label.');
- const recipe=plain(run.recipe),code=plain(run.code),serial=plain(run.qc_serial||'');
- const date=plain(run.production_date||'—'),expiry=plain(run.expiry_date||'—');
- const temp=Number.isFinite(Number(run.qc_temp_c))?plain(run.qc_temp_c)+'°C':'—';
- const title=compact?recipe.slice(0,54):recipe;
- w.document.open();
- w.document.write('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
- '<title>KITCH label · '+code+'</title><style>'+
- '@page{size:'+width+'mm '+height+'mm;margin:0}*{box-sizing:border-box}html,body{padding:0;margin:0;background:#fff;color:#000;font-family:Arial,sans-serif}'+
- '.sheet{width:'+width+'mm;height:'+height+'mm;overflow:hidden;padding:'+(compact?'1.2':'2')+'mm;display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;page-break-inside:avoid}'+
- '.head{display:flex;justify-content:space-between;gap:2mm;font-size:'+(compact?'6':'7')+'pt;font-weight:800}.recipe{font-size:'+(compact?'7':'10')+'pt;font-weight:800;line-height:1.1;overflow:hidden;max-height:'+(compact?'7':'10')+'mm}.meta{font-size:'+(compact?'5.5':'7')+'pt;line-height:1.22}.foot{font-size:'+(compact?'5':'6')+'pt;display:flex;justify-content:space-between}'+
- '.controls{position:fixed;top:20px;left:20px;background:#fff;padding:18px;border:1px solid #ddd;border-radius:10px;box-shadow:0 8px 24px #0002;z-index:5;font:14px Arial}.controls button{padding:9px 16px;background:#111;color:white;border:0;border-radius:8px;cursor:pointer}'+
- '@media screen{body{background:#eee;padding:80px 20px}.sheet{background:#fff;box-shadow:0 1px 15px #0002;margin:auto}}@media print{html,body{width:'+width+'mm;height:'+height+'mm;overflow:hidden}.controls{display:none!important}.sheet{box-shadow:none!important;margin:0!important} }'+
- '</style></head><body><div class="controls"><strong>KITCH · '+width+' × '+height+' mm</strong><p>Choose a matching label roll / paper size in Safari printer settings.<br>Disable browser headers and footers. Preview should show one page.</p><button onclick="window.print()">Print / Save as PDF</button></div>'+
- '<div class="sheet"><div class="head"><span>KITCH</span><span>'+code+'</span></div>'+
- '<div class="recipe">'+title+'</div><div class="meta">Made: '+date+'<br>Use by: '+expiry+'<br>'+(!compact?'Yield: '+plain(run.actual_yield)+' '+plain(run.yield_unit||'')+' · ':'')+'Temp: '+temp+'</div>'+
- '<div class="foot"><span>'+serial+'</span><span>QC APPROVED</span></div></div></body></html>');
- w.document.close();
+ if(pass)kitchPreviewLabel(id);
 }
 
+/* Shared production label queue. No changes to QC or inventory transactions. */
+let kitchLabelSelections=new Set();
+function kitchApprovedLabels(){
+ const rows=scopedRows(getArr(PROD_KEY)).filter(x=>x.status==='Label Created'&&x.qc_serial);
+ const unique=new Map();
+ rows.forEach(x=>unique.set(String(x.cloud_request_id||x.id),x));
+ return [...unique.values()].sort((a,b)=>String(b.qc_at||'').localeCompare(String(a.qc_at||'')));
+}
+function kitchLabelFormat(){return document.getElementById('kitchLabelFormat')?.value==='40'?'40':'70'}
+function kitchLabelMarkup(x,small){
+ const p=v=>esc(String(v??''));
+ return '<div class="kitchLabelSticker'+(small?' compact':'')+'"><div class="kitchLabelTop"><b>KITCH</b><b>'+p(x.code)+'</b></div>'+
+ '<strong class="kitchLabelName">'+p(x.recipe)+'</strong><div class="kitchLabelDates">Made: '+p(x.production_date||'—')+
+ '<br>Use by: '+p(x.expiry_date||'—')+'<br>'+(!small?'Yield: '+p(x.actual_yield)+' '+p(x.yield_unit||'')+' · ':'')+
+ 'Temp: '+p(x.qc_temp_c??'—')+'°C</div><div class="kitchLabelTop"><span>'+p(x.qc_serial)+'</span><span>QC APPROVED</span></div></div>';
+}
+function kitchLabelSelect(id,on){if(on)kitchLabelSelections.add(String(id));else kitchLabelSelections.delete(String(id));const e=document.getElementById('kitchLabelCount');if(e)e.textContent=kitchLabelSelections.size+' selected';}
+function kitchLabelSelectAll(on){kitchLabelSelections=new Set(on?kitchApprovedLabels().map(x=>String(x.id)):[]);document.querySelectorAll('.kitchLabelCheck').forEach(e=>e.checked=on);const e=document.getElementById('kitchLabelCount');if(e)e.textContent=kitchLabelSelections.size+' selected';}
+function kitchProductionLabelQueue(){
+ const rows=kitchApprovedLabels(),ids=new Set(rows.map(x=>String(x.id)));
+ kitchLabelSelections=new Set([...kitchLabelSelections].filter(id=>ids.has(id)));
+ return '<div class="panel kitchProductionLedger"><h2>Saved Production Labels</h2><p class="muted">All QC-approved production labels, ready to preview or print later. Printing does not change production records or inventory.</p>'+
+ '<div class="actions kitchProductionActions"><label>Label size <select id="kitchLabelFormat" style="margin-left:7px;padding:9px;border:1px solid #ddd;border-radius:10px"><option value="70">70 × 32 mm</option><option value="40">40 × 20 mm</option></select></label><button class="btn black" onclick="kitchPrintSelectedLabels()">Print Selected</button><span id="kitchLabelCount">'+kitchLabelSelections.size+' selected</span></div>'+
+ '<div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th><input type="checkbox" aria-label="Select all labels" onchange="kitchLabelSelectAll(this.checked)"></th><th>PRODUCTION</th><th>RECIPE</th><th>MADE</th><th>EXPIRY</th><th>QC</th><th>ACTIONS</th></tr>'+
+ (rows.map(x=>'<tr><td><input type="checkbox" class="kitchLabelCheck" '+(kitchLabelSelections.has(String(x.id))?'checked':'')+' onchange="kitchLabelSelect('+Number(x.id)+',this.checked)"></td><td>'+esc(x.code)+'</td><td><b>'+esc(x.recipe)+'</b></td><td>'+esc(x.production_date||'—')+'</td><td>'+esc(x.expiry_date||'—')+'</td><td><span class="ok">Approved</span></td><td><button class="btn" onclick="kitchPreviewLabel('+Number(x.id)+')">Preview</button> <button class="btn" onclick="printQCLabel('+Number(x.id)+')">Print</button></td></tr>').join('')||
+ '<tr><td colspan="7">No QC-approved labels yet. Completed and approved production labels will appear here automatically.</td></tr>')+
+ '</table></div></div>';
+}
+function kitchPreviewLabel(id){
+ const x=kitchApprovedLabels().find(r=>String(r.id)===String(id));
+ if(!x)return alert('Saved QC-approved production label not found.');
+ modal('<div class="modalHead"><h2>Label Preview</h2><button class="close" onclick="closeModal()">×</button></div>'+
+ '<div class="kitchLabelPreview">'+kitchLabelMarkup(x,kitchLabelFormat()==='40')+'</div>'+
+ '<div class="actions"><button class="btn" onclick="closeModal()">Close</button><button class="btn black" onclick="printQCLabel('+Number(x.id)+')">Print Label</button></div>');
+}
+function printQCLabel(id){
+ const run=kitchApprovedLabels().find(r=>String(r.id)===String(id));
+ if(!run)return alert('QC approval is required before printing.');
+ kitchPrintLabelSheet([run]);
+}
+function kitchPrintSelectedLabels(){
+ const rows=kitchApprovedLabels().filter(x=>kitchLabelSelections.has(String(x.id)));
+ if(!rows.length)return alert('Select at least one saved label.');
+ kitchPrintLabelSheet(rows);
+}
+function kitchPrintLabelSheet(rows){
+ const small=kitchLabelFormat()==='40',w=small?40:70,h=small?20:32;
+ document.getElementById('kitchPrintArea')?.remove();
+ document.getElementById('kitchPrintStyles')?.remove();
+ const style=document.createElement('style');style.id='kitchPrintStyles';
+ style.textContent='@page{size:'+w+'mm '+h+'mm;margin:0}@media print{body *{visibility:hidden!important}#kitchPrintArea,#kitchPrintArea *{visibility:visible!important}#kitchPrintArea{display:block!important;position:absolute!important;left:0!important;top:0!important;width:'+w+'mm!important;padding:0!important;margin:0!important}#kitchPrintArea .kitchLabelSticker{width:'+w+'mm!important;height:'+h+'mm!important;border:0!important;box-shadow:none!important;break-after:page;page-break-after:always}#kitchPrintArea .kitchLabelSticker:last-child{break-after:auto;page-break-after:auto}}';
+ document.head.appendChild(style);
+ const area=document.createElement('div');area.id='kitchPrintArea';area.innerHTML=rows.map(x=>kitchLabelMarkup(x,small)).join('');
+ document.body.appendChild(area);
+ const clean=()=>{area.remove();style.remove();window.removeEventListener('afterprint',clean)};
+ window.addEventListener('afterprint',clean);
+ window.print();
+}
+(function(){
+ if(document.getElementById('kitchLabelsInlineCSS'))return;
+ const css=document.createElement('style');css.id='kitchLabelsInlineCSS';
+ css.textContent='#kitchPrintArea{display:none}.kitchLabelPreview{display:flex;justify-content:center;padding:35px;background:#f3f3f3;margin:14px 0}.kitchLabelSticker{width:70mm;height:32mm;box-sizing:border-box;padding:2mm;background:#fff;color:#000;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;font:7pt/1.2 Arial,sans-serif}.kitchLabelSticker.compact{width:40mm;height:20mm;padding:1mm;font-size:5pt}.kitchLabelTop{display:flex;justify-content:space-between;gap:2mm;font-size:7pt}.kitchLabelSticker.compact .kitchLabelTop{font-size:5pt}.kitchLabelName{font-size:10pt;line-height:1.1}.kitchLabelSticker.compact .kitchLabelName{font-size:7pt}.kitchLabelDates{font-size:7pt}.kitchLabelSticker.compact .kitchLabelDates{font-size:5.5pt}';
+ document.head.appendChild(css);
+})();
 // WASTE & ADJUSTMENTS — raw ingredient waste and finished production waste are kept separate.
 const WASTE_KEY='kitch_demo_waste_v3';
 function wasteRecords(){return getArr(WASTE_KEY)}
