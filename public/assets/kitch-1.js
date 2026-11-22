@@ -2878,7 +2878,26 @@ function filterIngredients(){
 
 
 const RECIPE_KEY='kitch_demo_recipes_v1';
-function recipes(){return getArr(RECIPE_KEY)}
+const KITCH_ACTIVE_RECIPE_NAMES=new Set(["honey soy chicken & brown rice","chicken & vegetable white rice bowl","sesame chicken quinoa bowl","lime coriander chicken rice","chicken, spinach & quinoa bowl","soy chicken & broccoli","coriander chicken & cabbage bowl","grilled chicken garden salad","rocket, quinoa & cherry tomato salad","spinach & honey lime salad","cabbage, carrot & coriander slaw","broccoli & soy rice side","honey oats bowl","warm tomato & herb quinoa"]);
+const kitchIsActiveRecipe=r=>KITCH_ACTIVE_RECIPE_NAMES.has(String(r?.name||'').trim().toLowerCase());
+function kitchLatestRecipeList(list){
+ const selected=new Map();
+ (Array.isArray(list)?list:[]).filter(kitchIsActiveRecipe).forEach(r=>{
+  const key=String(r.name).trim().toLowerCase(),prior=selected.get(key);
+  if(!prior||String(r.updated_at||'')>String(prior.updated_at||''))selected.set(key,r);
+ });
+ return [...selected.values()];
+}
+function kitchArchiveAndReplaceRecipes(list){
+ const raw=getArr(RECIPE_KEY);
+ const backupKey='kitch_recipe_archive_before_20261122_14';
+ if(!localStorage.getItem(backupKey))localStorage.setItem(backupKey,JSON.stringify(raw));
+ const current=kitchLatestRecipeList(list);
+ setArr(RECIPE_KEY,current);
+ return current;
+}
+function recipes(){return kitchLatestRecipeList(getArr(RECIPE_KEY))}
+
 
 const KITCH_RECIPE_SYNC_TABLE='kitch_recipe_sync';
 async function kitchLoadSyncedRecipes(){
@@ -2888,7 +2907,11 @@ async function kitchLoadSyncedRecipes(){
   if(error){console.warn('Team recipe load failed',error.message);throw Error(error.message);}
   const local=recipes(),map=new Map(local.map(r=>[String(r.id),r]));
   for(const row of data||[]){if(row.payload&&Array.isArray(row.payload.items)){const v=row.payload;const prior=map.get(String(v.id));if(!prior||String(v.updated_at||'')>String(prior.updated_at||''))map.set(String(v.id),v)}}
-  setArr(RECIPE_KEY,[...map.values()]);return;
+  const active=kitchArchiveAndReplaceRecipes([...map.values()]);
+  // Upload newly imported recipes once, so staff on other devices see the same current catalogue.
+  const cloudNames=new Set((data||[]).map(x=>String(x.payload?.name||'').toLowerCase()));
+  for(const recipe of active){if(!cloudNames.has(String(recipe.name).toLowerCase())){try{await kitchSaveSyncedRecipe(recipe)}catch(err){console.warn('KITCH active recipe sync:',err.message)}}}
+  return;
  }
  if(!cloud?.restaurant_id||!cloud?.user?.id)throw Error('Workspace not authenticated for shared recipes');
  const {data,error}=await sb.from(KITCH_RECIPE_SYNC_TABLE).select('recipe_key,payload,updated_at').eq('restaurant_id',cloud.restaurant_id);
@@ -2901,7 +2924,7 @@ async function kitchLoadSyncedRecipes(){
   const prior=byId.get(String(incoming.id));
   if(!prior || String(incoming.updated_at||'')>String(prior.updated_at||''))byId.set(String(incoming.id),incoming);
  }
- setArr(RECIPE_KEY,[...byId.values()]);
+ kitchArchiveAndReplaceRecipes([...byId.values()]);
 }
 async function kitchSaveSyncedRecipe(recipe){
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
@@ -3056,6 +3079,7 @@ function recipeYieldReview(r){
  return 'Expected finished weight needs verification against EP ingredients; liquid and piece weights are separate.';
 }
 function recipesPage(){
+ kitchArchiveAndReplaceRecipes(getArr(RECIPE_KEY));
  linkRecipeIngredients();
  const a=recipes().slice().sort((x,y)=>x.name.localeCompare(y.name));
  const manage=session==='manager',chef=session==='production';
@@ -3133,7 +3157,7 @@ async function readRecipeExcel(file){
 function confirmRecipeImport(){
  let a=recipes(),added=0,updated=0;
  recipeImport.forEach(r=>{let e=a.find(x=>x.name.toLowerCase()===r.name.toLowerCase());if(e){Object.assign(e,r,{id:e.id});updated++}else{a.push(r);added++}});
- setArr(RECIPE_KEY,a);recipeImport=[];closeModal();openPage('Recipes');alert(`Recipe import complete: ${added} new · ${updated} updated`);
+ kitchArchiveAndReplaceRecipes(a);recipeImport=[];closeModal();openPage('Recipes');alert('Recipe import complete: '+recipes().length+' active recipes from the latest 36-ingredient catalogue. Older recipes are backed up and hidden.');
 }
 function viewRecipe(id){
  linkRecipeIngredients();const r=recipes().find(x=>x.id===id);if(!r)return;let miss=recipeMissing(r),m=ingredients();
