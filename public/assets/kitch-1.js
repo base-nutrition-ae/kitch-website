@@ -751,7 +751,7 @@ function openSubscribe(){
  <div class="kitchProPlanCard">
  <div class="kitchProPlanTop"><div><span class="kitchProTrial">30-day free trial</span><h3>KITCH Pro</h3><div class="kitchProPrice">AED 249 <small>/ month</small></div></div><div class="kitchProAllIn">All features included</div></div>
  <div class="kitchProFeatures"><span>✓ Ingredient Master & Inventory</span><span>✓ Recipes & Costing</span><span>✓ Purchasing & Suppliers</span><span>✓ Receiving & Invoices</span><span>✓ Production & Labels</span><span>✓ Central Store & Multiple Locations</span><span>✓ Staff & Permissions</span><span>✓ Waste, Stock Counts & Reports</span></div>
- <div class="kitchProPromoInfo"><b>Have a promo code?</b> Enter it securely at the Stripe checkout. Any valid discount will be calculated by Stripe before you confirm.</div>
+ <div class="kitchProPromoInfo"><b>Automatic 10% first-month offer · KITCHPRO10</b> The discount code is prefilled in Stripe's sandbox checkout. After the free trial, check Stripe's displayed first paid invoice amount before confirming.</div>
  <button class="primary kitchProChoose" onclick="startSubscription('business')">Start 30-day free trial</button>
  </div>
  <p class="kitchProSandboxNote">Stripe sandbox checkout for testing. No live payment will be charged. The same AED 249/month plan will require separate live billing verification before launch.</p>
@@ -760,7 +760,7 @@ function openSubscribe(){
 function toggleLandingDiscount(){openSubscribe();}
 function startSubscription(plan){
  const label=plan==='business'?'KITCH Pro · AED 249/month':'KITCH Starter · AED 149/month';
- closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>ACCOUNT SETUP</span></div><h2>${label}</h2><p class="muted">Create the management account and company details. Workspace activation will happen only after the payment-success step.</p><div class="formGrid"><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="subCompany"></div><div class="field"><label>${plan==='business'?'FIRST RESTAURANT BRANCH':'RESTAURANT LOCATION'}</label><input id="subBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="subEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="subPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('subPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div></div><div class="note"><b>KITCH Pro sandbox checkout.</b> AED 249/month, 30-day free trial. You can enter a valid promotion code on Stripe's checkout page. This is test mode and does not charge live funds.</div><button class="primary" onclick="testSubscriptionPayment('${plan}')">Continue to Stripe Test Checkout · Promo Codes Accepted</button>`)
+ closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>ACCOUNT SETUP</span></div><h2>${label}</h2><p class="muted">Create the management account and company details. Workspace activation will happen only after the payment-success step.</p><div class="formGrid"><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="subCompany"></div><div class="field"><label>${plan==='business'?'FIRST RESTAURANT BRANCH':'RESTAURANT LOCATION'}</label><input id="subBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="subEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="subPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('subPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div></div><div class="note"><b>KITCH Pro sandbox checkout.</b> AED 249/month, 30-day free trial. The KITCHPRO10 promotion code is prefilled automatically at Stripe checkout. This is test mode and does not charge live funds.</div><button class="primary" onclick="testSubscriptionPayment('${plan}')">Continue to Stripe Test Checkout · 10% Code Included</button>`)
 }
 const STRIPE_PAYMENT_LINKS={
  starter:'https://buy.stripe.com/test_fZueVd73MaYR26ocIr6Ri00',
@@ -811,7 +811,8 @@ async function testSubscriptionPayment(plan){
  const base=STRIPE_PAYMENT_LINKS[plan];
  const checkoutUrl=base
    +'?client_reference_id='+encodeURIComponent(user.id)
-   +'&locked_prefilled_email='+encodeURIComponent(em);
+   +'&locked_prefilled_email='+encodeURIComponent(em)
+   +(plan==='business'?'&prefilled_promo_code=KITCHPRO10':'');
 
  window.location.href=checkoutUrl;
 }
