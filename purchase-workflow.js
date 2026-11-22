@@ -77,6 +77,21 @@ if(typeof purchasingPage==='function'){
    '<h3>Purchase Orders</h3><div style="overflow:auto"><table><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Amount</th></tr>'+orderRows+'</table></div></div>';
  };
 }
+/* Match the clean Main Office purchasing look for chefs, without touching stock logic. */
+const chefStyle=document.createElement('style');
+chefStyle.id='kitch-kitchen-request-ui';
+chefStyle.textContent=`
+#cloudPurchaseItems{max-width:none!important;width:100%!important;border:1px solid #e8e8e8!important;border-radius:19px!important;background:#fff!important;padding:18px!important;box-sizing:border-box!important}
+#cloudPurchaseItems .kitch-line{grid-template-columns:minmax(0,1fr) minmax(120px,180px) 64px!important;gap:14px!important;align-items:end!important}
+#cloudPurchaseItems label{font-size:11px!important;color:#666!important;letter-spacing:.025em!important}
+#cloudPurchaseItems .kitch-line select,#cloudPurchaseItems .kitch-line input{height:48px!important;background:#fff!important;border:1px solid #ddd!important;border-radius:13px!important;font-size:14px!important}
+#cloudPurchaseItems .kitch-remove{width:62px!important;height:43px!important;border:1px solid #e3e3e3!important;border-radius:99px!important;color:#222!important;font-size:13px!important;font-weight:700!important}
+#cloudPurchaseItems+.actions{display:grid!important;grid-template-columns:auto minmax(180px,1fr) auto!important;gap:12px!important}
+#cloudPurchaseItems+.actions .btn{border-radius:99px!important;min-height:44px!important}
+#cloudPurchaseItems+.actions #cloudPrNotes{max-width:none!important}
+@media(max-width:650px){#cloudPurchaseItems{padding:12px!important}#cloudPurchaseItems .kitch-line{grid-template-columns:minmax(0,1fr) 95px 36px!important;gap:6px!important}#cloudPurchaseItems .kitch-remove{width:36px!important;font-size:18px!important}#cloudPurchaseItems+.actions{grid-template-columns:1fr!important}}
+`;
+document.head.appendChild(chefStyle);
 // Main Office is an iframe; insert its Purchasing tab without replacing the original office code.
 const officeFrame=document.getElementById('kitchOfficeFrame');
 if(!officeFrame)return;
@@ -116,51 +131,24 @@ async function officeAction(frame,action,extra={}){
 function officeRender(frame){
  const doc=frame.contentDocument,root=doc.getElementById('officePurchaseContent'),d=officeData;
  if(!root||!d)return;
- const reqs=groupLines(d.requests||[]),orders=groupLines(d.orders||[]),suppliers=d.suppliers||[],ingredients=d.ingredients||[];
+ const reqs=groupLines(d.requests||[]),orders=groupLines(d.orders||[]);
  const pending=reqs.filter(x=>x.status==='pending_approval').length;
- const row=reqs.map(r=>{
-  const action=r.status==='pending_approval'?'<button class="btn" data-act="approve" data-id="'+E(r.id)+'">Approve</button> <button class="btn" data-act="reject" data-id="'+E(r.id)+'" style="background:#eee;color:#222">Reject</button>':
-  (r.status==='approved'&&!orders.some(o=>o.request_id===r.id&&o.status!=='cancelled')?
-  '<select id="officeSupplier_'+E(r.id)+'">'+listOpt(suppliers,'Choose approved supplier')+'</select>'+priceFields(r)+'<button class="btn" data-act="create_order" data-id="'+E(r.id)+'">Emergency PO</button>':'—');
-  return '<tr><td>'+E(r.request_no)+'</td><td>'+r.lines.map(x=>E(x.ingredient)).join(', ')+'</td><td>'+r.lines.map(x=>E(x.quantity)+' '+E(x.unit)).join(', ')+'</td><td>'+E(String(r.status).replaceAll('_',' '))+'</td><td>'+action+'</td></tr>';
+ const statusText=v=>E(String(v||'').replaceAll('_',' '));
+ const rows=reqs.map(r=>{
+  const action=r.status==='pending_approval'
+   ? '<button class="btn purchase-primary" data-act="approve" data-id="'+E(r.id)+'">Approve request</button> <button class="btn" data-act="reject" data-id="'+E(r.id)+'">Reject</button>'
+   : '<span class="purchase-readonly">View only</span>';
+  return '<tr><td>'+E(r.request_no)+'</td><td>'+r.lines.map(x=>E(x.ingredient)+' · '+E(x.quantity)+' '+E(x.unit)).join('<br>')+'</td><td>'+statusText(r.status)+'</td><td>'+action+'</td></tr>';
  }).join('');
- root.innerHTML='<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="card"><small>Pending approval</small><div class="number">'+pending+'</div></div><div class="card"><small>Requests</small><div class="number">'+reqs.length+'</div></div><div class="card"><small>Purchase orders</small><div class="number">'+orders.length+'</div></div></div>'+
- '<div class="card" style="margin-top:16px"><h2>Approve or Reject Requests</h2><p class="subhead">Requests are visible for your company only. Approval does not deduct or add stock.</p><div style="overflow:auto"><table><thead><tr><th>Request</th><th>Ingredient</th><th>Quantity</th><th>Status</th><th>Decision</th></tr></thead><tbody>'+row+'</tbody></table></div><button class="btn purchase-primary" data-act="refresh">Refresh</button></div>'+
- '<div class="split" style="margin-top:16px"><div class="card"><h2>Emergency Ingredient Request</h2><p class="subhead">Owner override, still requires approval before an order.</p><div class="purchase-fields"><label class="wide">Location <select id="officeReqBranch">'+listOpt(officeBranches,'Choose location')+'</select></label><div class="wide" id="officeRequestItems">'+itemRows(ingredients)+'</div><button class="btn wide" data-act="add_item" type="button">+ Add ingredient</button><label class="wide">Note <input id="officeReqNote" maxlength="300" placeholder="Reason"></label></div><button class="btn purchase-primary" data-act="create">Submit all ingredients</button></div>'+
- '<div class="card"><h2>Approved Suppliers</h2><p class="subhead">Register a supplier for Store Managers to use when preparing orders.</p><p class="purchase-supplier-empty">'+E(suppliers.map(x=>x.name).join(', ')||'No suppliers registered yet')+'</p><label>Supplier name <input id="officeNewSupplier" maxlength="120" style="width:100%" placeholder="Supplier / company"></label><button class="btn purchase-primary" data-act="add_supplier">Add supplier</button></div></div>'+
- '<div class="card" style="margin-top:16px"><h2>Purchase Orders</h2><table><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Commitment</th></tr>'+orders.map(o=>'<tr><td>'+E(o.po_no)+'</td><td>'+E(o.supplier)+'</td><td>'+E(o.status)+'</td><td>'+AED(o.lines.reduce((sum,x)=>sum+Number(x.total||0),0))+'</td></tr>').join('')+'</table></div>';
- root.querySelector('#officeRequestItems')?.addEventListener('click',e=>{
-   const btn=e.target.closest('.kitch-remove');if(!btn)return;
-   const line=btn.closest('.kitch-line'),list=line?.parentElement;
-   if(list?.children.length>1)line.remove();
- });
- root.querySelectorAll('[data-act]').forEach(button=>button.addEventListener('click',async()=>{
+ const orderRows=orders.map(o=>'<tr><td>'+E(o.po_no)+'</td><td>'+E(o.supplier)+'</td><td>'+statusText(o.status)+'</td><td>'+AED(o.lines.reduce((sum,x)=>sum+Number(x.total||0),0))+'</td></tr>').join('');
+ root.innerHTML='<div class="grid" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div class="card"><small>Pending approval</small><div class="number">'+pending+'</div></div><div class="card"><small>Purchase requests</small><div class="number">'+reqs.length+'</div></div><div class="card"><small>Purchase orders</small><div class="number">'+orders.length+'</div></div></div>'+
+ '<div class="card" style="margin-top:16px"><h2>Kitchen Purchase Requests</h2><p class="subhead">Main Office can view, approve or reject chef requests. Orders must be created from Kitchen Operations. Approval does not update stock.</p><div style="overflow:auto"><table><thead><tr><th>Request</th><th>Ingredients and quantities</th><th>Status</th><th>Decision</th></tr></thead><tbody>'+(rows||'<tr><td colspan="4">No kitchen requests yet.</td></tr>')+'</tbody></table></div><button class="btn" data-act="refresh">Refresh</button></div>'+
+ '<div class="card" style="margin-top:16px"><h2>Purchase Orders · View only</h2><p class="subhead">Follow orders and amounts without creating or editing a PO here.</p><div style="overflow:auto"><table><thead><tr><th>PO</th><th>Supplier</th><th>Status</th><th>Amount</th></tr></thead><tbody>'+(orderRows||'<tr><td colspan="4">No purchase orders yet.</td></tr>')+'</tbody></table></div></div>';
+ root.querySelectorAll('[data-act]').forEach(button=>button.addEventListener('click',()=>{
   const act=button.dataset.act,id=button.dataset.id;
   if(act==='refresh')return officeRefresh(frame);
   if(act==='approve')return officeAction(frame,'approve',{p_request_id:id});
   if(act==='reject'){const reason=prompt('Reason for rejection:');if(reason===null)return;return officeAction(frame,'reject',{p_request_id:id,p_notes:reason})}
-  if(act==='add_supplier'){const name=root.querySelector('#officeNewSupplier')?.value.trim();if(!name)return alert('Enter supplier name.');return officeAction(frame,'add_supplier',{p_notes:name})}
-  if(act==='add_item'){
-    const lines=root.querySelector('#officeRequestItems .kitch-lines');
-    if(lines.children.length>=50)return alert('Maximum 50 ingredients');
-    const row=lines.firstElementChild.cloneNode(true);row.querySelector('select').value='';row.querySelector('input').value='';lines.appendChild(row);return;
-  }
-  if(act==='create'){
-    try{
-      const p_branch_id=root.querySelector('#officeReqBranch')?.value;
-      if(!p_branch_id)throw Error('Select a location');
-      const p_items=readItems(root.querySelector('#officeRequestItems'),ingredients);
-      return officeAction(frame,'create',{p_branch_id,p_items,p_notes:root.querySelector('#officeReqNote')?.value||''});
-    }catch(e){return alert(e.message)}
-  }
-  if(act==='create_order'){
-   try{
-    const p_supplier_id=root.querySelector('#officeSupplier_'+id)?.value;
-    if(!p_supplier_id)throw Error('Select approved supplier');
-    const p_items=readPrices(root,id);
-    return officeAction(frame,'create_order',{p_request_id:id,p_supplier_id,p_items});
-   }catch(e){return alert(e.message)}
-  }
  }));
 }
 function installOffice(){
@@ -176,7 +164,7 @@ function installOffice(){
  const removeCss=doc.createElement('style');removeCss.textContent='#approvals button.kitch-remove,#approvals button.kitch-remove:hover,#approvals button.kitch-remove:active,#approvals button.kitch-remove:focus{background:transparent!important;background-color:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;color:#555!important;padding:0!important;appearance:none!important;-webkit-appearance:none!important;display:flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;align-self:end!important;transform:translateY(-24px)!important}#approvals .kitch-line label{margin:0!important}#approvals .kitch-line{align-items:end!important}';doc.head.appendChild(removeCss);
  const ps=doc.createElement('style');ps.id='kitch-purchasing-styles';ps.textContent="#approvals #officePurchaseContent{background:transparent;border:0;padding:0;box-shadow:none}#approvals .card{background:#fff;border:1px solid #ececec;border-radius:22px;padding:24px;min-width:0}#approvals .card h2{font-size:19px;margin:0 0 9px;letter-spacing:-.035em}#approvals .subhead{font-size:12px;color:#888;line-height:1.5;margin:0 0 22px}#approvals .split{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}#approvals label{display:block;margin:0 0 17px;color:#444;font-size:12px;font-weight:650}#approvals input,#approvals select{display:block;width:100%;max-width:100%;box-sizing:border-box;height:44px;margin:8px 0 0;border:1px solid #dedede;border-radius:11px;background:#fafafa;padding:0 13px;color:#222;font-size:13px}#approvals input:focus,#approvals select:focus{outline:2px solid #ff8a56;outline-offset:1px;background:white}#approvals .purchase-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}#approvals .purchase-fields .wide{grid-column:1/-1}#approvals .purchase-primary{background:#191919;color:#fff;padding:12px 18px;border-radius:11px;font-size:12px;font-weight:700;min-height:44px}#approvals .purchase-supplier-empty{border:1px dashed #e7e7e7;background:#fafafa;padding:14px;border-radius:12px;color:#888;font-size:12px;margin:0 0 20px}#approvals th{background:#fafafa;padding:13px 12px}#approvals td{padding:15px 12px;border-bottom:1px solid #eee}#approvals td input,#approvals td select{min-width:145px}#approvals .grid .card{min-height:135px}@media(max-width:850px){#approvals .split{grid-template-columns:1fr}}@media(max-width:550px){#approvals .purchase-fields{grid-template-columns:1fr}#approvals .card{padding:16px}}input[type=number]{-moz-appearance:textfield!important;appearance:textfield!important}input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none!important;margin:0!important;display:none!important}";doc.head.appendChild(ps);
  const section=doc.createElement('section');section.className='section';section.id='approvals';
- section.innerHTML='<div class="hero"><div><h1>Purchasing Approvals</h1><p>Review kitchen requests, authorize orders and manage approved suppliers.</p></div><span class="tag">Main Office · Owner only</span></div><div id="officePurchaseContent">Open this tab to load purchasing records.</div>';
+ section.innerHTML='<div class="hero"><div><h1>Purchasing Approvals</h1><p>Review kitchen requests and approve or reject. Order creation stays with the kitchen.</p></div><span class="tag">Main Office · Approval only</span></div><div id="officePurchaseContent">Open this tab to load purchasing records.</div>';
  const footer=app.querySelector('.footer');if(footer)footer.before(section);else app.querySelector('.content')?.appendChild(section);
  // The Main Office is embedded using iframe.srcdoc. Safari may throw on
  // history.replaceState() in the original showPage(), after visually switching
