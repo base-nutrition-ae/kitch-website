@@ -690,3 +690,70 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
 @media(prefers-reduced-motion:reduce){
  body #app .side{transition:none!important}
 }
+
+
+/* KITCH THREE-COLUMN SIDEBAR RAIL V6 */
+#app .kitchIconRail{display:none}
+@media screen and (min-width:851px){
+ body #app.app:not(.hidden){
+  display:grid!important;grid-template-columns:58px 236px minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;min-height:100dvh!important;
+  width:100%!important;max-width:100%!important;overflow:visible!important;
+  transition:grid-template-columns .2s ease!important;
+  align-items:stretch!important;
+ }
+ body #app.app:not(.hidden)>.kitchIconRail{
+  display:flex!important;flex-direction:column!important;align-items:center!important;
+  grid-column:1!important;grid-row:1!important;position:sticky!important;top:0!important;
+  width:58px!important;min-width:58px!important;height:100dvh!important;
+  padding:14px 7px!important;box-sizing:border-box!important;z-index:12!important;
+  gap:9px!important;background:#f3f3f3!important;border-right:1px solid #e5e5e5!important;
+ }
+ body #app .kitchRailButton{
+  display:grid!important;place-items:center!important;flex:0 0 auto!important;
+  width:41px!important;height:41px!important;padding:0!important;
+  border:0!important;border-radius:12px!important;background:transparent!important;
+  color:#323232!important;font:700 21px/1 Arial,sans-serif!important;
+  cursor:pointer!important;transition:background .16s ease!important;
+ }
+ body #app .kitchRailButton:hover{background:#e3e3e3!important}
+ body #app .kitchRailButton.active{background:#dedede!important;color:#131313!important}
+ body #app .kitchRailMark{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;color:#191919;font:900 23px/1 Arial,sans-serif;letter-spacing:-.05em;margin-bottom:7px}
+ body #app .kitchRailEnd{margin-top:auto!important;display:flex!important;flex-direction:column!important;gap:6px!important}
+ body #app .kitchRailSignOut{background:#202020!important;color:#fff!important}
+ body #app.app:not(.hidden)>.side{
+  grid-column:2!important;grid-row:1!important;
+  position:sticky!important;top:0!important;left:auto!important;right:auto!important;
+  transform:none!important;display:flex!important;flex-direction:column!important;
+  width:236px!important;min-width:0!important;max-width:none!important;
+  height:100dvh!important;max-height:100dvh!important;
+  padding:16px 12px!important;box-sizing:border-box!important;
+  overflow:hidden!important;visibility:visible!important;opacity:1!important;
+  background:#fafafa!important;color:#202020!important;border-right:1px solid #e4e4e4!important;
+ }
+ body #app.app:not(.hidden)>.main{
+  grid-column:3!important;grid-row:1!important;min-width:0!important;
+  width:100%!important;box-sizing:border-box!important;
+  padding:28px 28px!important;margin:0!important;overflow-x:auto!important;
+ }
+ body #app .side .sideLogoWrap{min-height:58px!important}
+ body #app .side .kitchSidebarCollapse{display:none!important}
+ body #app.kitchSidebarCollapsed:not(.hidden){
+  grid-template-columns:58px 0 minmax(0,1fr)!important;
+ }
+ body #app.kitchSidebarCollapsed:not(.hidden)>.side{
+  display:none!important;width:0!important;padding:0!important;border:0!important;
+ }
+ body #app.kitchSidebarCollapsed:not(.hidden)>.main{grid-column:3!important}
+ body #app .side .nav>button{font-size:12px!important;white-space:normal!important}
+}
+@media screen and (max-width:850px){
+ body #app .kitchIconRail{display:none!important}
+ body #app.app:not(.hidden){display:block!important}
+ body #app.app:not(.hidden)>.side{
+  grid-column:auto!important;grid-row:auto!important;
+  left:0!important;right:auto!important;
+  transform:translate3d(-105%,0,0)!important;
+ }
+ body #app.app.mobileMenuOpen:not(.hidden)>.side{transform:translate3d(0,0,0)!important}
+}
