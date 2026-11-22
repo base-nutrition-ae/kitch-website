@@ -542,8 +542,14 @@ function renderNav(){
  for(const x of items){if(mainItems.length>=4)break;if(!mainItems.includes(x))mainItems.push(x)}
  const extra=items.filter(x=>!mainItems.includes(x) && !(items.includes('Suppliers & Purchasing') && x==='Receiving'));
  const makeButton=x=>{const b=document.createElement('button');b.type='button';b.textContent=x;b.addEventListener('click',()=>{document.getElementById('kitchMoreMenu')?.remove();openPage(x)});return b};
+ // On phones show one flat list: no More popover, no nested scrolling.
+ if(window.innerWidth<=850){
+  document.getElementById('kitchMoreMenu')?.remove();
+  nav.replaceChildren(...[...mainItems,...extra].map(makeButton));
+ }else{
  nav.replaceChildren(...mainItems.map(makeButton));
  if(extra.length){const more=document.createElement('button');more.type='button';more.textContent='More ▾';more.className='kitchMoreTrigger';more.setAttribute('aria-haspopup','true');more.setAttribute('aria-expanded','false');more.setAttribute('aria-controls','kitchMoreMenu');more.addEventListener('click',e=>{e.stopPropagation();let menu=document.getElementById('kitchMoreMenu');if(menu){menu.remove();more.setAttribute('aria-expanded','false');return}menu=document.createElement('div');menu.id='kitchMoreMenu';menu.className='kitchMoreMenu';extra.forEach(x=>menu.appendChild(makeButton(x)));if(window.innerWidth<=850){menu.classList.add('kitchMoreInline');more.insertAdjacentElement('afterend',menu);more.setAttribute('aria-expanded','true');requestAnimationFrame(()=>{more.scrollIntoView({block:'nearest',behavior:'smooth'});});}else{document.body.appendChild(menu);const r=more.getBoundingClientRect();menu.style.top=(r.bottom+8)+'px';menu.style.left=Math.max(12,Math.min(r.left,innerWidth-270))+'px';more.setAttribute('aria-expanded','true');}});nav.appendChild(more)}
+ }
  const u=document.getElementById('upgradeNav');if(u)u.innerHTML=(session==='owner'&&packageType()==='restaurant')?'<button onclick="openPage(\'Subscription Setup\')">Upgrade Subscription</button>':''
 }
 document.addEventListener('click',e=>{const m=document.getElementById('kitchMoreMenu');if(m&&!m.contains(e.target)&&!e.target.closest('.kitchMoreTrigger'))m.remove()});
