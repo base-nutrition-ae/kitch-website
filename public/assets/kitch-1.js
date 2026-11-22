@@ -3001,7 +3001,7 @@ function openProduction(){
 function previewProduction(){
  const r=recipes().find(x=>String(x.id)===String(document.getElementById('prRecipe')?.value)),
        mult=Number(document.getElementById('prBatches')?.value||0),m=ingredients();
- if(!r||!Number.isFinite(mult)||mult<=0)return;
+ if(!r||!Number.isFinite(mult)||mult<=0||mult>10000){const preview=document.getElementById('prPreview');if(preview)preview.innerHTML='<div class="note bad">Enter a valid batch quantity between 0.001 and 10,000.</div>';return;}
  const method=document.getElementById('prMethod');
  if(method)method.innerHTML=r.instructions
   ? `<div class="productionMethod"><b>METHOD / RECIPE INSTRUCTIONS</b>${esc(r.instructions)}</div>`
@@ -3074,7 +3074,7 @@ let kitchProductionSubmitting=false;
 async function confirmProduction(){
  if(kitchProductionSubmitting)return;
  const r=recipes().find(x=>String(x.id)===String(prRecipe.value)),mult=Number(prBatches.value||0);
- if(!r||!Number.isFinite(mult)||mult<=0)return alert('Enter a valid number of batches.');
+ if(!r||!Number.isFinite(mult)||mult<=0||mult>10000)return alert('Enter a valid number of batches (maximum 10,000).');
  if(recipeMissing(r).length)return alert('This recipe needs review. Link all ingredients before production.');
  for(const it of r.items){const ing=ingredientForRecipeItem(it,ingredients());
   if(!ing||!compatibleUnits(it.unit,ing.base_unit))return alert('Production blocked: fix the ingredient match or unit for '+it.ingredient+'.');}
@@ -3086,6 +3086,7 @@ async function confirmProduction(){
  for(const req of requirements){const ing=a.find(x=>x.name===req.ingredient);if(!ing)return alert('Ingredient name no longer matches. Refresh.');const key=String(ing.cloud_id||ing.name.toLowerCase());totals.set(key,(totals.get(key)||0)+req.canonical);}
  for(const [key,required] of totals){const ing=a.find(x=>String(x.cloud_id||x.name.toLowerCase())===key);if(!ing||productionStockCanonical(ing)+1e-9<required)return alert('Stock changed or insufficient for '+(ing?.name||key)+'. Refresh and try again.');}
  kitchProductionSubmitting=true;
+ let cloudStockDeducted=false,cloudProductionRequestId='';
  try{
   if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)throw Error('Sign in with an authorized KITCH Team account to start cloud production.');
   const requestId=crypto.randomUUID();
@@ -3095,6 +3096,7 @@ async function confirmProduction(){
   });
   if(error)throw Error(error.message);
   if(!data?.saved)throw Error('Cloud production confirmation was not returned.');
+  cloudStockDeducted=true;cloudProductionRequestId=requestId;
   const runs=getArr(PROD_KEY),code='PRD-'+String(runs.length+1).padStart(5,'0'),
         productionCost=requirements.reduce((t,x)=>t+Number(x.cost||0),0);
   runs.push({id:Date.now(),cloud_request_id:requestId,code,recipe_id:r.id,recipe:r.name,batches:mult,requirements,
@@ -3104,9 +3106,18 @@ async function confirmProduction(){
   setArr(PROD_KEY,runs);
   // Stock was already deducted by the cloud. If metadata sync fails, keep the local recovery record.
   try{const last=runs[runs.length-1];last.cloud_sync_revision=await kitchCloudSaveRun(last);setArr(PROD_KEY,runs)}catch(syncError){console.warn('Production stock deducted but completion metadata not yet synced',syncError.message||syncError)}
-  await cloudLoadIngredients();
+  try{await cloudLoadIngredients()}catch(refreshError){
+   console.warn('Cloud production succeeded but inventory display refresh failed',refreshError);
+   alert('Production started and stock was deducted in the cloud. Inventory display could not refresh; reload Inventory before starting another batch.');
+  }
   closeModal();openActualYield(runs[runs.length-1].id);
- }catch(err){alert('Production not started: '+err.message+'\\nStock was not deducted by this failed request.');}
+ }catch(err){
+  if(cloudStockDeducted){
+   alert('Production stock WAS deducted in KITCH cloud (request '+cloudProductionRequestId+'). A later step failed: '+err.message+'. Do NOT start the same batch again. Refresh Production and recover the saved record.');
+  }else{
+   alert('Production could not be confirmed: '+err.message+'. Check cloud production history before retrying; do not assume no stock was deducted if the connection was interrupted.');
+  }
+ }
  finally{kitchProductionSubmitting=false;}
 }
 function openActualYield(id){
