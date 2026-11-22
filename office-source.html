@@ -197,29 +197,30 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 <div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
 <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden>
   <div class="kitchPOHead">
-    <div><div class="kitchPOEyebrow">PURCHASING · MAIN OFFICE</div><h3>Prepare Supplier Purchase Order</h3><p id="officePOComposerSummary"></p></div>
-    <button type="button" class="kitchPOClose" id="officePOClose" aria-label="Close purchase order form">×</button>
+    <div><div class="kitchPOEyebrow">PURCHASING · MAIN OFFICE</div><h3>Send Kitchen Purchase Request</h3><p id="officePOComposerSummary"></p></div>
+    <button type="button" class="kitchPOClose" id="officePOClose" aria-label="Close order preview">×</button>
   </div>
   <div class="kitchPOFields">
-    <label class="kitchPOField"><span>Approved Supplier <b>*</b></span><select id="officePOSupplier"></select></label>
-    <div class="kitchPOField"><span>Items and unit prices</span><small>Enter the supplier price for each requested ingredient. Quantities come from the approved kitchen request.</small></div>
+    <label class="kitchPOField"><span>Approved supplier</span><select id="officePOSupplier"></select></label>
+    <label class="kitchPOField"><span>Supplier email</span><input id="officePOSupplierEmail" type="email" autocomplete="email" placeholder="supplier@example.com"></label>
   </div>
+  <p style="font-size:12px;color:#777;margin:0 0 15px">This is exactly what the chef requested. No prices or quantities to re-enter.</p>
   <div id="officePOLines" style="display:grid;gap:8px;margin:0 0 18px"></div>
   <div class="kitchPOSummary">
     <div class="kitchPOSummaryTitle">Order Summary</div>
     <div class="kitchPOSummaryRows">
+      <div><span>Request number</span><strong id="officePORequestNo">—</strong></div>
       <div><span>Ingredients</span><strong id="officePOItem">—</strong></div>
       <div><span>Requested quantities</span><strong id="officePOQuantity">—</strong></div>
       <div><span>Supplier</span><strong id="officePOSupplierText">—</strong></div>
-      <div><span>Pricing</span><strong id="officePOUnitPriceText">Enter a price for each ingredient</strong></div>
     </div>
-    <div class="kitchPOTotal"><span>Purchase Order Total</span><strong id="officePOTotal" aria-live="polite">AED 0.00</strong></div>
   </div>
-  <p class="kitchPONote">Creating a purchase order does not change inventory. Stock updates only when Receiving is confirmed.</p>
+  <p class="kitchPONote">Sending this request does not change inventory. Confirmed Receiving updates stock. Email opens in your mail app and must be sent there.</p>
   <p id="officePOInlineMessage" role="status" aria-live="polite"></p>
   <div class="kitchPOActions">
     <button type="button" class="kitchPOBtn kitchPOBtnSecondary" id="officePOCancel">Cancel</button>
-    <button type="button" class="kitchPOBtn kitchPOBtnPrimary" id="officePOConfirm">Create Supplier PO</button>
+    <button type="button" class="kitchPOBtn kitchPOBtnSecondary" id="officePOPrint">Print / Save PDF</button>
+    <button type="button" class="kitchPOBtn kitchPOBtnPrimary" id="officePOConfirm">Email Supplier</button>
   </div>
 </div></div>
 <div class="card"><div class="titleline"><h2>Purchase Orders</h2><span class="ghost" id="officePOCount">-</span></div>
@@ -455,7 +456,7 @@ async function officePurchaseLoad(){
    const actions=status==='pending_approval'
     ?'<button class="btn" data-po-action="approve" data-id="'+safe(r.id)+'">Approve</button> <button class="btn" data-po-action="reject" data-id="'+safe(r.id)+'">Reject</button>'
     :'<button type="button" class="btn" data-po-action="view" data-id="'+safe(r.id)+'">View details</button>'+
-      (status==='approved'&&!exists?' <button type="button" class="btn black" data-po-action="create_order" data-id="'+safe(r.id)+'">Prepare Supplier PO</button>':'');
+      (status==='approved'?' <button type="button" class="btn black" data-po-action="create_order" data-id="'+safe(r.id)+'">Send Order</button>':'');
    return '<tr><td><button type="button" class="officeRequestLink" data-po-action="view" data-id="'+safe(r.id)+'">'+safe(r.request_no)+'</button></td><td>'+r.lines.map(l=>safe(l.ingredient)).join(', ')+'</td><td>'+r.lines.map(l=>safe(l.quantity)+' '+safe(l.unit)).join(' · ')+'</td><td>'+safe(status.replaceAll('_',' '))+'</td><td>'+actions+'</td></tr>';
   }).join('')||'<tr><td colspan="5">No cloud purchase requests yet.</td></tr>';
   officePurchaseEl('officePurchaseOrders').innerHTML=[...groups.values()].map(o=>
@@ -465,20 +466,23 @@ async function officePurchaseLoad(){
 }
 let officeSelectedPurchaseRequest=null;
 function officePOShow(id){
- const req=officePurchaseState.requestGroups.find(x=>x.id===id);
- if(!req||req.status!=='approved')return officePurchaseStatus('Only approved requests can become supplier POs. Refresh first.');
- if(officePurchaseState.orders.some(o=>o.request_id===id&&o.status!=='cancelled'))return officePurchaseStatus('This request already has a purchase order. Refresh first.');
- if(!officePurchaseState.suppliers.length)return officePurchaseStatus('Register an approved cloud supplier first.');
+ const req=(officePurchaseState.requestGroups||[]).find(x=>String(x.id)===String(id));
+ if(!req||req.status!=='approved')return officePurchaseStatus('Only approved kitchen requests can be sent. Refresh first.');
  officeSelectedPurchaseRequest=req.id;
  const panel=officePurchaseEl('officePOComposer');
  officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredient'+(req.lines.length===1?'':'s');
- officePurchaseEl('officePOSupplier').innerHTML=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
- officePurchaseEl('officePOLines').innerHTML=req.lines.map(l=>'<div class="kitchPOLine"><div><strong>'+safe(l.ingredient)+'</strong><small>'+safe(l.quantity)+' '+safe(l.unit)+'</small></div><label>Unit price (AED / '+safe(l.unit)+')<input class="officePOLinePrice" type="number" min="0" step="any" inputmode="decimal" placeholder="0.00" data-ingredient="'+safe(l.ingredient_id)+'" data-quantity="'+safe(l.quantity)+'"></label><b class="officePOLineTotal">AED 0.00</b></div>').join('');
+ const opts=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
+ officePurchaseEl('officePOSupplier').innerHTML='<option value="">Select supplier</option>'+opts;
+ const defaultSupplier=officePurchaseState.suppliers.find(x=>req.lines.some(l=>String(l.supplier||'').toLowerCase()===String(x.name||'').toLowerCase()));
+ if(defaultSupplier)officePurchaseEl('officePOSupplier').value=defaultSupplier.id;
+ officePurchaseEl('officePOSupplierEmail').value='';
+ officePurchaseEl('officePOLines').innerHTML=req.lines.map((l,i)=>'<div class="kitchPOLine" style="display:flex;justify-content:space-between;align-items:center;gap:15px"><div><strong>'+(i+1)+'. '+safe(l.ingredient)+'</strong><small>Requested by kitchen</small></div><b style="font-size:14px;white-space:nowrap">'+safe(l.quantity)+' '+safe(l.unit)+'</b></div>').join('');
+ officePurchaseEl('officePORequestNo').textContent=req.request_no||req.id;
  officePurchaseEl('officePOItem').textContent=req.lines.map(x=>x.ingredient).join(', ');
  officePurchaseEl('officePOQuantity').textContent=req.lines.map(x=>x.quantity+' '+x.unit).join(' · ');
  officePurchaseEl('officePOInlineMessage').textContent='';
  panel.hidden=false;
- officePOUpdateTotal();
+ officePOUpdateSupplier();
  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
  officePurchaseStatus('');
 }
@@ -555,58 +559,52 @@ officePurchaseEl('officePurchaseRequests').addEventListener('click',e=>{
  if(button.dataset.poAction==='view')return officeShowRequestDetails(button.dataset.id);
  officePurchaseDo(button.dataset.poAction,button.dataset.id);
 });
-function officePOUpdateTotal(){
- const supplier=officePurchaseState.suppliers.find(x=>x.id===officePurchaseEl('officePOSupplier').value);
+function officePOUpdateSupplier(){
+ const id=officePurchaseEl('officePOSupplier').value;
+ const supplier=officePurchaseState.suppliers.find(x=>String(x.id)===String(id));
  officePurchaseEl('officePOSupplierText').textContent=supplier?.name||'Select supplier';
- let total=0,complete=true;
- for(const row of officePurchaseEl('officePOLines').querySelectorAll('.kitchPOLine')){
-  const input=row.querySelector('.officePOLinePrice');
-  const raw=input.value.trim(),price=Number(raw);
-  const valid=raw!==''&&Number.isFinite(price)&&price>=0&&price<=10000000;
-  if(!valid)complete=false;
-  const amount=valid?price*Number(input.dataset.quantity):0;
-  total+=amount;
-  row.querySelector('.officePOLineTotal').textContent='AED '+amount.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
- }
- officePurchaseEl('officePOUnitPriceText').textContent=complete?'All item prices entered':'Enter a price for each ingredient';
- officePurchaseEl('officePOTotal').textContent='AED '+total.toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+ if(supplier?.email)officePurchaseEl('officePOSupplierEmail').value=supplier.email;
 }
-officePurchaseEl('officePOLines').addEventListener('input',officePOUpdateTotal);
-officePurchaseEl('officePOSupplier').addEventListener('change',officePOUpdateTotal);
+function officeKitchenOrderText(req,supplierName){
+ const items=req.lines.map((l,i)=>(i+1)+'. '+l.ingredient+' — '+l.quantity+' '+l.unit).join('\n');
+ return 'KITCH — KITCHEN PURCHASE ORDER\nRequest: '+(req.request_no||req.id)+
+ '\nStatus: Approved\nSupplier: '+supplierName+'\n\nINGREDIENTS & QUANTITIES\n'+items+
+ '\n\nNotes: '+(req.notes||req.note||req.request_notes||'None')+
+ '\n\nPlease confirm availability and delivery details.\n\nKITCH Main Office';
+}
+function officeCurrentKitchenOrder(){
+ const req=(officePurchaseState.requestGroups||[]).find(x=>String(x.id)===String(officeSelectedPurchaseRequest));
+ if(!req||req.status!=='approved'){officePurchaseEl('officePOInlineMessage').textContent='Request not approved or missing. Refresh and try again.';return null}
+ const supplier=officePurchaseState.suppliers.find(x=>String(x.id)===String(officePurchaseEl('officePOSupplier').value));
+ if(!supplier){officePurchaseEl('officePOInlineMessage').textContent='Select the supplier first.';return null}
+ return {req,supplier};
+}
+officePurchaseEl('officePOSupplier').addEventListener('change',officePOUpdateSupplier);
 officePurchaseEl('officePOClose').addEventListener('click',()=>officePurchaseEl('officePOCancel').click());
 officePurchaseEl('officePOCancel').addEventListener('click',()=>{
  officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').hidden=true;
 });
-officePurchaseEl('officePOConfirm').addEventListener('click',async()=>{
- if(officePurchaseBusy)return;
- const req=officePurchaseState.requestGroups.find(x=>x.id===officeSelectedPurchaseRequest);
- const error=officePurchaseEl('officePOInlineMessage');
- const supplierId=officePurchaseEl('officePOSupplier').value;
- if(!req||req.status!=='approved'){error.textContent='Request is no longer approved. Refresh first.';return}
- if(officePurchaseState.orders.some(o=>o.request_id===req.id&&o.status!=='cancelled')){error.textContent='A purchase order already exists for this request. Refresh first.';return}
- if(!officePurchaseState.suppliers.some(x=>x.id===supplierId)){error.textContent='Select an approved supplier.';return}
- const items=[];
- for(const row of officePurchaseEl('officePOLines').querySelectorAll('.kitchPOLine')){
-  const input=row.querySelector('.officePOLinePrice'),raw=input.value.trim(),price=Number(raw);
-  if(raw===''||!Number.isFinite(price)||price<0||price>10000000){error.textContent='Enter valid prices for all ingredients.';input.focus();return}
-  items.push({ingredient_id:input.dataset.ingredient,unit_price:price});
+officePurchaseEl('officePOConfirm').addEventListener('click',()=>{
+ const data=officeCurrentKitchenOrder();if(!data)return;
+ const email=officePurchaseEl('officePOSupplierEmail').value.trim();
+ const message=officePurchaseEl('officePOInlineMessage');
+ if(!email||!officePurchaseEl('officePOSupplierEmail').checkValidity()){
+  message.textContent='Enter a valid supplier email address to open the order email.';officePurchaseEl('officePOSupplierEmail').focus();return;
  }
- if(items.length!==req.lines.length){error.textContent='Order lines do not match the request. Refresh and retry.';return}
- const supplierName=officePurchaseState.suppliers.find(x=>x.id===supplierId)?.name||'selected supplier';
- const orderTotal=items.reduce((sum,item)=>sum+Number(item.unit_price)*(Number(req.lines.find(l=>String(l.ingredient_id)===String(item.ingredient_id))?.quantity)||0),0);
- if(!confirm('Create one Supplier PO for '+req.lines.length+' ingredients from '+supplierName+'? Total: AED '+orderTotal.toFixed(2)+'. Stock will remain unchanged until Receiving.'))return;
- officePurchaseBusy=true;
- const button=officePurchaseEl('officePOConfirm');button.disabled=true;
- error.textContent='Creating purchase order…';
- try{
-  const {data, error:dbError}=await db.rpc('kitch_purchase_multi',{p_action:'create_order',p_restaurant_id:officeRid,
-   p_request_id:req.id,p_supplier_id:supplierId,p_items:items});
-  if(dbError)throw Error(dbError.message);
-  officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').hidden=true;
-  await officePurchaseLoad();
-  officePurchaseStatus('Supplier PO saved for '+items.length+' ingredients. Stock is unchanged; send to supplier separately.');
- }catch(e){error.textContent='Purchase order not created: '+e.message}
- finally{officePurchaseBusy=false;button.disabled=false}
+ const subject='KITCH Purchase Order — '+(data.req.request_no||data.req.id);
+ const body=officeKitchenOrderText(data.req,data.supplier.name);
+ const mailto='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+ message.textContent='Your mail app will open with the exact kitchen order. Review it and press Send there. KITCH has not marked this order as sent.';
+ window.location.href=mailto;
+});
+officePurchaseEl('officePOPrint').addEventListener('click',()=>{
+ const data=officeCurrentKitchenOrder();if(!data)return;
+ const rows=data.req.lines.map((l,i)=>'<tr><td>'+(i+1)+'</td><td>'+safe(l.ingredient)+'</td><td>'+safe(l.quantity)+'</td><td>'+safe(l.unit)+'</td></tr>').join('');
+ const notes=data.req.notes||data.req.note||data.req.request_notes||'None';
+ const doc='<!doctype html><html><head><meta charset="utf-8"><title>KITCH Order '+safe(data.req.request_no||data.req.id)+'</title><style>body{font:14px Arial,sans-serif;color:#111;margin:40px}h1{font-size:26px}p{line-height:1.6}.meta{margin:24px 0;padding:20px;background:#f7f7f7;border-radius:10px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}th{background:#f5f5f5}footer{margin-top:36px;color:#777;font-size:12px}@media print{body{margin:20mm}}</style></head><body><h1>KITCH · Purchase Order</h1><div class="meta"><p><b>Request:</b> '+safe(data.req.request_no||data.req.id)+'</p><p><b>Supplier:</b> '+safe(data.supplier.name)+'</p><p><b>Status:</b> Approved kitchen request</p></div><h2>Items ordered</h2><table><thead><tr><th>#</th><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>'+rows+'</tbody></table><p><b>Notes:</b> '+safe(notes)+'</p><footer>Generated from approved KITCH kitchen request. No prices entered. Inventory updates only after Receiving.</footer></body></html>';
+ const popup=window.open('','_blank');
+ if(!popup){officePurchaseEl('officePOInlineMessage').textContent='Allow pop-ups in your browser to print or save this order as a PDF.';return}
+ popup.document.open();popup.document.write(doc);popup.document.close();popup.focus();popup.print();
 });
 officePurchaseEl('officeSupplierAdd').addEventListener('click',async()=>{
  if(officePurchaseBusy)return;
