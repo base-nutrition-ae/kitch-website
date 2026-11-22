@@ -265,7 +265,7 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 <div class="note">Purchase requests and purchase orders are shared in KITCH cloud. Approving or ordering does not add stock. Only confirmed Receiving adds accepted inventory.</div>
 <div class="card" style="margin-bottom:16px">
 <div class="titleline"><h2>Approved Suppliers</h2><span class="ghost" id="officeSupplierCount">-</span></div>
-<div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;justify-content:space-between;align-items:center"><p style="font-size:12px;color:#777;margin:0">Saved supplier profiles automatically fill in order contact details.</p><button class="btn black" id="officeSupplierAdd" type="button">+ Add Supplier</button></div>
+<div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;justify-content:space-between;align-items:center"><p style="font-size:12px;color:#777;margin:0">Saved supplier profiles automatically fill in order contact details.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="officeSupplierSync" type="button">Sync Imported Suppliers</button><button class="btn black" id="officeSupplierAdd" type="button">+ Add Supplier</button></div></div>
 <p id="officeSupplierMessage" role="status" style="margin:8px 0;font-size:12px;min-height:16px"></p><div id="officeSuppliers" class="officeSupplierCards">Loading…</div></div>
 <div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
 <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>SUPPLIER</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="6">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden>
@@ -793,6 +793,65 @@ function officeSupplierProfileForm(id){
  };
  form.elements.name.focus();
 }
+// One-Excel workflow: Kitchen Manager imports ingredients and supplier contact fields;
+// Main Office owner confirms and syncs matching browser Supplier Master profiles.
+officePurchaseEl('officeSupplierSync').addEventListener('click',async()=>{
+ const button=officePurchaseEl('officeSupplierSync');
+ const msg=officePurchaseEl('officeSupplierMessage');
+ if(!officeRid){msg.textContent='Sign in as Main Office owner first.';return;}
+ let local=[];
+ try{local=JSON.parse(window.localStorage.getItem('kitch_demo_suppliers_v1')||'[]')}
+ catch(e){msg.textContent='Could not read the imported Supplier Master on this browser.';return;}
+ if(!Array.isArray(local))local=[];
+ const suppliers=new Map();
+ for(const raw of local){
+  const name=String(raw?.name||'').trim();
+  if(!name||name.length>120)continue;
+  const key=name.toLowerCase();
+  const old=suppliers.get(key)||{};
+  suppliers.set(key,{...old,...raw,name});
+ }
+ if(!suppliers.size){msg.textContent='No imported suppliers found on this browser. First import your Unified Master Excel from Operations.';return;}
+ button.disabled=true;
+ try{
+  const {data:cloudRows,error:listError}=await db.rpc('kitch_office_supplier_profile',{p_action:'list',p_restaurant_id:officeRid});
+  if(listError)throw Error(listError.message);
+  const existing=new Map((Array.isArray(cloudRows)?cloudRows:[]).map(x=>[String(x.name||'').trim().toLowerCase(),x]));
+  const additions=[...suppliers.values()].filter(x=>!existing.has(x.name.toLowerCase()));
+  const fillings=[...suppliers.values()].filter(x=>{
+   const old=existing.get(x.name.toLowerCase());
+   return old&&(['contact_name','email','phone','address','trade_license'].some((field,i)=>!old[field]&&String(x[['contact','email','phone','address','trn'][i]]||'').trim()));
+  });
+  if(!additions.length&&!fillings.length){msg.textContent='All '+suppliers.size+' imported suppliers are already in the cloud. No changes needed.';return;}
+  if(!confirm('Sync '+additions.length+' new supplier(s) and fill missing contact fields on '+fillings.length+' existing supplier(s)? Existing nonempty cloud details and purchase history stay unchanged.')){
+   msg.textContent='Sync cancelled. No supplier changes made.';return;
+  }
+  let saved=0;
+  for(const x of [...additions,...fillings]){
+   const old=existing.get(x.name.toLowerCase());
+   const field=(cloudName,localName,max)=>{
+    const v=String(old?.[cloudName]||x[localName]||'').trim();
+    return v.slice(0,max);
+   };
+   const notes=String(old?.notes||x.notes||x.supplier_type||'').slice(0,1000);
+   const {data,error}=await db.rpc('kitch_office_supplier_profile',{
+    p_action:'save',p_restaurant_id:officeRid,p_supplier_id:old?.id||null,
+    p_name:x.name,p_contact_name:field('contact_name','contact',120),
+    p_email:field('email','email',320),
+    p_phone:field('phone','phone',50),
+    p_address:field('address','address',600),
+    p_trade_license:field('trade_license','trn',120),p_notes:notes
+   });
+   if(error)throw Error(x.name+': '+error.message);
+   if(!data?.saved)throw Error(x.name+': cloud did not confirm save');
+   saved++;
+   msg.textContent='Synced '+saved+' / '+(additions.length+fillings.length)+' suppliers…';
+  }
+  await officePurchaseLoad();
+  msg.textContent='✓ '+saved+' imported supplier profiles synchronized. They now appear in cloud supplier orders.';
+ }catch(e){msg.textContent='Supplier sync stopped: '+e.message+' Earlier successful records remain saved; retry skips duplicates.'}
+ finally{button.disabled=false}
+});
 officePurchaseEl('officeSupplierAdd').addEventListener('click',()=>officeSupplierProfileForm(null));
 officePurchaseEl('officeSuppliers').addEventListener('click',e=>{
  const btn=e.target.closest('[data-supplier-id]');

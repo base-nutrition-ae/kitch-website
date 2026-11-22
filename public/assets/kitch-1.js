@@ -1347,7 +1347,33 @@ async function readExcel(file){
  try{
   const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}),sheetName=wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0],ws=wb.Sheets[sheetName],rows=XLSX.utils.sheet_to_json(ws,{defval:''});
   const pick=(o,names)=>{for(const n of names)if(Object.prototype.hasOwnProperty.call(o,n))return o[n];return''};
-  importRows=rows.map(r=>{const ref=Number(pick(r,['Reference Cost AED','Last Unit Cost AED','Unit Cost AED','Latest Price AED'])||0),open=Number(pick(r,['Opening Stock','Opening Quantity'])||0),openCost=Number(pick(r,['Opening Unit Cost AED','Opening Cost AED'])||ref||0);return {_importOpening:String(pick(r,['Opening Stock','Opening Quantity'])).trim()!=='',name:String(pick(r,['Ingredient Name','Ingredient'])).trim(),category:String(pick(r,['Category'])).trim(),supplier:String(pick(r,['Supplier','Supplier Name','Default Supplier'])).trim(),base_unit:unit(pick(r,['Base Unit'])),cost:openCost||ref,reference_cost:ref,opening_stock:open,opening_unit_cost:openCost,par:Number(pick(r,['PAR Target Stock','PAR Level','PAR'])||0),minimum:Number(pick(r,['Minimum Stock','Min Stock'])||0),receiving_type:correctedReceivingType(String(pick(r,['Ingredient Name','Ingredient','Name'])||'').trim(),String(pick(r,['Receiving Type','Storage Type'])||'Room Temperature').trim()||'Room Temperature')}}).filter(x=>x.name);
+  importRows=rows.map(r=>{
+   const val=names=>String(pick(r,names)??'').trim();
+   const ref=Number(pick(r,['Reference Cost AED','Unit Price (AED)','Last Unit Cost AED','Unit Cost AED','Latest Price AED'])||0);
+   const opening=val(['Opening Stock','Opening Quantity']);
+   const openCost=Number(pick(r,['Opening Unit Cost AED','Opening Cost AED'])||ref||0);
+   const name=val(['Ingredient Name','Ingredient']);
+   return {_importOpening:opening!==''&&Number(opening)!==0,
+    name,sku:val(['Ingredient SKU','SKU']),category:val(['Category']),subcategory:val(['Subcategory']),
+    supplier:val(['Supplier','Supplier Name','Default Supplier']),
+    supplier_type:val(['Supplier Type']),supplier_contact:val(['Contact Person','Supplier Contact']),
+    supplier_email:val(['Supplier Email']),supplier_phone:val(['Supplier Phone']),
+    supplier_address:val(['Supplier Address']),supplier_trn:val(['Supplier TRN']),
+    supplier_days:val(['Delivery Days']),supplier_lead:val(['Lead Time (Days)']),
+    supplier_notes:val(['Notes']),
+    base_unit:unit(pick(r,['Base Unit'])),cost:openCost||ref,reference_cost:ref,
+    opening_stock:Number(opening||0),opening_unit_cost:openCost,
+    par:Number(pick(r,['PAR Target Stock','PAR Level','PAR'])||0),
+    minimum:Number(pick(r,['Minimum Stock','Min Stock'])||0),
+    receiving_type:correctedReceivingType(name,val(['Receiving Type','Storage Type','Storage'])||'Room Temperature')
+   };
+  }).filter(x=>x.name);
+  if(importRows.some(x=>/^EXAMPLE\s*[-–]/i.test(x.name)||/DELETE EXAMPLE BEFORE IMPORT/i.test(x.supplier_notes))){
+   importRows=[];throw Error('Remove the three EXAMPLE rows from the template before importing real ingredients.');
+  }
+  if(importRows.some(x=>!Number.isFinite(x.reference_cost)||x.reference_cost<0||!Number.isFinite(x.opening_stock)||x.opening_stock<0)){
+   importRows=[];throw Error('Ingredient prices and opening quantities must be valid non-negative numbers.');
+  }
   const existing=ingredients();
   // Import preview only: raw Excel amounts are in grams or millilitres.
   const shortImportQty=(value,base)=>{
@@ -1436,6 +1462,20 @@ async function confirmImport(){
    }
   }
   syncSupplierMasterFromIngredients();
+  kitchMergeSupplierDetailsFromImport(importRows);
+  // Staff-authorized update: save the supplier name in the shared Ingredient Master.
+  // Supplier profiles (email/contact/phone) still require owner approval in Main Office.
+  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
+   for(const row of importRows.filter(x=>x.supplier)){
+    const saved=ingredients().find(x=>x.name.toLowerCase()===row.name.toLowerCase());
+    if(!saved?.cloud_id)continue;
+    const {error:linkError}=await sb.rpc('kitch_team_set_ingredient_supplier_by_staff',{
+     p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,
+     p_ingredient_id:saved.cloud_id,p_supplier_name:row.supplier
+    });
+    if(linkError)throw Error('Ingredient imported; supplier link for '+row.name+' could not sync: '+linkError.message);
+   }
+  }
   importRows=[];
   if(status)status.innerHTML='<b style="color:#26733a">✓ Import complete</b><div style="margin-top:6px">'+added+' added · '+updated+' updated</div>';
   if(button){button.textContent='Import complete';button.style.opacity='1'}
@@ -1484,6 +1524,33 @@ function syncSupplierMasterFromIngredients(){
  }
  if(changed){setArr(SUP_KEY,su);setSupplierProducts(sp);}
  return {su,sp};
+}
+// Keeps supplier contact data from the single Excel in the local Supplier Master.
+// Cloud supplier approval is a separate Main Office owner-authorized sync.
+function kitchMergeSupplierDetailsFromImport(rows){
+ const su=getArr(SUP_KEY),products=supplierProducts();
+ const byName=new Map(su.map(x=>[String(x.name||'').trim().toLowerCase(),x]));
+ for(const row of rows){
+  const name=String(row.supplier||'').trim();if(!name)continue;
+  const key=name.toLowerCase();
+  let supplier=byName.get(key);
+  if(!supplier){supplier={id:'master_'+name.toLowerCase().replace(/[^a-z0-9]/g,'_'),name};su.push(supplier);byName.set(key,supplier);}
+  for(const [field,value] of Object.entries({
+   contact:row.supplier_contact,phone:row.supplier_phone,email:row.supplier_email,
+   address:row.supplier_address,trn:row.supplier_trn,days:row.supplier_days,
+   lead_time:row.supplier_lead,supplier_type:row.supplier_type
+  })){
+   if(String(value??'').trim())supplier[field]=String(value).trim();
+  }
+  const product=products.find(p=>String(p.supplier||'').trim().toLowerCase()===key&&String(p.name||'').trim().toLowerCase()===row.name.toLowerCase());
+  if(product){
+   product.unit=row.base_unit;product.price=Number(row.reference_cost||0);product.category=row.category;
+  }else{
+   products.push({id:'master_'+(row.sku||row.name).toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+key.replace(/[^a-z0-9]/g,'_'),
+    supplier:name,name:row.name,sku:row.sku||'',unit:row.base_unit,price:Number(row.reference_cost||0),category:row.category,notes:'Linked from Unified Excel'});
+  }
+ }
+ setArr(SUP_KEY,su);setSupplierProducts(products);
 }
 function openUnifiedMasterImport(){
  openImport();
