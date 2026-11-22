@@ -3638,7 +3638,6 @@ async function finishQC(id,pass){
 }
 
 /* Shared production label queue. No changes to QC or inventory transactions. */
-let kitchLabelSelections=new Set();
 function kitchApprovedLabels(){
  const rows=scopedRows(getArr(PROD_KEY)).filter(x=>x.status==='Label Created'&&x.qc_serial);
  const unique=new Map();
@@ -3653,16 +3652,12 @@ function kitchLabelMarkup(x,small){
  '<br>Use by: '+p(x.expiry_date||'—')+'<br>'+(!small?'Yield: '+p(x.actual_yield)+' '+p(x.yield_unit||'')+' · ':'')+
  'Temp: '+p(x.qc_temp_c??'—')+'°C</div><div class="kitchLabelTop"><span>'+p(x.qc_serial)+'</span><span>QC APPROVED</span></div></div>';
 }
-function kitchLabelSelect(id,on){if(on)kitchLabelSelections.add(String(id));else kitchLabelSelections.delete(String(id));const e=document.getElementById('kitchLabelCount');if(e)e.textContent=kitchLabelSelections.size+' selected';}
-function kitchLabelSelectAll(on){kitchLabelSelections=new Set(on?kitchApprovedLabels().map(x=>String(x.id)):[]);document.querySelectorAll('.kitchLabelCheck').forEach(e=>e.checked=on);const e=document.getElementById('kitchLabelCount');if(e)e.textContent=kitchLabelSelections.size+' selected';}
 function kitchProductionLabelQueue(){
- const rows=kitchApprovedLabels(),ids=new Set(rows.map(x=>String(x.id)));
- kitchLabelSelections=new Set([...kitchLabelSelections].filter(id=>ids.has(id)));
+ const rows=kitchApprovedLabels();
  return '<div class="panel kitchProductionLedger"><h2>Saved Production Labels</h2><p class="muted">All QC-approved production labels, ready to preview or print later. Printing does not change production records or inventory.</p>'+
- '<div class="kitchLabelToolbar"><label class="kitchLabelSizeField"><span>LABEL SIZE</span><select id="kitchLabelFormat"><option value="70">70 × 32 mm</option><option value="40">40 × 20 mm</option></select></label><button type="button" class="kitchLabelPrintButton" onclick="kitchPrintSelectedLabels()">Print Selected</button><span class="kitchLabelSelectedCount" id="kitchLabelCount">' +kitchLabelSelections.size+' selected</span></div>'+
- '<div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th><input type="checkbox" aria-label="Select all labels" onchange="kitchLabelSelectAll(this.checked)"></th><th>PRODUCTION</th><th>RECIPE</th><th>MADE</th><th>EXPIRY</th><th>QC</th><th>ACTIONS</th></tr>'+
- (rows.map(x=>'<tr><td><input type="checkbox" class="kitchLabelCheck" '+(kitchLabelSelections.has(String(x.id))?'checked':'')+' onchange="kitchLabelSelect('+Number(x.id)+',this.checked)"></td><td>'+esc(x.code)+'</td><td><b>'+esc(x.recipe)+'</b></td><td>'+esc(x.production_date||'—')+'</td><td>'+esc(x.expiry_date||'—')+'</td><td><span class="ok">Approved</span></td><td><button class="btn" onclick="kitchPreviewLabel('+Number(x.id)+')">Preview</button> <button class="btn" onclick="printQCLabel('+Number(x.id)+')">Print</button></td></tr>').join('')||
- '<tr><td colspan="7">No QC-approved labels yet. Completed and approved production labels will appear here automatically.</td></tr>')+
+ '<div class="kitchProductionTableScroll"><table class="kitchProductionTable"><tr><th>PRODUCTION</th><th>RECIPE</th><th>MADE</th><th>EXPIRY</th><th>QC</th><th>ACTIONS</th></tr>'+
+ (rows.map(x=>'<tr><td>'+esc(x.code)+'</td><td><b>'+esc(x.recipe)+'</b></td><td>'+esc(x.production_date||'—')+'</td><td>'+esc(x.expiry_date||'—')+'</td><td><span class="ok">Approved</span></td><td><button class="btn" onclick="kitchPreviewLabel('+Number(x.id)+')">Preview</button> <button class="btn" onclick="printQCLabel('+Number(x.id)+')">Print</button></td></tr>').join('')||
+ '<tr><td colspan="6">No QC-approved labels yet. Completed and approved production labels will appear here automatically.</td></tr>')+
  '</table></div></div>';
 }
 function kitchPreviewLabel(id){
@@ -3675,15 +3670,13 @@ function kitchPreviewLabel(id){
 function printQCLabel(id){
  const run=kitchApprovedLabels().find(r=>String(r.id)===String(id));
  if(!run)return alert('QC approval is required before printing.');
- kitchPrintLabelSheet([run]);
+ const choice=window.prompt('Label size: 1 = 70 × 32 mm, 2 = 40 × 20 mm','1');
+ if(choice===null)return;
+ if(choice!=='1'&&choice!=='2')return alert('Choose 1 or 2.');
+ kitchPrintLabelSheet([run],choice==='2'?'40':'70');
 }
-function kitchPrintSelectedLabels(){
- const rows=kitchApprovedLabels().filter(x=>kitchLabelSelections.has(String(x.id)));
- if(!rows.length)return alert('Select at least one saved label.');
- kitchPrintLabelSheet(rows);
-}
-function kitchPrintLabelSheet(rows){
- const small=kitchLabelFormat()==='40',w=small?40:70,h=small?20:32;
+function kitchPrintLabelSheet(rows,size='70'){
+ const small=size==='40',w=small?40:70,h=small?20:32;
  document.getElementById('kitchPrintArea')?.remove();
  document.getElementById('kitchPrintStyles')?.remove();
  const style=document.createElement('style');style.id='kitchPrintStyles';
