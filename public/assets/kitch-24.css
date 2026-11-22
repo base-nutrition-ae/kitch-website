@@ -28,7 +28,7 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
   body #app .main .top h1{font-size:clamp(22px,6vw,30px)!important;line-height:1.13!important;letter-spacing:-.03em!important;overflow-wrap:anywhere!important;margin:4px 0 0!important}
   body #app #appMobileMenu.appMobileMenu{position:fixed!important;top:calc(14px + env(safe-area-inset-top, 0px))!important;right:16px!important;left:auto!important;width:48px!important;height:48px!important;min-width:48px!important;border-radius:14px!important;font-size:0!important;display:flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;z-index:1005!important;color:#191919!important;background:#fff!important;border:1px solid #dedede!important;box-shadow:0 4px 16px rgba(0,0,0,.08)!important}
   body #app #appMobileMenu.appMobileMenu::after{content:"☰";font-size:22px!important;line-height:1!important;font-weight:700!important}
-  body #app.mobileMenuOpen #appMobileMenu.appMobileMenu{z-index:1006!important;right:calc(min(320px, 88vw) + 10px)!important;background:#181818!important;color:#fff!important;border-color:#181818!important}
+  body #app.mobileMenuOpen #appMobileMenu.appMobileMenu{z-index:1006!important;right:calc(min(320px, 88vw) - 54px)!important;background:#181818!important;color:#fff!important;border-color:#181818!important}
   body #app.mobileMenuOpen #appMobileMenu.appMobileMenu::after{content:"×";font-size:27px!important;font-weight:400!important}
   body #app .side{box-sizing:border-box!important;position:fixed!important;left:auto!important;right:0!important;top:0!important;bottom:0!important;transform:translateX(105%)!important;width:min(320px,88vw)!important;max-width:88vw!important;height:100dvh!important;min-height:100dvh!important;padding:calc(24px + env(safe-area-inset-top, 0px)) 18px calc(18px + env(safe-area-inset-bottom, 0px))!important;z-index:1004!important;background:#fff!important;box-shadow:-8px 0 28px rgba(0,0,0,.09)!important;overflow-x:hidden!important;overflow-y:auto!important;display:flex!important;flex-direction:column!important;gap:8px!important}
   body #app.mobileMenuOpen .side{transform:translateX(0)!important}
@@ -69,5 +69,5 @@ body #app .main table td button.black{background:#171717!important;color:#fff!im
   body #app .k26-metric>strong{font-size:26px!important}
   body #app .k26-action-grid{grid-template-columns:minmax(0,1fr)!important}
   body #app .side{width:min(320px,90vw)!important;max-width:90vw!important}
-  body #app.mobileMenuOpen #appMobileMenu.appMobileMenu{right:calc(min(320px,90vw) + 5px)!important;width:38px!important;min-width:38px!important;height:38px!important}
+  body #app.mobileMenuOpen #appMobileMenu.appMobileMenu{right:calc(min(320px,90vw) - 47px)!important;width:38px!important;min-width:38px!important;height:38px!important}
 }
