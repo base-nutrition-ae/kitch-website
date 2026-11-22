@@ -164,7 +164,37 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 .kitchPOLine input{height:41px;border:1px solid #dedede;border-radius:9px;padding:0 12px;font:600 13px Inter,Arial,sans-serif;box-sizing:border-box;width:100%}
 .kitchPOLine b.officePOLineTotal{font-size:13px;min-width:90px;text-align:right}
 @media(max-width:650px){.kitchPOLine{grid-template-columns:1fr 1fr}.kitchPOLine>div{grid-column:1/-1}}
-</style></head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="purchasing">Purchasing</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
+</style>
+<style id="office-supplier-master-styles">
+.officeSupplierCards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.officeSupplierCard{border:1px solid #ebebeb;border-radius:16px;background:#fff;padding:16px;display:flex;flex-direction:column;justify-content:space-between;gap:18px;min-width:0}
+.officeSupplierCardName{font-size:15px;font-weight:800;color:#1b1b1b}
+.officeSupplierCardInfo{font-size:12px;color:#777;margin-top:8px;overflow-wrap:anywhere}
+.officeSupplierCard .officeSupplierEdit{align-self:flex-start;border-radius:99px}
+.officeSupplierEmpty{background:#f6f6f6;border-radius:15px;padding:18px;font-size:13px;color:#777}
+.officeSupplierPreview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;background:#f7f7f7;border-radius:14px;padding:15px 18px;margin-top:14px;color:#888;font-size:12px}
+.officeSupplierPreview span{display:block;color:#999;font-size:10px;font-weight:800;letter-spacing:.06em;margin-bottom:8px}
+.officeSupplierPreview strong{display:block;color:#222;font-size:12px;overflow-wrap:anywhere}
+#officeSupplierProfileOverlay{position:fixed;inset:0;background:rgba(0,0,0,.56);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+.officeSupplierProfileDialog{width:min(780px,100%);max-height:calc(100vh - 32px);overflow-y:auto;background:#fff;color:#161616;border-radius:24px;box-shadow:0 25px 80px #0003}
+.officeSupplierDialogHead{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:26px 30px 19px;border-bottom:1px solid #eee}
+.officeSupplierDialogHead small{font-size:10px;letter-spacing:.12em;color:#909090;font-weight:800}
+.officeSupplierDialogHead h2{font-size:25px;letter-spacing:-.035em;margin:7px 0}
+.officeSupplierDialogHead p{font-size:12px;color:#888;margin:0}
+.officeSupplierDialogClose{width:37px;height:37px;min-width:37px;border:0;border-radius:50%;background:#f2f2f2;font-size:22px}
+.officeSupplierProfileForm{padding:22px 30px 26px}
+.officeSupplierFormGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}
+.officeSupplierFormGrid label{display:block;font-size:12px;font-weight:750;min-width:0}
+.officeSupplierFormGrid label.wide{grid-column:1/-1}
+.officeSupplierFormGrid input,.officeSupplierFormGrid textarea{width:100%;display:block;box-sizing:border-box;margin-top:8px;padding:12px 13px;border:1px solid #ddd;border-radius:11px;background:#fff;font:inherit;font-size:13px;color:#161616}
+.officeSupplierFormGrid input{height:44px}
+.officeSupplierFormGrid textarea{resize:vertical}
+.officeSupplierDialogFooter{display:flex;justify-content:flex-end;gap:10px;margin-top:15px}
+.officeSupplierDialogFooter .btn{border-radius:99px;padding:11px 20px}
+#officeSupplierFormError{color:#b42318;font-size:12px;min-height:18px;margin:15px 0 0}
+@media(max-width:620px){.officeSupplierPreview,.officeSupplierFormGrid{grid-template-columns:1fr}.officeSupplierDialogHead,.officeSupplierProfileForm{padding-left:17px;padding-right:17px}}
+</style>
+</head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="purchasing">Purchasing</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
 <section class="section active" id="overview">
 <div class="hero"><div><h1>Main Office Overview</h1><p>All your restaurant operations in one place.</p></div><span class="tag">Main Office · Owner View</span></div>
 <div class="note">Live inventory and cloud-synced recipe counts are shown where available. Production stock deductions and costs come from the cloud ledger; final completion and purchasing are not yet fully cloud-connected.</div>
@@ -192,8 +222,8 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 <div class="note">Purchase requests and purchase orders are shared in KITCH cloud. Approving or ordering does not add stock. Only confirmed Receiving adds accepted inventory.</div>
 <div class="card" style="margin-bottom:16px">
 <div class="titleline"><h2>Approved Suppliers</h2><span class="ghost" id="officeSupplierCount">-</span></div>
-<div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap"><input id="officeSupplierName" maxlength="120" placeholder="Supplier name" aria-label="Supplier name" style="flex:1;min-width:220px;border:1px solid #ddd;border-radius:12px;padding:12px"><button class="btn" id="officeSupplierAdd" type="button">+ Add Cloud Supplier</button></div>
-<p id="officeSupplierMessage" role="status" style="margin:8px 0;font-size:12px;min-height:16px"></p><div id="officeSuppliers" class="muted">Loading…</div></div>
+<div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap;justify-content:space-between;align-items:center"><p style="font-size:12px;color:#777;margin:0">Saved supplier profiles automatically fill in order contact details.</p><button class="btn black" id="officeSupplierAdd" type="button">+ Add Supplier</button></div>
+<p id="officeSupplierMessage" role="status" style="margin:8px 0;font-size:12px;min-height:16px"></p><div id="officeSuppliers" class="officeSupplierCards">Loading…</div></div>
 <div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
 <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden>
   <div class="kitchPOHead">
@@ -202,9 +232,9 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
   </div>
   <div class="kitchPOFields">
     <label class="kitchPOField"><span>Approved supplier</span><select id="officePOSupplier"></select></label>
-    <label class="kitchPOField"><span>Supplier email</span><input id="officePOSupplierEmail" type="email" autocomplete="email" placeholder="supplier@example.com"></label>
+    <label class="kitchPOField"><span>Supplier email</span><input id="officePOSupplierEmail" type="email" autocomplete="email" placeholder="Select a supplier to load saved email"></label>
   </div>
-  <p style="font-size:12px;color:#777;margin:0 0 15px">This is exactly what the chef requested. No prices or quantities to re-enter.</p>
+  <div id="officePOSupplierContact" class="officeSupplierPreview">Choose a supplier to view saved contact details.</div><p style="font-size:12px;color:#777;margin:14px 0 15px">Chef's approved ingredient list · No prices or quantities to re-enter.</p>
   <div id="officePOLines" style="display:grid;gap:8px;margin:0 0 18px"></div>
   <div class="kitchPOSummary">
     <div class="kitchPOSummaryTitle">Order Summary</div>
@@ -418,6 +448,7 @@ ig('officeIngredientImport').onchange=async e=>{const file=e.target.files[0];if(
 const oldShowPage=showPage;showPage=function(page){oldShowPage(page);if(page==='ingredients'&&officeRid)refreshIngredients().catch(err=>{ig('officeIngredientCount').textContent='Load failed';ig('officeIngredientStatus').textContent=err.message;});};
 
 const officePurchaseState={requests:[],orders:[],suppliers:[],dispatches:[]};
+let officeSupplierProfileEditing=null;
 let officePurchaseBusy=false;
 const officePurchaseEl=id=>document.getElementById(id);
 const officePurchaseStatus=message=>{const n=officePurchaseEl('officePurchaseMessage');if(n)n.textContent=message||''};
@@ -435,7 +466,9 @@ async function officePurchaseLoad(){
   if(d?.role!=='owner')throw Error('Main Office owner access required');
   const requests=Array.isArray(d.requests)?d.requests:[];
   const orders=Array.isArray(d.orders)?d.orders:[];
-  const suppliers=Array.isArray(d.suppliers)?d.suppliers:[];
+  const {data:profileRows,error:profileError}=await db.rpc('kitch_office_supplier_profile',{p_action:'list',p_restaurant_id:officeRid});
+  if(profileError)throw Error('Supplier Master unavailable: '+profileError.message);
+  const suppliers=Array.isArray(profileRows)?profileRows.filter(x=>x.is_approved&&x.is_active):[];
   officePurchaseState.requests=requests;officePurchaseState.orders=orders;officePurchaseState.suppliers=suppliers;
   const {data:sentRows,error:sentError}=await db.from('kitch_supplier_order_dispatches').select('request_id,supplier_id,recipient_email,sent_at').eq('restaurant_id',officeRid);
   if(sentError)throw Error('Supplier dispatch history unavailable: '+sentError.message);
@@ -454,7 +487,7 @@ async function officePurchaseLoad(){
    groups.get(o.id).total+=Number(o.total)||0;
   }
   officePurchaseEl('officePOCount').textContent=groups.size+' orders';
-  officePurchaseEl('officeSuppliers').textContent=suppliers.map(s=>s.name).join(' · ')||'No approved cloud suppliers yet.';
+  officePurchaseEl('officeSuppliers').innerHTML=suppliers.map(x=>'<div class="officeSupplierCard"><div><div class="officeSupplierCardName">'+safe(x.name)+'</div><div class="officeSupplierCardInfo">'+safe(x.contact_name||'No contact person')+' · '+safe(x.email||'No email')+'</div><div class="officeSupplierCardInfo">'+safe(x.phone||'No phone number')+'</div></div><button type="button" class="btn officeSupplierEdit" data-supplier-id="'+safe(x.id)+'">Edit details</button></div>').join('')||'<div class="officeSupplierEmpty">No suppliers yet. Click <b>+ Add Supplier</b> to save their contact details.</div>';
   officePurchaseEl('officePurchaseRequests').innerHTML=[...requestGroups.values()].map(r=>{
    const status=String(r.status||'');
    const exists=orders.some(o=>o.request_id===r.id&&o.status!=='cancelled');
@@ -494,7 +527,8 @@ function officePOShow(id){
  if(dispatch){officePurchaseEl('officePOSupplier').value=dispatch.supplier_id;officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email;}
  officePurchaseEl('officePOInlineMessage').textContent=dispatch?'Sent to supplier on '+new Date(dispatch.sent_at).toLocaleString()+' · '+dispatch.recipient_email:'';
  panel.hidden=false;
- if(!dispatch)officePOUpdateSupplier();
+ officePOUpdateSupplier();
+ if(dispatch)officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email;
  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
  officePurchaseStatus('');
 }
@@ -575,7 +609,9 @@ function officePOUpdateSupplier(){
  const id=officePurchaseEl('officePOSupplier').value;
  const supplier=officePurchaseState.suppliers.find(x=>String(x.id)===String(id));
  officePurchaseEl('officePOSupplierText').textContent=supplier?.name||'Select supplier';
- if(supplier?.email)officePurchaseEl('officePOSupplierEmail').value=supplier.email;
+ officePurchaseEl('officePOSupplierEmail').value=supplier?.email||'';
+ const preview=officePurchaseEl('officePOSupplierContact');
+ if(preview)preview.innerHTML=supplier?'<div><span>CONTACT PERSON</span><strong>'+safe(supplier.contact_name||'Not provided')+'</strong></div><div><span>PHONE</span><strong>'+safe(supplier.phone||'Not provided')+'</strong></div><div><span>SUPPLIER ADDRESS</span><strong>'+safe(supplier.address||'Not provided')+'</strong></div>':'Choose a supplier to view saved contact details.';
 }
 function officeKitchenOrderText(req,supplierName){
  const restaurant=officeRestaurantName||'Restaurant';
@@ -640,20 +676,57 @@ officePurchaseEl('officePOPrint').addEventListener('click',()=>{
  if(!popup){officePurchaseEl('officePOInlineMessage').textContent='Allow pop-ups in your browser to print or save this order as a PDF.';return}
  popup.document.open();popup.document.write(doc);popup.document.close();popup.focus();popup.print();
 });
-officePurchaseEl('officeSupplierAdd').addEventListener('click',async()=>{
- if(officePurchaseBusy)return;
- const input=officePurchaseEl('officeSupplierName'),name=input.value.trim();
- const message=officePurchaseEl('officeSupplierMessage');
- if(!name||name.length>120){message.textContent='Enter a supplier name (up to 120 characters).';input.focus();return}
- if(officePurchaseState.suppliers.some(x=>x.name.toLowerCase()===name.toLowerCase())){message.textContent='Supplier already registered.';return}
- officePurchaseBusy=true;const button=officePurchaseEl('officeSupplierAdd');button.disabled=true;
- message.textContent='Saving '+name+' to KITCH cloud…';
- try{
-  await officePurchaseRpc('add_supplier',{p_notes:name});
-  input.value='';await officePurchaseLoad();
-  message.textContent='Supplier '+name+' added to the approved cloud supplier list.';
- }catch(e){message.textContent='Supplier not saved: '+e.message}
- finally{officePurchaseBusy=false;button.disabled=false}
+
+function officeSupplierProfileForm(id){
+ const supplier=officePurchaseState.suppliers.find(x=>String(x.id)===String(id))||null;
+ officeSupplierProfileEditing=supplier?.id||null;
+ const overlay=document.createElement('div');
+ overlay.id='officeSupplierProfileOverlay';
+ overlay.innerHTML='<div class="officeSupplierProfileDialog" role="dialog" aria-modal="true" aria-label="Supplier details"><div class="officeSupplierDialogHead"><div><small>SUPPLIER MASTER · MAIN OFFICE</small><h2>'+(supplier?'Edit Supplier':'Add New Supplier')+'</h2><p>Save contact information once and use it automatically for future purchase orders.</p></div><button type="button" id="officeSupplierClose" class="officeSupplierDialogClose" aria-label="Close">×</button></div>'+
+ '<form id="officeSupplierProfileForm" class="officeSupplierProfileForm"><div class="officeSupplierFormGrid">'+
+ '<label>Supplier / Company Name *<input required maxlength="120" name="name" placeholder="Supplier company name"></label>'+
+ '<label>Contact Person<input maxlength="120" name="contact" placeholder="Full name"></label>'+
+ '<label>Supplier Email<input type="email" maxlength="320" name="email" placeholder="orders@supplier.com"></label>'+
+ '<label>Phone / WhatsApp<input type="tel" maxlength="50" name="phone" placeholder="+971 ..."></label>'+
+ '<label class="wide">Business Address<textarea maxlength="600" name="address" rows="2" placeholder="Street, area, city"></textarea></label>'+
+ '<label>Trade License / TRN (optional)<input maxlength="120" name="license" placeholder="Reference number"></label>'+
+ '<label class="wide">Additional Information<textarea maxlength="1000" name="notes" rows="3" placeholder="Delivery schedule, ordering instructions, account details"></textarea></label></div>'+
+ '<p id="officeSupplierFormError" role="status"></p><div class="officeSupplierDialogFooter"><button type="button" class="btn" id="officeSupplierCancel">Cancel</button><button class="btn black" id="officeSupplierSave" type="submit">Save Supplier</button></div></form></div>';
+ document.getElementById('officeSupplierProfileOverlay')?.remove();
+ document.body.appendChild(overlay);
+ const form=overlay.querySelector('form');
+ const fields={name:'name',contact_name:'contact',email:'email',phone:'phone',address:'address',trade_license:'license',notes:'notes'};
+ if(supplier)for(const [key,field] of Object.entries(fields))form.elements[field].value=supplier[key]||'';
+ const close=()=>overlay.remove();
+ overlay.querySelector('#officeSupplierClose').onclick=close;
+ overlay.querySelector('#officeSupplierCancel').onclick=close;
+ overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
+ form.onsubmit=async e=>{
+  e.preventDefault();
+  if(!form.reportValidity())return;
+  const button=overlay.querySelector('#officeSupplierSave');
+  const err=overlay.querySelector('#officeSupplierFormError');
+  const name=form.elements.name.value.trim(),email=form.elements.email.value.trim();
+  if(!name){err.textContent='Supplier company name is required.';return}
+  button.disabled=true;err.textContent='Saving supplier…';
+  try{
+   const {data,error}=await db.rpc('kitch_office_supplier_profile',{
+    p_action:'save',p_restaurant_id:officeRid,p_supplier_id:officeSupplierProfileEditing,
+    p_name:name,p_contact_name:form.elements.contact.value.trim(),p_email:email,
+    p_phone:form.elements.phone.value.trim(),p_address:form.elements.address.value.trim(),
+    p_trade_license:form.elements.license.value.trim(),p_notes:form.elements.notes.value.trim()
+   });
+   if(error)throw Error(error.message);
+   close();await officePurchaseLoad();officePurchaseStatus('Supplier '+name+' saved in KITCH Supplier Master.');
+  }catch(ex){err.textContent='Supplier not saved: '+ex.message}
+  finally{button.disabled=false}
+ };
+ form.elements.name.focus();
+}
+officePurchaseEl('officeSupplierAdd').addEventListener('click',()=>officeSupplierProfileForm(null));
+officePurchaseEl('officeSuppliers').addEventListener('click',e=>{
+ const btn=e.target.closest('[data-supplier-id]');
+ if(btn)officeSupplierProfileForm(btn.dataset.supplierId);
 });
 const originalOfficeShowPage=showPage;
 showPage=function(page){originalOfficeShowPage(page);if(page==='purchasing'&&officeRid)officePurchaseLoad()};
