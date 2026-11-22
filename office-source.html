@@ -145,9 +145,9 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 <div class="card" style="margin-bottom:16px">
 <div class="titleline"><h2>Approved Suppliers</h2><span class="ghost" id="officeSupplierCount">-</span></div>
 <div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap"><input id="officeSupplierName" maxlength="120" placeholder="Supplier name" aria-label="Supplier name" style="flex:1;min-width:220px;border:1px solid #ddd;border-radius:12px;padding:12px"><button class="btn" id="officeSupplierAdd" type="button">+ Add Cloud Supplier</button></div>
-<div id="officeSuppliers" class="muted">Loading&</div></div>
+<p id="officeSupplierMessage" role="status" style="margin:8px 0;font-size:12px;min-height:16px"></p><div id="officeSuppliers" class="muted">Loading…</div></div>
 <div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
-<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading&</td></tr></tbody></table></div></div>
+<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" style="display:none;margin-top:16px;padding:16px;border:1px solid #e5e5e5;border-radius:14px;background:#f8f8f8"><h3 style="margin:0 0 8px">Create Purchase Order</h3><p id="officePOComposerSummary" style="font-size:12px;color:#666"></p><div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap"><label style="flex:2;min-width:190px">Supplier<select id="officePOSupplier" style="width:100%;height:42px;padding:0 12px;border:1px solid #ddd;border-radius:10px;background:white"></select></label><label style="flex:1;min-width:140px">Price per unit (AED)<input id="officePOPrice" type="number" min="0" step="any" placeholder="0.00" style="width:100%;height:42px;padding:0 12px;border:1px solid #ddd;border-radius:10px;background:white"></label><button class="btn" type="button" id="officePOConfirm">Confirm Create PO</button><button class="btn light" type="button" id="officePOCancel">Cancel</button></div><p id="officePOInlineMessage" role="status" style="font-size:12px;color:#b42318"></p></div></div>
 <div class="card"><div class="titleline"><h2>Purchase Orders</h2><span class="ghost" id="officePOCount">-</span></div>
 <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>PO</th><th>SUPPLIER</th><th>STATUS</th><th>TOTAL</th></tr></thead><tbody id="officePurchaseOrders"><tr><td colspan="4">Loading&</td></tr></tbody></table></div></div>
 <p id="officePurchaseMessage" role="status" style="margin-top:14px;color:#b42318"></p>
@@ -384,49 +384,78 @@ async function officePurchaseLoad(){
   ).join('')||'<tr><td colspan="4">No cloud purchase orders yet.</td></tr>';
  }catch(e){officePurchaseStatus('Could not load Purchasing: '+e.message)}
 }
+let officeSelectedPurchaseRequest=null;
+function officePOShow(id){
+ const req=officePurchaseState.requests.find(x=>x.id===id);
+ if(!req||req.status!=='approved')return officePurchaseStatus('Refresh this request first.');
+ if(!officePurchaseState.suppliers.length)return officePurchaseStatus('Add an approved cloud supplier first, using the supplier name field above.');
+ officeSelectedPurchaseRequest=req.id;
+ const panel=officePurchaseEl('officePOComposer');
+ officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.ingredient+' · '+req.quantity+' '+req.unit;
+ officePurchaseEl('officePOSupplier').innerHTML=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
+ officePurchaseEl('officePOPrice').value='';
+ officePurchaseEl('officePOInlineMessage').textContent='';
+ panel.style.display='block';
+ panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+ officePurchaseStatus('');
+}
 async function officePurchaseDo(action,id){
  if(officePurchaseBusy)return;
  const req=officePurchaseState.requests.find(r=>r.id===id);
  if(!req)return officePurchaseStatus('Refresh requests and try again.');
- if(!['pending_approval','approved'].includes(req.status))return officePurchaseStatus('Request is no longer awaiting action.');
- let values={p_request_id:id};
- if(action==='approve'||action==='reject'){
-  if(req.status!=='pending_approval')return;
-  if(!confirm((action==='approve'?'Approve':'Reject')+' purchase request '+req.request_no+'?'))return;
- }else if(action==='create_order'){
-  if(req.status!=='approved')return;
-  if(!officePurchaseState.suppliers.length)return officePurchaseStatus('Add an approved cloud supplier before creating a PO.');
-  const choice=prompt('Supplier name (choose one):\n'+officePurchaseState.suppliers.map(x=>x.name).join('\n'),officePurchaseState.suppliers[0].name);
-  if(choice===null)return;
-  const supplier=officePurchaseState.suppliers.find(x=>x.name.trim().toLowerCase()===choice.trim().toLowerCase());
-  if(!supplier)return officePurchaseStatus('Choose a supplier from the approved list.');
-  const raw=prompt('Purchase order price in AED per '+req.unit+':');
-  if(raw===null)return;
-  const price=Number(raw);
-  if(raw.trim()===''||!Number.isFinite(price)||price<0)return officePurchaseStatus('Enter a valid unit price.');
-  if(!confirm('Create PO for '+req.quantity+' '+req.unit+' of '+req.ingredient+' at AED '+price.toFixed(2)+' per unit?'))return;
-  values={p_request_id:id,p_supplier_id:supplier.id,p_price:price};
- }else return;
+ if(action==='create_order')return officePOShow(id);
+ if(!['approve','reject'].includes(action)||req.status!=='pending_approval')return officePurchaseStatus('This request is not pending approval.');
  officePurchaseBusy=true;
- try{await officePurchaseRpc(action,values);await officePurchaseLoad()}
- catch(e){officePurchaseStatus('No changes made: '+e.message)}
+ officePurchaseStatus('Saving '+action+'…');
+ try{
+  await officePurchaseRpc(action,{p_request_id:id});
+  await officePurchaseLoad();
+  officePurchaseStatus('Request '+req.request_no+' '+(action==='approve'?'approved':'rejected')+'.');
+ }catch(e){officePurchaseStatus('No changes made: '+e.message)}
  finally{officePurchaseBusy=false}
 }
 officePurchaseEl('officePurchaseRefresh').addEventListener('click',officePurchaseLoad);
 officePurchaseEl('officePurchaseRequests').addEventListener('click',e=>{
- const button=e.target.closest('[data-po-action]');if(!button)return;
+ const button=e.target.closest('[data-po-action]');
+ if(!button)return;
  officePurchaseDo(button.dataset.poAction,button.dataset.id);
+});
+officePurchaseEl('officePOCancel').addEventListener('click',()=>{
+ officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').style.display='none';
+});
+officePurchaseEl('officePOConfirm').addEventListener('click',async()=>{
+ if(officePurchaseBusy)return;
+ const req=officePurchaseState.requests.find(x=>x.id===officeSelectedPurchaseRequest);
+ const error=officePurchaseEl('officePOInlineMessage');
+ const supplierId=officePurchaseEl('officePOSupplier').value;
+ const raw=officePurchaseEl('officePOPrice').value.trim();
+ const price=Number(raw);
+ if(!req||req.status!=='approved'){error.textContent='Request is no longer approved. Refresh first.';return}
+ if(!officePurchaseState.suppliers.some(x=>x.id===supplierId)){error.textContent='Select an approved supplier.';return}
+ if(raw===''||!Number.isFinite(price)||price<0||price>10000000){error.textContent='Enter a valid price per unit.';return}
+ officePurchaseBusy=true;const button=officePurchaseEl('officePOConfirm');button.disabled=true;
+ error.textContent='Creating purchase order…';
+ try{
+  await officePurchaseRpc('create_order',{p_request_id:req.id,p_supplier_id:supplierId,p_price:price});
+  officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').style.display='none';
+  await officePurchaseLoad();officePurchaseStatus('Purchase order created successfully. Inventory was not changed.');
+ }catch(e){error.textContent='Purchase order not created: '+e.message}
+ finally{officePurchaseBusy=false;button.disabled=false}
 });
 officePurchaseEl('officeSupplierAdd').addEventListener('click',async()=>{
  if(officePurchaseBusy)return;
  const input=officePurchaseEl('officeSupplierName'),name=input.value.trim();
- if(!name||name.length>120)return officePurchaseStatus('Enter a supplier name (up to 120 characters).');
- if(officePurchaseState.suppliers.some(x=>x.name.toLowerCase()===name.toLowerCase()))return officePurchaseStatus('Supplier is already registered.');
- if(!confirm('Add '+name+' as an approved company supplier?'))return;
- officePurchaseBusy=true;
- try{await officePurchaseRpc('add_supplier',{p_notes:name});input.value='';await officePurchaseLoad()}
- catch(e){officePurchaseStatus('Supplier not saved: '+e.message)}
- finally{officePurchaseBusy=false}
+ const message=officePurchaseEl('officeSupplierMessage');
+ if(!name||name.length>120){message.textContent='Enter a supplier name (up to 120 characters).';input.focus();return}
+ if(officePurchaseState.suppliers.some(x=>x.name.toLowerCase()===name.toLowerCase())){message.textContent='Supplier already registered.';return}
+ officePurchaseBusy=true;const button=officePurchaseEl('officeSupplierAdd');button.disabled=true;
+ message.textContent='Saving '+name+' to KITCH cloud…';
+ try{
+  await officePurchaseRpc('add_supplier',{p_notes:name});
+  input.value='';await officePurchaseLoad();
+  message.textContent='Supplier '+name+' added to the approved cloud supplier list.';
+ }catch(e){message.textContent='Supplier not saved: '+e.message}
+ finally{officePurchaseBusy=false;button.disabled=false}
 });
 const originalOfficeShowPage=showPage;
 showPage=function(page){originalOfficeShowPage(page);if(page==='purchasing'&&officeRid)officePurchaseLoad()};
