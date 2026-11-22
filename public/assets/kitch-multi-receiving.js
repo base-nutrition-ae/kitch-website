@@ -15,10 +15,28 @@
  const safe = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
  const options=(values,selected)=>values.map(u=>'<option value="'+u+'"'+(u===selected?' selected':'')+'>'+u+'</option>').join('');
- let lines=[],counter=0,saving=false,packageDefaults=new Map();
+ let lines=[],counter=0,saving=false,packageDefaults=new Map(),receivingSuppliers=[];
  const newLine=()=>({key:++counter,id:'',unit:'',qty:'',rejected:'0',price:'',packSize:'',packUnit:'',expiry:'',temperature:'',production:''});
- const ingredientList=()=>ingredients().filter(i=>i.cloud_id).sort((a,b)=>a.name.localeCompare(b.name));
- const findIngredient=id=>ingredientList().find(x=>String(x.cloud_id)===String(id));
+ const allIngredients=()=>ingredients().filter(i=>i.cloud_id).sort((a,b)=>a.name.localeCompare(b.name));
+ const findIngredient=id=>allIngredients().find(x=>String(x.cloud_id)===String(id));
+ const supplierNorm=v=>String(v??'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+ const produceNames=new Set('baby spinach|broccoli|cabbage|carrot|cherry tomato|cucumber|fresh coriander|lettuce|lime|red onion|rocket leaves|tomato'.split('|'));
+ const meatNames=new Set('chicken breast|chicken thigh'.split('|'));
+ const seafoodNames=new Set('salmon|tuna|seabass|sea bass|prawn|prawns|shrimp|cod|fish|calamari'.split('|'));
+ const currentSupplier=()=>receivingSuppliers.find(x=>String(x.id)===String(document.getElementById('kmrSupplier')?.value))||null;
+ const supplierAllows=(ing,supplier)=>{
+   if(!ing||!supplier)return false;
+   const name=supplierNorm(ing.name),seller=supplierNorm(supplier.name),cat=supplierNorm(ing.category);
+   const produce=produceNames.has(name)||/fruit|vegetable|produce|herb/.test(cat);
+   const meat=meatNames.has(name)||/meat|poultry|chicken|beef|lamb/.test(cat);
+   const seafood=seafoodNames.has(name)||/seafood|fish|shellfish/.test(cat);
+   if(seller==='gpfruit llc')return produce;
+   if(seller==='butcher llc')return meat;
+   if(seller==='seaplus llc')return seafood;
+   if(seller==='urs llc')return !produce;
+   return supplierNorm(ing.supplier||ing.supplier_name)===seller;
+ };
+ const ingredientList=()=>allIngredients().filter(i=>supplierAllows(i,currentSupplier()));
  const packBaseUnit=b=>({l:'ltr'}[String(b||'').toLowerCase()]||String(b||'').toLowerCase());
  const isMilkUnitMismatch=ing=>/\bmilk\b/i.test(ing?.name||'') && ['g','kg'].includes(String(ing?.base_unit||'').toLowerCase());
  const normalizePackSize=(saved,base)=>{
@@ -86,13 +104,14 @@
    document.getElementById('kmrCount').textContent=lines.length+' item'+(lines.length===1?'':'s');
  }
  function validate(){
-   const supplier=document.getElementById('kmrSupplier')?.value.trim(),invoice=document.getElementById('kmrInvoice')?.value.trim();
-   if(!supplier||!invoice)throw Error('Enter supplier and invoice number.');
+   const selected=currentSupplier(),supplier=selected?.name||'',invoice=document.getElementById('kmrInvoice')?.value.trim();
+   if(!selected||!invoice)throw Error('Select an approved supplier and enter the invoice number.');
    if(!lines.length||lines.length>100)throw Error('Add between 1 and 100 ingredients.');
    const used=new Set();
    const payload=lines.map((line,i)=>{
      const ing=findIngredient(line.id),qty=Number(line.qty),rej=Number(line.rejected),price=Number(line.price);
      if(!ing)throw Error('Choose an ingredient on line '+(i+1));
+     if(!supplierAllows(ing,selected))throw Error(ing.name+' is not assigned to '+supplier+'; no invoice was saved.');
      if(isMilkUnitMismatch(ing))throw Error(ing.name+' uses '+ing.base_unit+' in Ingredient Master. Correct and reconcile its stock units before receiving.');
      if(used.has(line.id))throw Error('Ingredient repeated on lines. Combine it into one line: '+ing.name);
      used.add(line.id);
@@ -173,7 +192,17 @@
  }
  window.openKitchNewReceiving=async function(){
    if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud?.branch_id)return alert('Sign in to your assigned KITCH location first.');
-   if(!ingredientList().length)return alert('Import Ingredient Master first.');
+   if(!allIngredients().length)return alert('Import Ingredient Master first.');
+   receivingSuppliers=[];
+   try{
+     const supplierResult=await sb.rpc('kitch_purchase_supplier_view',{
+       p_restaurant_id:cloud.restaurant_id,p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin
+     });
+     if(supplierResult.error)throw supplierResult.error;
+     receivingSuppliers=(Array.isArray(supplierResult.data?.suppliers)?supplierResult.data.suppliers:[])
+       .filter(x=>x.id&&x.name).sort((a,b)=>a.name.localeCompare(b.name));
+   }catch(err){return alert('Approved supplier master could not load: '+(err?.message||err)+'. No stock was changed.');}
+   if(!receivingSuppliers.length)return alert('No approved cloud suppliers. Add suppliers in Suppliers & Purchasing first.');
    packageDefaults=new Map();
    try {
      const result=await sb.rpc(LOCAL?'kitch_team_local_package_defaults':'kitch_team_package_defaults',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
@@ -181,15 +210,22 @@
    } catch(err){console.warn('Local package master defaults unavailable',err)}
    lines=[newLine()];counter=lines[0].key;
    modal('<div class="modalHead"><div><h2>New Receiving</h2><small>One invoice · Multiple ingredients</small></div><button class="close" onclick="closeModal()">×</button></div>'+
-    '<style>#modal .modalBox{width:min(940px,calc(100vw - 32px));max-width:940px;box-sizing:border-box;padding:24px 28px;border-radius:24px}#modal .modalHead{margin-bottom:14px}#modal .modalHead h2{font-size:24px;letter-spacing:-.035em;margin:0}.kmrWrap{max-height:76vh;overflow:auto;padding-right:4px}.kmrIntro{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 14px;background:#f6f6f5;color:#777;border-radius:12px;padding:10px 13px;margin:4px 0 16px;font-size:12px}.kmrIntro b{color:#222}.kmrHeader{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:18px;border-bottom:1px solid #eaeaea}.kmrHeader label,.kmrGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrHeader input,.kmrGrid input,.kmrGrid select{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrHeader input:focus,.kmrGrid input:focus,.kmrGrid select:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrLine{border:1px solid #e9e9e9;border-radius:18px;background:#fff;padding:17px 18px;margin:14px 0}.kmrLineTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.kmrLineIdentity{display:flex;gap:10px;align-items:center;font-size:15px}.kmrLineNum{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#fff1eb;color:#db6c36;font-size:11px;font-weight:850}.kmrMasterAction{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}.kmrMasterAction button{border:1px solid #efd8c8;background:#fff7f0;color:#a65a2e;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:750;cursor:pointer}.kmrMasterAction span{font-size:11px;color:#999}.kmrLineTop button{border:0;background:#fafafa;padding:9px 12px;border-radius:20px;color:#b64736;font-weight:700;cursor:pointer;font-size:11px}.kmrMainGrid{display:grid;grid-template-columns:1.6fr .75fr .9fr .85fr;gap:12px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrPackSize input{width:100%!important}.kmrUnitWarning{grid-column:1/-1;border-radius:10px;background:#fff3ed;border:1px solid #f2c5ad;color:#8b371f;font-size:12px;line-height:1.4;padding:10px 12px}.kmrQualityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid #efefef}.kmrQualityGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrQualityGrid input{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrQualityGrid input:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrExtras{margin-top:13px;border-top:1px solid #eee;padding-top:10px}.kmrExtras summary{font-size:12px;font-weight:750;color:#555;cursor:pointer}.kmrExtras summary span{font-weight:400;color:#999;margin-left:8px}.kmrExtras .kmrGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:11px}.kmrPreview{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f7f7f5;border-radius:10px;margin:12px 0 0;padding:11px 13px;color:#666;font-size:12px}.kmrPreview b{color:#111}#kmrAdd{width:auto;background:white;border:1px dashed #bcbcbc;color:#222;padding:11px 18px;border-radius:30px;font-weight:750;cursor:pointer}.kmrSummary{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 10px;padding:15px 16px;background:#f4f4f2;border-radius:13px}.kmrSummary strong{font-size:17px;color:#111}#kmrSubmit{border-radius:999px;min-height:50px}@media(max-width:840px){.kmrMainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.kmrMainGrid .kmrIngredient{grid-column:span 2}}@media(max-width:560px){.kmrQualityGrid{grid-template-columns:1fr 1fr}.kmrQualityGrid label:last-child{grid-column:span 2}#modal .modalBox{padding:18px 16px;width:calc(100vw - 20px)}.kmrHeader,.kmrExtras .kmrGrid{grid-template-columns:1fr}.kmrMainGrid{grid-template-columns:1fr 1fr;gap:10px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrLine{padding:13px}.kmrPreview{display:block}.kmrPreview span{display:block;margin:3px 0}.kmrSummary strong{font-size:14px}}</style>'+
+    '<style>#modal .modalBox{width:min(940px,calc(100vw - 32px));max-width:940px;box-sizing:border-box;padding:24px 28px;border-radius:24px}#modal .modalHead{margin-bottom:14px}#modal .modalHead h2{font-size:24px;letter-spacing:-.035em;margin:0}.kmrWrap{max-height:76vh;overflow:auto;padding-right:4px}.kmrIntro{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 14px;background:#f6f6f5;color:#777;border-radius:12px;padding:10px 13px;margin:4px 0 16px;font-size:12px}.kmrIntro b{color:#222}.kmrHeader{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:18px;border-bottom:1px solid #eaeaea}.kmrHeader label,.kmrGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrHeader input,.kmrHeader select,.kmrGrid input,.kmrGrid select{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrHeader input:focus,.kmrGrid input:focus,.kmrGrid select:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrLine{border:1px solid #e9e9e9;border-radius:18px;background:#fff;padding:17px 18px;margin:14px 0}.kmrLineTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.kmrLineIdentity{display:flex;gap:10px;align-items:center;font-size:15px}.kmrLineNum{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#fff1eb;color:#db6c36;font-size:11px;font-weight:850}.kmrMasterAction{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}.kmrMasterAction button{border:1px solid #efd8c8;background:#fff7f0;color:#a65a2e;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:750;cursor:pointer}.kmrMasterAction span{font-size:11px;color:#999}.kmrLineTop button{border:0;background:#fafafa;padding:9px 12px;border-radius:20px;color:#b64736;font-weight:700;cursor:pointer;font-size:11px}.kmrMainGrid{display:grid;grid-template-columns:1.6fr .75fr .9fr .85fr;gap:12px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrPackSize input{width:100%!important}.kmrUnitWarning{grid-column:1/-1;border-radius:10px;background:#fff3ed;border:1px solid #f2c5ad;color:#8b371f;font-size:12px;line-height:1.4;padding:10px 12px}.kmrQualityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid #efefef}.kmrQualityGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrQualityGrid input{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrQualityGrid input:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrExtras{margin-top:13px;border-top:1px solid #eee;padding-top:10px}.kmrExtras summary{font-size:12px;font-weight:750;color:#555;cursor:pointer}.kmrExtras summary span{font-weight:400;color:#999;margin-left:8px}.kmrExtras .kmrGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:11px}.kmrPreview{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f7f7f5;border-radius:10px;margin:12px 0 0;padding:11px 13px;color:#666;font-size:12px}.kmrPreview b{color:#111}#kmrAdd{width:auto;background:white;border:1px dashed #bcbcbc;color:#222;padding:11px 18px;border-radius:30px;font-weight:750;cursor:pointer}.kmrSummary{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 10px;padding:15px 16px;background:#f4f4f2;border-radius:13px}.kmrSummary strong{font-size:17px;color:#111}#kmrSubmit{border-radius:999px;min-height:50px}@media(max-width:840px){.kmrMainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.kmrMainGrid .kmrIngredient{grid-column:span 2}}@media(max-width:560px){.kmrQualityGrid{grid-template-columns:1fr 1fr}.kmrQualityGrid label:last-child{grid-column:span 2}#modal .modalBox{padding:18px 16px;width:calc(100vw - 20px)}.kmrHeader,.kmrExtras .kmrGrid{grid-template-columns:1fr}.kmrMainGrid{grid-template-columns:1fr 1fr;gap:10px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrLine{padding:13px}.kmrPreview{display:block}.kmrPreview span{display:block;margin:3px 0}.kmrSummary strong{font-size:14px}}</style>'+
     '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>'+(LOCAL?'Local test only':'Cloud Receiving · Confirmed stock updates inventory')+'</span></div>'+
-    '<div class="kmrHeader"><label>SUPPLIER *<input id="kmrSupplier" placeholder="Supplier"></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="Supplier invoice number"></label></div>'+
+    '<div class="kmrHeader"><label>SUPPLIER *<select id="kmrSupplier"><option value="">Choose approved supplier</option>'+receivingSuppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('')+'</select></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="Supplier invoice number"></label></div>'+
     '<div id="kmrLines"></div><button type="button" id="kmrAdd" class="btn">+ Add Ingredient</button>'+
     '<div class="kmrSummary"><span id="kmrCount">1 item</span><strong>Invoice total: <span id="kmrTotal">AED 0.00</span></strong></div>'+
     '<p id="kmrMessage" role="status" aria-live="polite" style="font-size:12px;color:#555"></p>'+
     '<button id="kmrSubmit" class="primary" type="button">Confirm Entire Receiving</button></div>');
    const root=document.getElementById('modal');
-   root.querySelector('#kmrAdd').addEventListener('click',()=>{if(lines.length>=100)return alert('Maximum 100 items');lines.push(newLine());draw()});
+   root.querySelector('#kmrSupplier').addEventListener('change',()=>{
+     // Never carry ingredient quantities from a different supplier.
+     lines=[newLine()];counter=lines[0].key;draw();
+     const supplier=currentSupplier(),count=ingredientList().length;
+     const info=root.querySelector('#kmrMessage');
+     if(info){info.style.color=count?'#28734b':'#b42318';info.textContent=supplier?(count+' approved products available from '+supplier.name+(count?'':'. Check supplier product assignments.')):'Choose a supplier to see its products.';}
+   });
+   root.querySelector('#kmrAdd').addEventListener('click',()=>{if(!currentSupplier())return alert('Choose a supplier first');if(!ingredientList().length)return alert('No products assigned to this supplier');if(lines.length>=100)return alert('Maximum 100 items');lines.push(newLine());draw()});
    root.querySelector('#kmrSubmit').addEventListener('click',submit);
    root.querySelector('#kmrLines').addEventListener('click',async e=>{
      const button=e.target.closest('[data-action]');if(!button)return;
