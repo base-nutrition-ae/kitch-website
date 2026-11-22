@@ -721,40 +721,22 @@ function publicInfo(type){
 (function(){
  if(document.getElementById('kitchProSubscriptionStyles'))return;
  const style=document.createElement('style');style.id='kitchProSubscriptionStyles';
- style.textContent=`
- .kitchProPlanPage{max-width:760px;margin:0 auto;color:#161616}
- .kitchProPlanEyebrow{font-size:10px;font-weight:800;letter-spacing:.14em;color:#888;margin-bottom:10px}
- .kitchProPlanPage h2{font-size:38px;letter-spacing:-.055em;margin:0 0 10px}
- .kitchProPlanIntro{font-size:13px;max-width:600px;line-height:1.65;margin-bottom:20px!important}
- .kitchProPlanCard{border:1px solid #dedede;background:#fff;border-radius:23px;padding:27px;margin:21px 0 15px}
- .kitchProPlanTop{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;border-bottom:1px solid #eee;padding-bottom:22px;margin-bottom:19px}
- .kitchProTrial{display:inline-block;padding:7px 11px;border-radius:99px;background:#e9f7ee;color:#236d42;font-size:11px;font-weight:750}
- .kitchProPlanTop h3{font-size:24px;margin:14px 0 7px;letter-spacing:-.04em}
- .kitchProPrice{font-size:29px;font-weight:850;letter-spacing:-.04em}
- .kitchProPrice small{font-size:13px;color:#777;font-weight:600;letter-spacing:normal}
- .kitchProAllIn{font-size:11px;color:#777;font-weight:750;padding:8px 11px;border-radius:99px;background:#f6f6f6;white-space:nowrap}
- .kitchProFeatures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 18px;font-size:12px;font-weight:650;line-height:1.4;margin:0 0 21px}
- .kitchProPromoInfo{font-size:12px;line-height:1.55;padding:14px;border-radius:13px;background:#f8f8f8;color:#666;margin-bottom:17px}
- .kitchProPromoInfo b{color:#222}
- .kitchProChoose{border-radius:99px!important;min-height:48px;width:100%;font-size:13px!important;font-weight:800!important}
- .kitchProSandboxNote{font-size:11px;color:#888;line-height:1.6;margin:0 2px}
- @media(max-width:600px){.kitchProPlanPage h2{font-size:30px}.kitchProPlanCard{padding:19px}.kitchProFeatures{grid-template-columns:1fr}.kitchProPlanTop{flex-direction:column}}
- `;document.head.appendChild(style);
+ style.textContent=".publicBox:has(.kitchProPlanPage){width:min(790px,calc(100vw - 28px))!important;max-width:790px!important;max-height:calc(100dvh - 30px)!important;overflow-y:auto!important;padding:29px 34px 24px!important;border-radius:27px!important;box-shadow:0 28px 90px #0005!important;box-sizing:border-box!important}\n.publicBox:has(.kitchProPlanPage) .closePublic{top:22px!important;right:22px!important;border-radius:99px!important;background:#f4f4f4!important}\n.kitchProPlanPage{max-width:100%;color:#171717}\n.kitchProBrand{display:flex;align-items:center;justify-content:space-between;gap:15px;padding-right:36px;margin-bottom:29px}\n.kitchProBrandName{font-size:25px;letter-spacing:-.065em;font-weight:900;line-height:1}\n.kitchProBrandName span{font-size:12px;color:#9b9b9b;font-weight:800;letter-spacing:-.01em}\n.kitchProBrandTag{color:#888;font-weight:750;font-size:10px;letter-spacing:.13em}\n.kitchProIntro{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;margin-bottom:17px}\n.kitchProIntro h2{font-size:35px!important;letter-spacing:-.065em!important;line-height:1.08!important;margin:0 0 8px!important;color:#151515}\n.kitchProIntro p{font-size:12px;color:#888;line-height:1.55;margin:0;max-width:500px}\n.kitchProTopTag{background:#eef8f0;border-radius:99px;padding:8px 11px;font-size:11px;font-weight:800;color:#287548;white-space:nowrap}\n.kitchProPlanCard{border:1px solid #e9e9e9;background:#fff;border-radius:20px;padding:22px 24px 20px;margin:0 0 14px;box-shadow:0 3px 24px #00000004}\n.kitchProPlanTop{display:flex;justify-content:space-between;align-items:center;gap:15px;padding-bottom:20px;border-bottom:1px solid #ececec}\n.kitchProPlanTop small{display:block;color:#999;font-size:10px;font-weight:800;letter-spacing:.12em;margin-bottom:5px}\n.kitchProPrice{font-size:40px;line-height:1.1;font-weight:900;letter-spacing:-.055em;color:#111}\n.kitchProPrice .currency{font-size:18px;font-weight:800;letter-spacing:-.02em;margin-right:4px}\n.kitchProPrice .period{font-size:12px;color:#888;font-weight:650;letter-spacing:0;margin-left:4px}\n.kitchProAllIn{display:flex;align-items:center;gap:7px;background:#f6f6f6;border-radius:99px;padding:9px 12px;color:#4b4b4b;font-size:11px;font-weight:750}\n.kitchProSectionHead{font-size:10px;font-weight:850;letter-spacing:.12em;color:#9b9b9b;margin:20px 0 13px}\n.kitchProFeatures{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 16px;margin-bottom:20px}\n.kitchProFeatures span{display:flex;align-items:flex-start;gap:9px;color:#3b3b3b;font-size:12px;font-weight:650;line-height:1.45}\n.kitchProFeatures .tick{display:inline-flex;justify-content:center;align-items:center;background:#eaf6ed;color:#267347;border-radius:50%;font-weight:900;width:18px;height:18px;min-width:18px;font-size:11px;line-height:1}\n.kitchProPromoInfo{display:flex;align-items:center;gap:11px;background:#f7f7f7;border-radius:13px;padding:12px 13px;margin-bottom:15px}\n.kitchProPromoIcon{font-size:17px;display:flex;align-items:center;justify-content:center;width:33px;height:33px;min-width:33px;background:#fff;border:1px solid #ececec;border-radius:10px}\n.kitchProPromoInfo b{display:block;color:#242424;font-size:12px;margin-bottom:3px}\n.kitchProPromoInfo p{color:#858585;font-size:11px;line-height:1.45;margin:0}\n.kitchProChoose{width:100%!important;min-height:49px!important;border-radius:999px!important;font-size:13px!important;font-weight:800!important;letter-spacing:0!important;background:#151515!important;color:#fff!important;border:1px solid #151515!important}\n.kitchProChoose:hover{background:#303030!important}\n.kitchProAfterButton{text-align:center;font-size:11px;color:#868686;margin:11px 0 0}\n.kitchProSandboxNote{font-size:10px;color:#999;line-height:1.55;padding:0 4px;margin:0}\n@media(max-width:600px){.publicBox:has(.kitchProPlanPage){padding:23px 18px 18px!important;border-radius:21px!important}.kitchProBrand{margin-bottom:23px}.kitchProBrandTag{display:none}.kitchProIntro{align-items:flex-start;flex-direction:column}.kitchProIntro h2{font-size:29px!important}.kitchProPlanCard{padding:17px 15px}.kitchProPrice{font-size:34px}.kitchProFeatures{grid-template-columns:1fr;gap:11px}.kitchProPlanTop{align-items:flex-start}.kitchProAllIn{font-size:10px}.kitchProBrandName{font-size:22px}}";
+ document.head.appendChild(style);
 })();
-
 function openSubscribe(){
- publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>SUBSCRIPTION</span></div>
- <div class="kitchProPlanPage">
- <div class="kitchProPlanEyebrow">ONE PLAN · COMPLETE RESTAURANT OPERATIONS</div>
- <h2>KITCH Pro</h2>
- <p class="muted kitchProPlanIntro">Everything your kitchen needs, from purchasing and inventory to production, receiving and reports.</p>
+ publicModal(`<div class="kitchProPlanPage">
+ <div class="kitchProBrand"><div class="kitchProBrandName">KITCH <span>/ PRO</span></div><span class="kitchProBrandTag">RESTAURANT OPERATING SYSTEM</span></div>
+ <div class="kitchProIntro"><div><h2>Everything your kitchen needs.</h2><p>One powerful plan for your team, stock, suppliers and production. No complicated packages.</p></div><span class="kitchProTopTag">30 days free</span></div>
  <div class="kitchProPlanCard">
- <div class="kitchProPlanTop"><div><span class="kitchProTrial">30-day free trial</span><h3>KITCH Pro</h3><div class="kitchProPrice">AED 249 <small>/ month</small></div></div><div class="kitchProAllIn">All features included</div></div>
- <div class="kitchProFeatures"><span>✓ Ingredient Master & Inventory</span><span>✓ Recipes & Costing</span><span>✓ Purchasing & Suppliers</span><span>✓ Receiving & Invoices</span><span>✓ Production & Labels</span><span>✓ Central Store & Multiple Locations</span><span>✓ Staff & Permissions</span><span>✓ Waste, Stock Counts & Reports</span></div>
- <div class="kitchProPromoInfo"><b>Have a promo code?</b> Enter it securely at the Stripe checkout. Any valid discount will be calculated by Stripe before you confirm.</div>
- <button class="primary kitchProChoose" onclick="startSubscription('business')">Start 30-day free trial</button>
+ <div class="kitchProPlanTop"><div><small>KITCH PRO · MONTHLY</small><div class="kitchProPrice"><span class="currency">AED</span>249<span class="period">/ month</span></div></div><span class="kitchProAllIn">✓ All features included</span></div>
+ <div class="kitchProSectionHead">EVERYTHING INCLUDED</div>
+ <div class="kitchProFeatures"><span><i class="tick" aria-hidden="true">✓</i>Ingredient master & inventory</span><span><i class="tick" aria-hidden="true">✓</i>Recipes & food costing</span><span><i class="tick" aria-hidden="true">✓</i>Suppliers & purchase orders</span><span><i class="tick" aria-hidden="true">✓</i>Receiving & supplier invoices</span><span><i class="tick" aria-hidden="true">✓</i>Production & QC labels</span><span><i class="tick" aria-hidden="true">✓</i>Central Store & multiple locations</span><span><i class="tick" aria-hidden="true">✓</i>Staff roles & permissions</span><span><i class="tick" aria-hidden="true">✓</i>Waste, stock counts & reports</span></div>
+ <div class="kitchProPromoInfo"><span class="kitchProPromoIcon" aria-hidden="true">%</span><div><b>Have a promotional code?</b><p>Enter your code securely at Stripe checkout to see your eligible discount.</p></div></div>
+ <button class="primary kitchProChoose" onclick="startSubscription('business')">Start your free 30-day trial →</button>
+ <p class="kitchProAfterButton">AED 0 today · AED 249/month after trial, before any valid discount</p>
  </div>
- <p class="kitchProSandboxNote">Stripe sandbox checkout for testing. No live payment will be charged. The same AED 249/month plan will require separate live billing verification before launch.</p>
+ <p class="kitchProSandboxNote">Sandbox checkout for testing only. No live funds are charged. Live subscription billing is not yet enabled.</p>
  </div>`);
 }
 function toggleLandingDiscount(){openSubscribe();}
