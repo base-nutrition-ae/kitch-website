@@ -116,6 +116,43 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 #overview .overview-kpis{grid-template-columns:1fr}
 }
 </style>
+<style id="kitch-purchase-order-redesign">
+.kitchPOComposer[hidden]{display:none!important}
+.kitchPOComposer{box-sizing:border-box;width:min(100%,940px);max-width:940px;margin:24px auto 8px;padding:28px 30px;background:#fff;border:1px solid #e6e6e6;border-radius:23px;box-shadow:0 12px 36px rgba(0,0,0,.035);color:#161616}
+.kitchPOHead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
+.kitchPOEyebrow{font-size:10px;letter-spacing:1.5px;color:#909090;font-weight:800;margin-bottom:9px}
+.kitchPOHead h3{font-size:23px;letter-spacing:-.6px;line-height:1.2;margin:0 0 8px;font-weight:800}
+.kitchPOHead p{margin:0;font-size:12px;color:#777}
+.kitchPOClose{flex:none;border:0;border-radius:50%;background:#f3f3f3;width:34px;height:34px;font-size:22px;color:#444;cursor:pointer}
+.kitchPOFields{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;margin-bottom:20px}
+.kitchPOField{display:flex;flex-direction:column;gap:9px;min-width:0;font-size:12px;font-weight:750;color:#383838}
+.kitchPOField b{font-weight:800;color:#ce513f}
+.kitchPOField select,.kitchPOField input{width:100%;height:48px;min-height:48px;box-sizing:border-box;border:1px solid #e1e1e1;border-radius:12px;background:#fff;font:600 14px/1.2 Inter,-apple-system,Arial,sans-serif;color:#222;padding:0 14px;outline:none}
+.kitchPOField select:focus,.kitchPOField input:focus{border-color:#777;box-shadow:0 0 0 3px #f1f1f1}
+.kitchPOField small{font-size:11px;font-weight:450;color:#888}
+.kitchPOInputGroup{display:flex;align-items:center;gap:0;border:1px solid #e1e1e1;border-radius:12px;background:#fff;overflow:hidden}
+.kitchPOInputGroup>span{height:48px;display:flex;align-items:center;padding:0 14px;background:#f6f6f6;border-right:1px solid #eaeaea;color:#666;font-size:12px;font-weight:800}
+.kitchPOInputGroup input{border:0;border-radius:0;box-shadow:none!important}
+.kitchPOSummary{padding:20px 22px;background:#f7f7f7;border:1px solid #efefef;border-radius:16px}
+.kitchPOSummaryTitle{font-size:13px;font-weight:800;margin-bottom:16px}
+.kitchPOSummaryRows{display:grid;grid-template-columns:1fr 1fr;gap:15px 32px}
+.kitchPOSummaryRows>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.kitchPOSummaryRows span{font-size:11px;color:#888}
+.kitchPOSummaryRows strong{font-size:13px;color:#242424;overflow-wrap:anywhere}
+.kitchPOTotal{border-top:1px solid #e3e3e3;margin-top:18px;padding-top:17px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.kitchPOTotal span{font-size:13px;font-weight:700}
+.kitchPOTotal strong{font-size:25px;font-weight:850;letter-spacing:-.7px}
+.kitchPONote{color:#777;font-size:11px;line-height:1.5;margin:15px 0 0}
+#officePOInlineMessage{font-size:12px;color:#b42318;min-height:16px;margin:9px 0}
+.kitchPOActions{display:flex;justify-content:flex-end;gap:10px;align-items:center;margin-top:8px}
+.kitchPOBtn{box-sizing:border-box;min-height:43px;display:inline-flex;align-items:center;justify-content:center;padding:0 22px;border-radius:999px;white-space:nowrap;font-size:12px;font-weight:800;cursor:pointer;transition:background .15s}
+.kitchPOBtnPrimary{background:#151515;border:1px solid #151515;color:#fff}
+.kitchPOBtnPrimary:hover{background:#333}
+.kitchPOBtnSecondary{background:#fff;border:1px solid #dedede;color:#242424}
+.kitchPOBtnSecondary:hover{background:#f5f5f5}
+.kitchPOBtn:disabled{opacity:.6;cursor:not-allowed}
+@media(max-width:700px){.kitchPOComposer{padding:20px 16px;border-radius:18px}.kitchPOFields{grid-template-columns:1fr}.kitchPOSummaryRows{gap:13px}.kitchPOActions{display:grid;grid-template-columns:1fr 1fr}.kitchPOBtn{padding:0 12px}.kitchPOTotal strong{font-size:21px}}
+</style>
 </head><body><div id="officeBoot" style="position:fixed;inset:0;z-index:99999;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font:600 15px Arial,sans-serif;color:#555"><div style="text-align:center"><strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>Opening Main Office…</div></div><div id="officeAuth"><h2>Main Office Sign In</h2><p class="officeHint">Owner access uses email and password. Your existing kitchen staff PIN login stays unchanged.</p><form id="officeLoginForm"><label>Email<input type="email" id="officeEmail" autocomplete="email" required placeholder="owner@company.com"></label><label>Password<input type="password" id="officePassword" autocomplete="current-password" required></label><button id="officeLoginButton" type="submit">Sign in</button></form><p id="officeAuthMessage" class="error" role="status"></p><p class="officeHint">Only an owner assigned to this company in Supabase can access its Main Office data. Setup instructions are in the accompanying SQL file.</p></div><div class="frame officeHidden" id="officeApp"><div class="app"><main class="content"><header class="header"><strong>KITCH <span style="font-weight:400;color:#aaa;font-size:12px">/ MAIN OFFICE</span></strong><nav aria-label="Main navigation" class="topnav"><button class="active" data-page="overview">Overview</button><button data-page="ingredients">Ingredient Master</button><button data-page="purchasing">Purchasing</button><button data-page="locations">Locations</button><button data-page="staff">Team</button><button data-page="reports">Reports</button><button data-page="settings">Account</button></nav><div class="profile"><div class="avatar">K</div><span>Owner workspace<br/><small style="color:#aaa">Secure owner access</small></span></div></header>
 <section class="section active" id="overview">
 <div class="hero"><div><h1>Main Office Overview</h1><p>All your restaurant operations in one place.</p></div><span class="tag">Main Office · Owner View</span></div>
@@ -147,7 +184,32 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
 <div class="actions" style="display:flex;gap:10px;margin:14px 0;flex-wrap:wrap"><input id="officeSupplierName" maxlength="120" placeholder="Supplier name" aria-label="Supplier name" style="flex:1;min-width:220px;border:1px solid #ddd;border-radius:12px;padding:12px"><button class="btn" id="officeSupplierAdd" type="button">+ Add Cloud Supplier</button></div>
 <p id="officeSupplierMessage" role="status" style="margin:8px 0;font-size:12px;min-height:16px"></p><div id="officeSuppliers" class="muted">Loading…</div></div>
 <div class="card" style="margin-bottom:16px"><div class="titleline"><h2>Purchase Requests</h2><span class="ghost" id="officeRequestCount">-</span></div>
-<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" style="display:none;margin-top:16px;padding:16px;border:1px solid #e5e5e5;border-radius:14px;background:#f8f8f8"><h3 style="margin:0 0 8px">Create Purchase Order</h3><p id="officePOComposerSummary" style="font-size:12px;color:#666"></p><div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap"><label style="flex:2;min-width:190px">Supplier<select id="officePOSupplier" style="width:100%;height:42px;padding:0 12px;border:1px solid #ddd;border-radius:10px;background:white"></select></label><label style="flex:1;min-width:140px">Price per unit (AED)<input id="officePOPrice" type="number" min="0" step="any" placeholder="0.00" style="width:100%;height:42px;padding:0 12px;border:1px solid #ddd;border-radius:10px;background:white"></label><button class="btn" type="button" id="officePOConfirm">Confirm Create PO</button><button class="btn light" type="button" id="officePOCancel">Cancel</button></div><p id="officePOInlineMessage" role="status" style="font-size:12px;color:#b42318"></p></div></div>
+<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>REQUEST</th><th>INGREDIENT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody id="officePurchaseRequests"><tr><td colspan="5">Loading…</td></tr></tbody></table></div><div id="officePOComposer" class="kitchPOComposer" hidden>
+  <div class="kitchPOHead">
+    <div><div class="kitchPOEyebrow">PURCHASING · MAIN OFFICE</div><h3>Create Purchase Order</h3><p id="officePOComposerSummary"></p></div>
+    <button type="button" class="kitchPOClose" id="officePOClose" aria-label="Close purchase order form">×</button>
+  </div>
+  <div class="kitchPOFields">
+    <label class="kitchPOField"><span>Approved Supplier <b>*</b></span><select id="officePOSupplier"></select></label>
+    <label class="kitchPOField"><span>Unit Price <b>*</b></span><span class="kitchPOInputGroup"><span>AED</span><input id="officePOPrice" type="number" min="0" step="any" inputmode="decimal" placeholder="0.00" aria-describedby="officePOPriceHelp"></span><small id="officePOPriceHelp">Price per <span id="officePOUnitLabel">unit</span></small></label>
+  </div>
+  <div class="kitchPOSummary">
+    <div class="kitchPOSummaryTitle">Order Summary</div>
+    <div class="kitchPOSummaryRows">
+      <div><span>Ingredient</span><strong id="officePOItem">—</strong></div>
+      <div><span>Quantity</span><strong id="officePOQuantity">—</strong></div>
+      <div><span>Supplier</span><strong id="officePOSupplierText">—</strong></div>
+      <div><span>Unit price</span><strong id="officePOUnitPriceText">AED 0.00</strong></div>
+    </div>
+    <div class="kitchPOTotal"><span>Estimated PO Total</span><strong id="officePOTotal" aria-live="polite">AED 0.00</strong></div>
+  </div>
+  <p class="kitchPONote">Creating a purchase order does not change inventory. Stock updates only when Receiving is confirmed.</p>
+  <p id="officePOInlineMessage" role="status" aria-live="polite"></p>
+  <div class="kitchPOActions">
+    <button type="button" class="kitchPOBtn kitchPOBtnSecondary" id="officePOCancel">Cancel</button>
+    <button type="button" class="kitchPOBtn kitchPOBtnPrimary" id="officePOConfirm">Confirm Create PO</button>
+  </div>
+</div></div>
 <div class="card"><div class="titleline"><h2>Purchase Orders</h2><span class="ghost" id="officePOCount">-</span></div>
 <div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>PO</th><th>SUPPLIER</th><th>STATUS</th><th>TOTAL</th></tr></thead><tbody id="officePurchaseOrders"><tr><td colspan="4">Loading&</td></tr></tbody></table></div></div>
 <p id="officePurchaseMessage" role="status" style="margin-top:14px;color:#b42318"></p>
@@ -394,8 +456,12 @@ function officePOShow(id){
  officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.ingredient+' · '+req.quantity+' '+req.unit;
  officePurchaseEl('officePOSupplier').innerHTML=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
  officePurchaseEl('officePOPrice').value='';
+ officePurchaseEl('officePOItem').textContent=req.ingredient;
+ officePurchaseEl('officePOQuantity').textContent=req.quantity+' '+req.unit;
+ officePurchaseEl('officePOUnitLabel').textContent=req.unit;
  officePurchaseEl('officePOInlineMessage').textContent='';
- panel.style.display='block';
+ panel.hidden=false;
+ officePOUpdateTotal();
  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
  officePurchaseStatus('');
 }
@@ -420,8 +486,21 @@ officePurchaseEl('officePurchaseRequests').addEventListener('click',e=>{
  if(!button)return;
  officePurchaseDo(button.dataset.poAction,button.dataset.id);
 });
+function officePOUpdateTotal(){
+ const req=officePurchaseState.requests.find(x=>x.id===officeSelectedPurchaseRequest);
+ const supplier=officePurchaseState.suppliers.find(x=>x.id===officePurchaseEl('officePOSupplier').value);
+ const raw=officePurchaseEl('officePOPrice').value.trim();
+ const price=raw===''?null:Number(raw);
+ const valid=price!==null&&Number.isFinite(price)&&price>=0&&price<=10000000;
+ officePurchaseEl('officePOSupplierText').textContent=supplier?.name||'Select supplier';
+ officePurchaseEl('officePOUnitPriceText').textContent=valid?'AED '+price.toFixed(2):'—';
+ officePurchaseEl('officePOTotal').textContent=valid&&req?'AED '+(Number(req.quantity)*price).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2}):'AED 0.00';
+}
+officePurchaseEl('officePOPrice').addEventListener('input',officePOUpdateTotal);
+officePurchaseEl('officePOSupplier').addEventListener('change',officePOUpdateTotal);
+officePurchaseEl('officePOClose').addEventListener('click',()=>officePurchaseEl('officePOCancel').click());
 officePurchaseEl('officePOCancel').addEventListener('click',()=>{
- officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').style.display='none';
+ officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').hidden=true;
 });
 officePurchaseEl('officePOConfirm').addEventListener('click',async()=>{
  if(officePurchaseBusy)return;
@@ -437,7 +516,7 @@ officePurchaseEl('officePOConfirm').addEventListener('click',async()=>{
  error.textContent='Creating purchase order…';
  try{
   await officePurchaseRpc('create_order',{p_request_id:req.id,p_supplier_id:supplierId,p_price:price});
-  officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').style.display='none';
+  officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').hidden=true;
   await officePurchaseLoad();officePurchaseStatus('Purchase order created successfully. Inventory was not changed.');
  }catch(e){error.textContent='Purchase order not created: '+e.message}
  finally{officePurchaseBusy=false;button.disabled=false}
