@@ -1,0 +1,58 @@
+name: KITCH Main Office startup fix
+on:
+  push:
+    branches: [recipe-yield-test]
+    paths:
+      - .github/workflows/kitch-main-office-fast-open.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix-main-office:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: recipe-yield-test
+          persist-credentials: true
+      - name: Patch Main Office loading in current production page
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, base64
+          path = Path("index.html")
+          page = path.read_text(encoding="utf-8")
+          match = re.search(r"const KITCH_OFFICE_EMBED='([^']+)'", page)
+          if not match:
+              raise SystemExit("KITCH embedded Main Office not found - no files changed")
+          office = base64.b64decode(match.group(1)).decode("utf-8")
+          edits = [
+            ("const rid=members[0].restaurant_id;officeRid=rid;",
+             "const rid=members[0].restaurant_id;officeRid=rid;\n // Verified owner: show office shell immediately, before optional dashboard reads.\n setVisible(true);document.getElementById('officeBoot')?.remove();"),
+            ("if(errors.length){setVisible(false);say('Data access needs attention: '+errors.join('; '));return;} if(recipes.error){setVisible(false);say('Recipe access needs attention: '+recipes.error.message);return;}",
+             "if(errors.length){const note=document.querySelector('#overview .notice');if(note)note.textContent='Some dashboard data unavailable: '+errors.join('; ');console.warn('Main Office data access:',errors.join('; '));} if(recipes.error)console.warn('Recipe access:',recipes.error.message);"),
+            ("const boot=document.getElementById('officeBoot');\n  try{",
+             "const boot=document.getElementById('officeBoot');\n  const watchdog=setTimeout(()=>{if(boot?.isConnected){setVisible(false);say('Main Office connection timed out. Check connection and retry.');boot.remove();}},10000);\n  try{"),
+            ("finally{if(boot)boot.remove();}",
+             "finally{clearTimeout(watchdog);if(boot)boot.remove();}")
+          ]
+          for before, after in edits:
+              if office.count(before) != 1:
+                  raise SystemExit("Safety check failed for: " + before[:60])
+              office = office.replace(before, after, 1)
+          patched = base64.b64encode(office.encode("utf-8")).decode("ascii")
+          updated = page[:match.start(1)] + patched + page[match.end(1):]
+          if updated.count("const KITCH_OFFICE_EMBED=") != 1:
+              raise SystemExit("Unexpected embedded office count")
+          path.write_text(updated, encoding="utf-8")
+          print("Patched Main Office, retaining all other page content.")
+          PY
+      - name: Commit only index.html fix
+        run: |
+          git config user.name "KITCH Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --check
+          git diff --cached --quiet || git commit -m "Show verified Main Office immediately and avoid endless loading"
+          git push
