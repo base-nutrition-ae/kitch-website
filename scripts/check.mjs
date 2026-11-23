@@ -100,6 +100,11 @@ const accessChecks=[
  ['owner logout clears view',app.includes("sessionStorage.removeItem('kitch_last_view')")]
 ];
 for(const [label,ok] of accessChecks)if(!ok)throw new Error('Missing KITCH desktop/session behavior: '+label);
+if(!officeNav.includes('id="kitch-office-auth-isolation"'))throw new Error('Main Office sign-in isolation missing');
+if(!officeNav.includes('Main Office is taking longer than expected.'))throw new Error('Main Office slow-start retry screen missing');
+if(officeNav.includes("msg.textContent='Main Office connection is taking too long. Reload the page or sign in again.'"))throw new Error('Old forced sign-in timeout still present');
+if(officeScript.includes("if(auth)auth.classList.remove('officeHidden');"))throw new Error('Iframe watchdog must not expose login during session restore');
+console.log('PASS: Main Office timeout cannot reveal sign-in over a loading dashboard.');
 console.log('PASS: Desktop navigation and authenticated owner refresh-page restoration contracts.');
 
 
