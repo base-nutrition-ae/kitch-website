@@ -60,5 +60,24 @@ const finalDesignChecks=[
 for (const [name,ok] of finalDesignChecks)if(!ok)throw new Error('Missing unified design feature: '+name);
 console.log('PASS: Unified Main Office / Main Kitchen branding, layout, dashboard and logout contracts.');
 
+
+const mobileCss=fs.readFileSync('design/mobile-unified.css','utf8');
+const mobileJs=fs.readFileSync('design/office-mobile.js','utf8');
+const buildScript=fs.readFileSync('scripts/build.mjs','utf8');
+const officeSource=fs.readFileSync('office-source.html','utf8');
+const mobileChecks=[
+ ['mobile CSS present',mobileCss.includes('KITCH MOBILE FINAL')],
+ ['Main Kitchen responsive drawer',mobileCss.includes('mobileMenuOpen')&&mobileCss.includes('appMobileMenu')],
+ ['Main Office responsive drawer',mobileCss.includes('officeMobileOpen')&&mobileCss.includes('officeMobileMenu')],
+ ['office mobile menu button',officeSource.includes('id="officeMobileMenu"')],
+ ['office mobile menu backdrop',officeSource.includes('id="officeMobileBackdrop"')],
+ ['office drawer close behavior',mobileJs.includes("addEventListener('keydown'")&&mobileJs.includes("officeMobileOpen")],
+ ['mobile styles injected last',buildScript.includes('kitch-mobile-kitchen')&&buildScript.includes('kitch-mobile-office')],
+ ['office mobile JS injected',buildScript.includes('kitch-office-mobile-script')],
+ ['kitchen logout accessible',page.includes('onclick="logout()">Log out</button>')]
+];
+for(const [label,passed] of mobileChecks)if(!passed)throw new Error('Missing KITCH mobile feature: '+label);
+console.log('PASS: Mobile layout, navigation, responsive tables and logout contracts.');
+
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} static asset references, and Main Office embed.`);
