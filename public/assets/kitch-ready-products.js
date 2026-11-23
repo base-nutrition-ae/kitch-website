@@ -57,7 +57,7 @@
   const isManager=typeof session!=='undefined'&&session==='manager';
   const canManage=typeof session!=='undefined'&&['owner','store'].includes(session);
   const notices=!ready?'<div class="note"><b>Ready Products cloud setup required.</b> '+escapeHtml(error||'Checking access…')+' Existing ingredient requests remain available; finished-product transfers are disabled until this separate workflow is configured.</div>':'';
-  return '<div class="panel kitchReadyPage"><div class="kitchReadyHeading"><div><div class="sub">KITCH PRO · INTERNAL TRANSFERS</div><h2>Ready Products</h2><p class="muted">Prepared products from Central Kitchen, separate from the Ingredient Master.</p></div><div class="actions"><button class="btn" onclick="kitchReadyRefresh()">Refresh</button>'+(canManage?'<button class="btn black" onclick="kitchReadyOpenImport()">Import Ready Products</button>':'')+(isManager?'<button class="btn black" onclick="kitchReadyNewRequest()">+ Request Ready Products</button>':'')+'</div></div>'+notices+
+  return '<div class="panel kitchReadyPage"><div class="kitchReadyHeading"><div><div class="sub">KITCH PRO · INTERNAL TRANSFERS</div><h2>Ready Products</h2><p class="muted">Prepared products from Central Kitchen, separate from the Ingredient Master.</p></div><div class="actions"><button class="btn" onclick="kitchReadyRefresh()">Refresh</button>'+(canManage?'<button class="btn black" onclick="kitchReadyOpenImport()">Import Ready Products</button><button class="btn" onclick="kitchReadyOpenBatch()">Record Finished Batch</button>':'')+(isManager?'<button class="btn black" onclick="kitchReadyNewRequest()">+ Request Ready Products</button>':'')+'</div></div>'+notices+
    '<div class="grid"><div class="card"><span>READY PRODUCTS</span><b>'+catalog.length+'</b></div><div class="card"><span>ACTIVE REQUESTS</span><b>'+requests.filter(x=>!['Received','Cancelled'].includes(x.status)).length+'</b></div><div class="card"><span>FLOW</span><b style="font-size:13px">Kitchen → Branch → Receipt</b></div></div>'+
    '<h3 style="margin:22px 0 10px">Ready Products Master</h3>'+table(catalog,['SKU','READY PRODUCT','UNIT','STORAGE','SHELF LIFE','UNIT COST'],x=>'<tr><td>'+escapeHtml(x.sku)+'</td><td><b>'+escapeHtml(x.name)+'</b><div class="muted">'+escapeHtml(x.category||'')+'</div></td><td>'+escapeHtml(x.unit)+'</td><td>'+escapeHtml(x.storage)+'</td><td>'+fmt(x.shelf_life_days)+' days</td><td>AED '+fmt(x.unit_cost)+'</td></tr>','No ready products imported.')+
    '<h3 style="margin:22px 0 10px">Branch Ready Product Requests</h3>'+table(requests,['REQUEST','BRANCH','PRODUCT','QTY','STATUS','ACTION'],x=>'<tr><td><b>#'+escapeHtml(x.id)+'</b></td><td>'+escapeHtml(x.branch_name||'—')+'</td><td>'+escapeHtml(x.product_name||x.sku)+'</td><td>'+fmt(x.qty)+' '+escapeHtml(x.unit)+'</td><td>'+escapeHtml(x.status)+'</td><td>'+actions(x,canManage,isManager)+'</td></tr>','No ready product requests yet.')+
@@ -110,6 +110,19 @@
   const b=$('kitchReadySaveImport');if(b)b.disabled=true;
   try{const result=await rpc('import',{products:pending});pending=[];closeModal();await refresh();alert('Ready Products catalog saved: '+(result?.count??'completed')+' items.')}
   catch(e){alert('Import not saved: '+e.message)}finally{if(b)b.disabled=false}
+ };
+ window.kitchReadyOpenBatch=()=>{
+  if(!['owner','store'].includes(session)||!ready||!catalog.some(x=>x.active))return alert('Ready Products catalog must be loaded before recording a batch.');
+  modal('<div class="modalHead"><h2>Record Finished Batch</h2><button class="close" onclick="closeModal()">×</button></div><p class="muted">Record Central Kitchen production. This creates a separate finished-product stock movement, never an ingredient receiving record.</p><div class="formGrid"><div class="field"><label>READY PRODUCT</label><select id="kitchReadyBatchSku">'+productOptions()+'</select></div><div class="field"><label>BATCH NUMBER</label><input id="kitchReadyNewBatchNo" maxlength="80"></div><div class="field"><label>PRODUCTION DATE</label><input type="date" id="kitchReadyProducedDate"></div><div class="field"><label>EXPIRY DATE</label><input type="date" id="kitchReadyNewExpiryDate"></div><div class="field"><label>FINISHED QUANTITY</label><input type="number" id="kitchReadyBatchQty" min=".001" step=".001"></div></div><button class="primary" onclick="kitchReadySaveBatch()">Record Finished Stock</button>');
+  const today=new Date().toISOString().slice(0,10);
+  if($('kitchReadyProducedDate'))$('kitchReadyProducedDate').value=today;
+ };
+ window.kitchReadySaveBatch=async()=>{
+  const sku=$('kitchReadyBatchSku')?.value,batch_no=$('kitchReadyNewBatchNo')?.value.trim(),
+   produced_on=$('kitchReadyProducedDate')?.value,expiry_date=$('kitchReadyNewExpiryDate')?.value,qty=Number($('kitchReadyBatchQty')?.value);
+  if(!sku||!batch_no||!produced_on||!expiry_date||expiry_date<produced_on||!Number.isFinite(qty)||qty<=0||qty>100000)return alert('Enter a valid product, batch, dates and quantity.');
+  try{await rpc('batch',{sku,batch_no,produced_on,expiry_date,qty});closeModal();await refresh(true);alert('Finished-product batch recorded in Central Kitchen.')}
+  catch(e){alert('Batch was not saved: '+e.message)}
  };
  window.kitchReadyNewRequest=()=>{
   if(session!=='manager'||!ready||!catalog.some(x=>x.active))return alert('Import ready products before placing a request.');
