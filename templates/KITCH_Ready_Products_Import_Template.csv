@@ -1,0 +1,5 @@
+SKU,Product Name,Category,Unit,Pack Size,Unit Cost AED,Source,Shelf Life Days,Storage,Active
+SOUP-TOMATO,Tomato Soup,Soups,portion,1,8.50,Central Kitchen,3,Chilled,Yes
+SOUP-MUSHROOM,Mushroom Soup,Soups,ltr,1,18.00,Central Kitchen,3,Chilled,Yes
+BEEF-COOKED,Cooked Beef,Prepared Protein,kg,1,49.00,Central Kitchen,3,Chilled,Yes
+SAUCE-MUSHROOM,Mushroom Sauce,Sauces,pack,1,7.50,Central Kitchen,4,Chilled,Yes
