@@ -73,3 +73,33 @@
 #app.app:not(.hidden)>.side .sideLogoWrap .kitchSideLogo{display:none!important}
 #app.app:not(.hidden)>.side .sideLogoWrap .kitchNavBrand{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:4px!important;font-size:23px!important;line-height:1!important;letter-spacing:-.065em!important;font-weight:850!important;color:#24252c!important}
 #app.app:not(.hidden)>.side .sideLogoWrap .kitchNavBrand small{display:block!important;margin:0!important;font-size:9px!important;line-height:1.1!important;letter-spacing:.15em!important;font-weight:750!important;color:#999aa5!important}
+
+
+/* 2026-11-23 DESIGN PARITY — override old KITCH selectors with identical Main Office style */
+@media (min-width:851px){
+ body #app.app:not(.hidden){display:grid!important;grid-template-columns:228px minmax(0,1fr)!important;gap:18px!important;padding:16px!important;background:#e9e9ef!important}
+ body #app.app:not(.hidden)>.side{grid-column:1!important;grid-row:1!important;position:sticky!important;left:auto!important;right:auto!important;top:16px!important;bottom:auto!important;transform:none!important;display:flex!important;visibility:visible!important;opacity:1!important;width:228px!important;min-width:228px!important;max-width:228px!important;height:calc(100dvh - 32px)!important;margin:0!important;background:#fff!important;border:1px solid #fff!important;border-radius:23px!important;padding:18px 13px!important;box-shadow:0 10px 27px #25253510!important}
+ body #app.app:not(.hidden)>.main{grid-column:2!important;grid-row:1!important;min-width:0!important;width:100%!important;max-width:none!important;padding:0 0 25px!important;margin:0!important}
+ body #app.app:not(.hidden)>.main>.top{background:#ffffffdd!important;border:1px solid white!important;border-radius:20px!important;box-shadow:none!important;padding:20px 24px!important;margin:0 0 18px!important}
+}
+body #app.app:not(.hidden)>.side .nav{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important;gap:5px!important;overflow-y:auto!important;background:transparent!important;border:0!important;box-shadow:none!important}
+body #app.app:not(.hidden)>.side .nav button{display:flex!important;align-items:center!important;justify-content:flex-start!important;flex:0 0 auto!important;width:100%!important;min-height:44px!important;padding:12px 14px!important;border:0!important;border-radius:12px!important;box-shadow:none!important;background:transparent!important;color:#626470!important;font-size:12.5px!important;font-weight:600!important;letter-spacing:0!important;text-align:left!important}
+body #app.app:not(.hidden)>.side .nav button.active,body #app.app:not(.hidden)>.side .nav button[aria-current="page"]{background:#25262e!important;color:#fff!important;border:0!important;box-shadow:0 5px 14px #24253020!important}
+body #app.app:not(.hidden)>.side .nav button:hover:not(.active){background:#f1f1f5!important;color:#25262e!important}
+body #app.app:not(.hidden)>.side .sideLogoWrap{background:transparent!important;border:0!important;border-bottom:1px solid #e7e7ed!important;padding:4px 8px 19px!important;margin:0 0 17px!important;min-height:70px!important}
+body #app.app:not(.hidden)>.side .sideLogoWrap .kitchNavBrand{display:block!important;color:#25262e!important;font-size:23px!important;letter-spacing:-.06em!important;font-weight:850!important}
+body #app.app:not(.hidden)>.side .sideLogoWrap .kitchNavBrand small{display:block!important;color:#9899a5!important;font-size:9px!important;font-weight:700!important;letter-spacing:.16em!important;margin-top:5px!important}
+body #app.app:not(.hidden)>.side .user{background:#f4f4f8!important;border:1px solid #e7e7ed!important;border-radius:13px!important;color:#25262e!important}
+body #app.app:not(.hidden)>.main #content .dashTop,body #app.app:not(.hidden)>.main #content .dashTitle{background:transparent!important;color:#25262e!important}
+body #app.app:not(.hidden)>.main #content .panel,body #app.app:not(.hidden)>.main #content .card{background:#fff!important;border:1px solid #e6e6eb!important;border-radius:20px!important;box-shadow:none!important;color:#25262e!important}
+body #app.app:not(.hidden)>.main #content :is(.btn.black,.btn.primary,button.black,button.primary){background:#25262e!important;color:white!important;border-color:#25262e!important}
+body #app.app:not(.hidden)>.main #content :is(.accent,.orange,.kitch-orange){color:#25262e!important}
+body #app.app:not(.hidden)>.main #content :is([style*="color:#ff6"],[style*="color: #ff6"],[style*="color:rgb(255"]){color:#25262e!important}
+#officeApp .officeSidebarFooter{display:flex!important;align-items:center!important;flex-wrap:wrap!important;gap:9px!important;padding:12px!important;margin-top:auto!important;background:#f4f4f8!important;border:1px solid #e7e7ed!important;border-radius:13px!important;color:#757680!important;font-size:11px!important}
+#officeApp .officeSidebarFooter .officeLogoutButton{display:block!important;flex:1 0 100%!important;width:100%!important;min-height:40px!important;margin:3px 0 0!important;padding:10px 14px!important;border-radius:10px!important;border:0!important;box-shadow:none!important;background:#25262e!important;color:#fff!important;font-family:inherit!important;font-size:12px!important;font-weight:750!important;cursor:pointer!important}
+#officeApp .officeSidebarFooter .officeLogoutButton:disabled{opacity:.6!important;cursor:wait!important}
+@media(max-width:850px){
+ body #app.app:not(.hidden)>.side .nav button.active{background:#25262e!important;color:#fff!important}
+ #officeApp .officeSidebarFooter{display:flex!important;margin-top:10px!important}
+ #officeApp .officeSidebarFooter .officeLogoutButton{max-width:none!important}
+}
