@@ -170,8 +170,12 @@ begin
   if v_qty is null or v_qty<=0 or v_qty>100000 or v_produced is null or v_expiry is null or v_produced>current_date or v_expiry<current_date or length(v_batch_no) not between 1 and 80 or v_expiry<v_produced then raise exception 'Invalid production batch or dates';end if;
   select * into v_product from public.kitch_ready_products p where p.restaurant_id=v_restaurant and p.sku=v_sku and p.active;
   if not found then raise exception 'Ready product not found';end if;
-  select id into v_central from public.branches b where b.restaurant_id=v_restaurant and b.is_active
-     and (lower(b.name) like '%central%kitchen%' or lower(b.code) like '%central%kitchen%') limit 1;
+  select b.id into v_central from public.branches b
+   where b.restaurant_id=v_restaurant and b.is_active
+   and (lower(b.name) like '%central%kitchen%' or lower(b.code) like '%central%kitchen%'
+        or (b.branch_type='restaurant' and lower(trim(b.name))='main kitchen'))
+   order by case when lower(b.name) like '%central%kitchen%' then 0 else 1 end, b.created_at
+   limit 1;
   if v_central is null then raise exception 'Central Kitchen branch must be configured first';end if;
   if v_role='production_staff' and v_branch is distinct from v_central then raise exception 'Production permission is limited to Central Kitchen';end if;
   insert into public.kitch_ready_batches(restaurant_id,product_id,branch_id,batch_no,produced_on,expiry_date)
@@ -187,6 +191,7 @@ begin
   if v_role not in ('owner','operations_manager','kitchen_manager') then raise exception 'Request not permitted';end if;
   v_branch:=coalesce(v_branch,(p_payload->>'branch_id')::uuid);
   if v_branch is null or not exists(select 1 from public.branches b where b.id=v_branch and b.restaurant_id=v_restaurant and b.is_active) then raise exception 'Active destination branch required';end if;
+  if not exists(select 1 from public.branches b where b.id=v_branch and b.restaurant_id=v_restaurant and b.branch_type='branch') then raise exception 'Select a restaurant branch as the ready-product destination';end if;
   v_sku:=upper(trim(p_payload->>'sku'));v_qty:=(p_payload->>'qty')::numeric;v_unit:=lower(trim(p_payload->>'unit'));
   select * into v_product from public.kitch_ready_products p where p.restaurant_id=v_restaurant and p.sku=v_sku and p.active;
   if not found or v_unit<>v_product.unit or v_qty is null or v_qty<=0 or v_qty>100000 then raise exception 'Invalid ready product or quantity';end if;
@@ -210,9 +215,14 @@ begin
   v_expiry:=(p_payload->>'expiry_date')::date;
   v_qty:=(p_payload->>'qty')::numeric;
   if v_qty is null or v_qty<=0 or v_qty>v_request.qty then raise exception 'Dispatch exceeds request';end if;
-  select id into v_central from public.branches b where b.restaurant_id=v_restaurant and b.is_active
-     and (lower(b.name) like '%central%kitchen%' or lower(b.code) like '%central%kitchen%') limit 1;
+  select b.id into v_central from public.branches b
+   where b.restaurant_id=v_restaurant and b.is_active
+   and (lower(b.name) like '%central%kitchen%' or lower(b.code) like '%central%kitchen%'
+        or (b.branch_type='restaurant' and lower(trim(b.name))='main kitchen'))
+   order by case when lower(b.name) like '%central%kitchen%' then 0 else 1 end, b.created_at
+   limit 1;
   if v_central is null then raise exception 'Central Kitchen not configured';end if;
+  if v_central=v_request.branch_id then raise exception 'Cannot dispatch ready products to their source kitchen';end if;
   select * into v_batch from public.kitch_ready_batches b where b.restaurant_id=v_restaurant
     and b.product_id=v_product.id and b.branch_id=v_central and b.batch_no=v_batch_no and b.expiry_date=v_expiry for update;
   if not found or v_batch.expiry_date<current_date then raise exception 'Valid unexpired production batch not found';end if;
