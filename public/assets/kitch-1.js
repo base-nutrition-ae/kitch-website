@@ -2,6 +2,9 @@
 const SUPABASE_URL='https://rtovpjgrezwxuvantxgt.supabase.co';
 const SUPABASE_KEY='sb_publishable_ERMt86IhOTqRSRXE05CQ-A_JXi27ode';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage:window.localStorage}});
+// Reuse this single authenticated Supabase client in the same-origin Main Office
+// iframe; two clients sharing browser storage can contend during session boot.
+window.__kitchSharedSupabaseClient=sb;
 const KITCH_AUTH_BUILD='2026-10-02-final-all-in-one-v1';
 let cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
 let teamCloudAuth=null;
