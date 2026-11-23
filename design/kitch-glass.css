@@ -1,0 +1,31 @@
+/* KITCH Graphite Glass — visual theme, no operations logic changes */
+:root{--orange:#26272e!important;--k-orange:#26272e!important;--k-accent:#26272e!important}
+body:has(#app:not(.hidden)){background:radial-gradient(ellipse at 78% 0%,#fafafd,#e8e8ee 56%,#dedee5)!important;color:#25262e!important;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important}
+#app.app:not(.hidden){background:transparent!important;min-height:100dvh!important;box-shadow:none!important}
+@media(min-width:851px){
+body #app.app:not(.hidden){display:grid!important;grid-template-columns:246px minmax(0,1fr)!important;gap:12px!important;padding:20px!important;align-items:stretch!important}
+body #app.app:not(.hidden) #kitchIconRail{display:none!important}
+body #app.app:not(.hidden)>.side{grid-column:1!important;grid-row:1!important;position:sticky!important;left:auto!important;right:auto!important;top:20px!important;bottom:auto!important;transform:none!important;display:flex!important;visibility:visible!important;opacity:1!important;height:calc(100dvh - 40px)!important;width:246px!important;max-width:246px!important;min-height:660px!important;border-radius:24px!important;overflow:hidden!important}
+body #app.app:not(.hidden)>.main{grid-column:2!important;grid-row:1!important;min-width:0!important;max-width:none!important}
+}
+#app.app:not(.hidden)>.side{background:rgba(255,255,255,.77)!important;color:#31323b!important;border:1px solid white!important;box-shadow:0 12px 30px #27273810!important;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);padding:21px 14px!important}
+#app.app:not(.hidden)>.side .sideLogoWrap{background:transparent!important;color:#23232a!important;border-bottom:1px solid #dcdce69c!important;padding-bottom:19px!important;margin-bottom:9px!important}
+#app.app:not(.hidden)>.side .kitchSideLogo{max-width:150px!important;max-height:56px!important;object-fit:contain!important}
+#app.app:not(.hidden)>.side .nav{background:transparent!important;border:0!important;padding:8px 1px!important;gap:3px!important}
+#app.app:not(.hidden)>.side .nav button,#app.app:not(.hidden)>.side .nav a,#app.app:not(.hidden)>.side .sideUtility button{background:transparent!important;color:#55565f!important;border:0!important;border-radius:12px!important;box-shadow:none!important;font-weight:550!important;letter-spacing:0!important;min-height:39px!important;transition:background .15s}
+#app.app:not(.hidden)>.side .nav button:hover,#app.app:not(.hidden)>.side .nav a:hover,#app.app:not(.hidden)>.side .sideUtility button:hover{background:white!important;color:#1d1d24!important}
+#app.app:not(.hidden)>.side .nav button.active,#app.app:not(.hidden)>.side .nav .active{background:white!important;color:#16171c!important;border-left:3px solid #26272c!important;box-shadow:0 4px 14px #25253209!important}
+#app.app:not(.hidden)>.side .user{color:#25252c!important;border-color:#e2e2e8!important;background:#ffffff80!important;border-radius:14px!important}
+#app.app:not(.hidden)>.side .user small{color:#85858e!important}
+#app.app:not(.hidden)>.main{background:transparent!important;color:#26262d!important;padding:18px 18px 50px!important;overflow-x:hidden!important}
+#app.app:not(.hidden)>.main .top{background:#ffffffa0!important;backdrop-filter:blur(8px);border:1px solid #ffffffc7!important;border-radius:20px!important;padding:20px 24px!important;margin:0 0 18px!important;box-shadow:0 8px 22px #3c3c4b0a!important}
+#app.app:not(.hidden)>.main .top h1{font-size:clamp(23px,2.3vw,31px)!important;letter-spacing:-.045em!important;font-weight:700!important;color:#22232b!important}
+#app.app:not(.hidden)>.main .top .sub{color:#8a8a94!important;letter-spacing:.11em!important;font-size:10px!important}
+#app.app:not(.hidden)>.main .card,#app.app:not(.hidden)>.main .commandCenter,#app.app:not(.hidden)>.main .dashboardPeriod,#app.app:not(.hidden)>.main .panel,#app.app:not(.hidden)>.main .surface{border:1px solid #fff!important;background:#ffffffcf!important;box-shadow:0 10px 26px #1d1d320b!important;border-radius:20px!important;color:#25262e!important;backdrop-filter:blur(8px)}
+#app.app:not(.hidden)>.main button,#app.app:not(.hidden)>.main select,#app.app:not(.hidden)>.main input{border-radius:11px!important}
+#app.app:not(.hidden)>.main button.primary,#app.app:not(.hidden)>.main .primary,#app.app:not(.hidden)>.main .btn.primary{background:#25262d!important;border-color:#25262d!important;color:white!important}
+#app.app:not(.hidden)>.main :is(.card,.commandCenter,.panel,.surface) h2{color:#292a31!important;letter-spacing:-.025em!important}
+#app.app:not(.hidden)>.main th{background:#f5f5f8!important;color:#767780!important}
+#app.app:not(.hidden)>.main .orange,#app.app:not(.hidden)>.main .accent{color:#26272c!important}
+#app.app:not(.hidden)>.main #content .commandCenter img:not(.kitchSideLogo),#app.app:not(.hidden)>.main #content .dashboardCard img:not(.kitchSideLogo){display:none!important}
+@media(max-width:850px){body #app.app:not(.hidden){padding:0!important;display:block!important}#app.app:not(.hidden)>.main{padding:78px 14px 34px!important}#app.app:not(.hidden)>.main .top{padding:17px 18px!important}#app.app:not(.hidden)>.side{border-radius:22px 0 0 22px!important}#app.app:not(.hidden) #appMobileMenu{background:#25262d!important;color:white!important;border-radius:12px!important}}
