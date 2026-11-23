@@ -1,0 +1,41 @@
+name: KITCH staff branch inventory fix
+on:
+  push:
+    branches: [recipe-yield-test]
+    paths:
+      - .github/workflows/kitch-staff-inventory-branch-fix.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: recipe-yield-test
+      - name: Align staff inventory with verified assigned branch
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          src=p.read_text(encoding='utf-8')
+          edits=[
+            ("if(restaurantBranch){\n   cloud.branch_id=restaurantBranch.id;",
+             "if(restaurantBranch && !teamCloudAuth?.staff_name){\n   cloud.branch_id=restaurantBranch.id;"),
+            ("if(!error&&(String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id)||String(teamSnapshot?.branch_id)!==String(cloud.branch_id)))error={message:'Inventory location does not match login'};",
+             "if(!error&&String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id))error={message:'Inventory workspace does not match login'};\n  if(!error&&teamSnapshot?.branch_id){\n   // The PIN-verified server response is authoritative for a staff member's inventory location.\n   cloud.branch_id=teamSnapshot.branch_id;\n   if(currentStaff){currentStaff.location_id=teamSnapshot.branch_id;}\n  }")
+          ]
+          for before,after in edits:
+              if src.count(before)!=1: raise SystemExit('Safety check failed: '+before[:65])
+              src=src.replace(before,after,1)
+          p.write_text(src,encoding='utf-8')
+          print('Scoped stock to server-verified staff assignment.')
+          PY
+      - name: Commit only inventory branch changes
+        run: |
+          git config user.name "KITCH Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --check
+          git diff --cached --quiet || git commit -m "Keep staff inventory scoped to verified assigned location"
+          git push
