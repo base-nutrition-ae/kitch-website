@@ -2263,7 +2263,7 @@ async function syncPackageFromCloud(){
   const hasStore=rows.some(b=>String(b.branch_type||'').toLowerCase()==='central_store');
   const restaurantBranch=rows.find(b=>String(b.branch_type||'').toLowerCase()!=='central_store')||rows[0]||null;
   localStorage.setItem(PACKAGE_KEY,hasStore?'multi':'restaurant');
-  if(restaurantBranch){
+  if(restaurantBranch && !teamCloudAuth?.staff_name){
    cloud.branch_id=restaurantBranch.id;
    localStorage.setItem('kitch_cloud_branch_name',restaurantBranch.name||'Main Restaurant');
    if(cloud.user?.id){
@@ -2286,7 +2286,12 @@ async function cloudLoadIngredients(){
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
   const response=await sb.rpc('kitch_team_inventory_read',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
   error=response.error;teamSnapshot=response.data;
-  if(!error&&(String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id)||String(teamSnapshot?.branch_id)!==String(cloud.branch_id)))error={message:'Inventory location does not match login'};
+  if(!error&&String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id))error={message:'Inventory workspace does not match login'};
+  if(!error&&teamSnapshot?.branch_id){
+   // The PIN-verified server response is authoritative for a staff member's inventory location.
+   cloud.branch_id=teamSnapshot.branch_id;
+   if(currentStaff){currentStaff.location_id=teamSnapshot.branch_id;}
+  }
   if(!error&&!Array.isArray(teamSnapshot?.ingredients))error={message:'Staff catalog response is unavailable'};
   data=teamSnapshot?.ingredients;
  }else{
