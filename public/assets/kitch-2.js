@@ -8,6 +8,7 @@ function prepareKitchOffice(){
  });return kitchOfficeDecodePromise;
 }
 function openKitchMainOffice(){
+ try{sessionStorage.setItem('kitch_last_view','office')}catch(e){}
  const box=document.getElementById('kitchOfficeOverlay'),frame=document.getElementById('kitchOfficeFrame');
  box.classList.add('open');document.body.style.overflow='hidden';
  if(frame.dataset.initialized==='yes')return;
@@ -47,7 +48,7 @@ function openKitchMainOffice(){
   document.getElementById('kitchOfficeLoading').textContent='Unable to load Main Office. Please refresh and try again.';
  });
 }
-function closeKitchMainOffice(){document.getElementById('kitchOfficeOverlay').classList.remove('open');document.body.style.overflow='';document.getElementById('login')?.classList.remove('hidden')}
+function closeKitchMainOffice(){try{sessionStorage.setItem('kitch_last_view','kitchen')}catch(e){}document.getElementById('kitchOfficeOverlay').classList.remove('open');document.body.style.overflow='';document.getElementById('login')?.classList.remove('hidden')}
 window.addEventListener('message',function(event){
   const frame=document.getElementById('kitchOfficeFrame');
   if(!frame||event.source!==frame.contentWindow||event.data?.type!=='KITCH_OFFICE_SIGNED_OUT')return;
