@@ -61,3 +61,15 @@
 #officeApp .header{padding:15px!important;min-height:62px!important;margin-bottom:10px!important}
 #officeApp .header .profile{display:none!important}
 }
+
+
+/* Brand alignment — the KITCH wordmark never uses a letter tile. */
+#officeApp .officeSidebarBrand{justify-content:flex-start!important;gap:0!important}
+#officeApp .officeSidebarBrand .officeBrandMark{display:none!important}
+#officeApp .officeSidebarBrand .officeWordmark{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:4px!important}
+#officeApp .officeSidebarBrand .officeWordmark strong{font-size:23px!important;line-height:1!important;font-weight:850!important;letter-spacing:-.065em!important;color:#24252c!important}
+#officeApp .officeSidebarBrand .officeWordmark small{font-size:9px!important;letter-spacing:.15em!important;font-weight:750!important;color:#999aa5!important}
+#app.app:not(.hidden)>.side .sideLogoWrap{justify-content:flex-start!important}
+#app.app:not(.hidden)>.side .sideLogoWrap .kitchSideLogo{display:none!important}
+#app.app:not(.hidden)>.side .sideLogoWrap .kitchNavBrand{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:4px!important;font-size:23px!important;line-height:1!important;letter-spacing:-.065em!important;font-weight:850!important;color:#24252c!important}
+#app.app:not(.hidden)>.side .sideLogoWrap .kitchNavBrand small{display:block!important;margin:0!important;font-size:9px!important;line-height:1.1!important;letter-spacing:.15em!important;font-weight:750!important;color:#999aa5!important}
