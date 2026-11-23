@@ -86,5 +86,21 @@ if(!page.includes('<button class="solid" onclick="openPublicSignIn()">Sign In</b
 if(page.includes('class="kitchHeroAccess"')) throw new Error('Oversized public hero CTAs must remain removed');
 console.log('PASS: Desktop Sign In preserved; mobile Sign In remains only inside drawer.');
 
+
+const desktopStyle=fs.readFileSync('design/mobile-unified.css','utf8');
+const officeNav=fs.readFileSync('office-source.html','utf8');
+const officeScript=fs.readFileSync('public/assets/kitch-2.js','utf8');
+const accessChecks=[
+ ['right-aligned desktop navigation',desktopStyle.includes('Desktop public navigation: actions stay flush to right')],
+ ['owner page stored',app.includes('function kitchRememberOwnerPage')],
+ ['owner page restored',app.includes('const lastPage=kitchLastOwnerPage()')],
+ ['owner verified on restoration',app.includes("const ownerAccess=await sb.from('kitch_office_owners')")],
+ ['main office view remembered',officeScript.includes("sessionStorage.setItem('kitch_last_view','office')")],
+ ['main office section remembered',officeNav.includes("sessionStorage.setItem('kitch_office_last_section'")],
+ ['owner logout clears view',app.includes("sessionStorage.removeItem('kitch_last_view')")]
+];
+for(const [label,ok] of accessChecks)if(!ok)throw new Error('Missing KITCH desktop/session behavior: '+label);
+console.log('PASS: Desktop navigation and authenticated owner refresh-page restoration contracts.');
+
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} static asset references, and Main Office embed.`);
