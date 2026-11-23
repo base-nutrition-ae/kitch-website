@@ -246,6 +246,8 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
    const box=boot.firstElementChild;
    if(!box)return;
    const phase=String(window.__kitchOfficeStartupPhase||'connecting').replace(/[&<>"']/g,'');
+   const runtime=document.getElementById('kitchOfficeRuntime');
+   if(runtime&&!window.__kitchOfficeRuntimeStarted&&phase==='connecting')window.__kitchOfficeStartupPhase='Main Office runtime did not initialize';
    box.innerHTML='<strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>'+
      '<div style="font-size:15px;margin-bottom:8px">Main Office is taking longer than expected.</div>'+
      '<div style="font-size:12px;color:#777;margin-bottom:14px">Step: '+phase+'</div>'+
@@ -357,4 +359,4 @@ window.kitchOfficeLoadAuthLibrary=function(){
    document.head.appendChild(tag);
  });
 };
-</script><script src="/assets/kitch-office-runtime.js?v=20261123-office-startup-v1" id="kitchOfficeRuntime"></script></body></html>
+</script><script src="/assets/kitch-office-runtime.js?v=20261123-office-startup-v2" id="kitchOfficeRuntime" onerror="window.__kitchOfficeStartupPhase='office runtime download failed';document.getElementById('officeBoot')?.querySelector('strong')?.setAttribute('title','Runtime network error')"></script></body></html>
