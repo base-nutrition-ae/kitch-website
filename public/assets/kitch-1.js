@@ -527,16 +527,21 @@ async function logout(){toggleAppMobileMenu(false);window.__kitchTeamLiveStock=n
 function renderNav(){
  let items=[...roles[session].nav];
  if(!hasCentralStore()){
-   items=items.filter(x=>x!=='Stock Transfer'&&x!=='Stock Requests'&&x!=='Ready Products','Ready Products');
+   items=items.filter(x=>!['Stock Transfer','Stock Requests','Ready Products'].includes(x));
  }else{
+   // Navigation labels are unique; do not add modules already declared by the role.
    if(session==='manager'){
      items=items.filter(x=>x!=='Stock Transfer');
-     const i=Math.max(1,items.indexOf('Inventory')+1);items.splice(i,0,'Stock Requests','Ready Products');
+     const i=Math.max(1,items.indexOf('Inventory')+1);
+     if(!items.includes('Stock Requests'))items.splice(i,0,'Stock Requests');
    }
    if(session==='store'){
-     const i=items.indexOf('Receiving')+1;items.splice(i,0,'Stock Requests','Ready Products','Stock Transfer');
+     const i=Math.max(0,items.indexOf('Receiving')+1);
+     const extra=['Stock Requests','Stock Transfer'].filter(x=>!items.includes(x));
+     items.splice(i,0,...extra);
    }
  }
+ items=[...new Set(items)];
  const preferred=session==='store'?['Inventory','Ready Products','Receiving','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
  const mainItems=preferred.filter(x=>items.includes(x)).slice(0,4);
  for(const x of items){if(mainItems.length>=4)break;if(!mainItems.includes(x))mainItems.push(x)}
