@@ -3,8 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "check": "node scripts/check.mjs",
+    "check": "node scripts/check.mjs && npm run test:ready",
     "build": "node scripts/build.mjs",
-    "dev": "python3 -m http.server 8080 --directory public"
+    "dev": "python3 -m http.server 8080 --directory public",
+    "test:ready": "node tests/ready-products.test.mjs"
   }
 }
