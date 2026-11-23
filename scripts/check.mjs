@@ -119,6 +119,10 @@ const readyChecks=[
  ['No ingredient movement side effect',!readySQL.includes('insert into public.inventory_movements')]
 ];
 for(const [label,ok] of readyChecks)if(!ok)throw new Error('Missing KITCH Ready Products feature: '+label);
+if(!app.includes('items=[...new Set(items)]'))throw new Error('Workspace navigation must deduplicate items');
+if(!app.includes("items=items.filter(x=>!['Stock Transfer','Stock Requests','Ready Products'].includes(x))"))throw new Error('Pro-only navigation visibility check missing');
+if(!readySource.includes('disabled title="Cloud setup required"'))throw new Error('Unconfigured Ready Product requests must be blocked');
+console.log('PASS: Ready Products navigation unique and unconfigured requests disabled.');
 console.log('PASS: Ready Products catalog, requests, batch flow and isolated SQL migration staged.');
 
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
