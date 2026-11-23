@@ -10,6 +10,8 @@ let cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
 let teamCloudAuth=null;
 
 async function loadCloudWorkspace(){
+ // Never replace the PIN-verified Team workspace with a stale owner browser session.
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return true;
  const {data:{user},error:userError}=await sb.auth.getUser(); cloud.user=user||null;
  if(userError||!user){window.__kitchWorkspaceError=userError?.message||'No authenticated user';return false;}
 
@@ -520,6 +522,8 @@ async function teamLogin(){
   try{await Promise.race([syncTeamWorkspaceContext(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Workspace sync timed out')),8000))]);}
   catch(syncError){console.warn('Team workspace sync:',syncError);}
   const r=(role==='kitchen_manager'||role==='executive_chef')?'manager':((role==='store_manager'||role==='receiving_staff')?'store':'production');
+  // Reset to the verified staff login's workspace after any in-flight owner refresh.
+  cloud.restaurant_id=row.restaurant_id;cloud.branch_id=row.branch_id;
   await cloudLoadIngredients();
   await kitchLoadSyncedRecipes();
   enter(r);
@@ -4675,9 +4679,13 @@ async function completeStripeReturn(){
  }
 })();
 sb.auth.onAuthStateChange((event,authSession)=>{
+ // Team and owner sessions have different server-verified location scopes.
+ // Owner authentication refresh must never alter an active PIN staff session.
+ if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return;
  if(authSession?.user){
    cloud.user=authSession.user;
    setTimeout(async()=>{
+     if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return;
      const ok=await loadCloudWorkspace().catch(()=>false);
      if(ok){await syncPackageFromCloud();ensureStructure();await cloudLoadIngredients();if(session && !app.classList.contains('hidden')) openPage(document.getElementById('pageTitle')?.textContent?.trim()||'Dashboard');}
    },0);
