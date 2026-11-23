@@ -7,6 +7,7 @@
  const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:3});
  let catalog=[],requests=[],ready=false,loading=false,error='';
+ let markupPercent=50,priceLookup=Object.create(null);
  const maxImport=500;
  const units=['pcs','portion','pack','kg','g','ltr','ml'];
  const headings=['SKU','Product Name','Category','Unit','Pack Size','Unit Cost AED','Source','Shelf Life Days','Storage','Active'];
@@ -40,12 +41,26 @@
   if(problem)throw Error(problem.code==='PGRST202'?'Ready Products database update has not been installed. No stock was changed.':(problem.message||'Ready Products cloud request failed.'));
   return data;
  }
+
+ async function commerce(action,payload={}){
+  if(typeof sb==='undefined'||!sb)throw Error('Cloud authentication unavailable.');
+  const staff=typeof teamCloudAuth!=='undefined'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin;
+  const auth=typeof cloud!=='undefined'&&cloud?.user?.id;
+  if(!staff&&!auth)throw Error('Please sign in first.');
+  const {data,error:problem}=await sb.rpc('kitch_ready_commercial_action',{p_action:action,p_payload:payload,p_staff_name:staff?teamCloudAuth.staff_name:null,p_pin:staff?teamCloudAuth.pin:null});
+  if(problem)throw Error(problem.message||'Ready Products pricing could not load');
+  return data;
+ }
+ const money=n=>(n===null||n===undefined||!Number.isFinite(Number(n)))?'—':'AED '+Number(n).toLocaleString('en-AE',{minimumFractionDigits:2,maximumFractionDigits:2});
+
  async function refresh(showAlert=false){
   if(loading)return;
   loading=true;error='';
   try{
-   const result=await rpc('overview');
-   catalog=Array.isArray(result?.catalog)?result.catalog:[];
+   const [result,prices]=await Promise.all([rpc('overview'),commerce('overview')]);
+   markupPercent=Number(prices?.markup_percent??50);
+   priceLookup=Object.fromEntries((prices?.pricing||[]).map(x=>[x.sku,x]));
+   catalog=(Array.isArray(result?.catalog)?result.catalog:[]).map(x=>({...x,costPrice:priceLookup[x.sku]?.cost==null?null:Number(priceLookup[x.sku].cost),salePrice:priceLookup[x.sku]?.price==null?null:Number(priceLookup[x.sku].price)}));
    requests=Array.isArray(result?.requests)?result.requests:[];
    ready=true;
   }catch(e){error=e.message;ready=false;if(showAlert)alert(error)}
@@ -57,10 +72,10 @@
   const isManager=typeof session!=='undefined'&&session==='manager';
   const canManage=typeof session!=='undefined'&&['owner','store'].includes(session);
   const notices=!ready?'<div class="note"><b>Ready Products cloud setup required.</b> '+escapeHtml(error||'Checking access…')+' Existing ingredient requests remain available; finished-product transfers are disabled until this separate workflow is configured.</div>':'';
-  return '<div class="panel kitchReadyPage"><div class="kitchReadyHeading"><div><div class="sub">KITCH PRO · INTERNAL TRANSFERS</div><h2>Ready Products</h2><p class="muted">Ready products are created automatically from saved recipes. Available stock comes only from completed chef production.</p></div><div class="actions"><button class="btn" onclick="kitchReadyRefresh()">Refresh</button>'+(isManager?'<button class="btn black" onclick="kitchReadyNewRequest()" '+(!ready?'disabled title="Cloud setup required"':'')+'>+ Request Ready Products</button>':'')+'</div></div>'+notices+
+  return '<div class="panel kitchReadyPage"><div class="kitchReadyHeading"><div><div class="sub">KITCH PRO · INTERNAL TRANSFERS</div><h2>Ready Products</h2><p class="muted">Ready products are created automatically from saved recipes. Available stock comes only from completed chef production.</p></div><div class="actions"><button class="btn" onclick="kitchReadyRefresh()">Refresh</button>'+(session==='owner'?'<button class="btn black" onclick="kitchReadySetMarkup()">Pricing · +'+fmt(markupPercent)+'%</button>':'')+(isManager?'<button class="btn black" onclick="kitchReadyNewRequest()" '+(!ready?'disabled title="Cloud setup required"':'')+'>+ Request Ready Products</button>':'')+'</div></div>'+notices+
    '<div class="grid"><div class="card"><span>READY PRODUCTS</span><b>'+catalog.length+'</b></div><div class="card"><span>ACTIVE REQUESTS</span><b>'+requests.filter(x=>!['Received','Cancelled'].includes(x.status)).length+'</b></div><div class="card"><span>FLOW</span><b style="font-size:13px">Kitchen → Branch → Receipt</b></div></div>'+
-   '<h3 style="margin:22px 0 10px">Ready Products from Recipes</h3>'+table(catalog,['SKU','READY PRODUCT','UNIT','STORAGE','SHELF LIFE','UNIT COST'],x=>'<tr><td>'+escapeHtml(x.sku)+'</td><td><b>'+escapeHtml(x.name)+'</b><div class="muted">'+escapeHtml(x.category||'')+'</div></td><td>'+escapeHtml(x.unit)+'</td><td>'+escapeHtml(x.storage)+'</td><td>'+fmt(x.shelf_life_days)+' days</td><td>AED '+fmt(x.unit_cost)+'</td></tr>','No saved recipes with a valid kg or litre yield yet.')+
-   '<h3 style="margin:22px 0 10px">Branch Ready Product Requests</h3>'+table(requests,['REQUEST','BRANCH','PRODUCT','QTY','STATUS','ACTION'],x=>'<tr><td><b>#'+escapeHtml(x.id)+'</b></td><td>'+escapeHtml(x.branch_name||'—')+'</td><td>'+escapeHtml(x.product_name||x.sku)+'</td><td>'+fmt(x.qty)+' '+escapeHtml(x.unit)+'</td><td>'+escapeHtml(x.status)+'</td><td>'+actions(x,canManage,isManager)+'</td></tr>','No ready product requests yet.')+
+   '<h3 style="margin:22px 0 10px">Ready Products · Cost & Transfer Price <small class="muted">(+ '+fmt(markupPercent)+'% markup)</small></h3>'+table(catalog,['SKU','READY PRODUCT','UNIT','STORAGE','COST / UNIT','BRANCH PRICE / UNIT'],x=>'<tr><td>'+escapeHtml(x.sku)+'</td><td><b>'+escapeHtml(x.name)+'</b><div class="muted">'+escapeHtml(x.category||'')+'</div></td><td>'+escapeHtml(x.unit)+'</td><td>'+escapeHtml(x.storage)+'</td><td>'+money(x.costPrice)+'</td><td><b>'+money(x.salePrice)+'</b></td></tr>','No saved recipes with kg or litre yield.')+
+   '<h3 style="margin:22px 0 10px">Branch Ready Product Requests</h3>'+table(requests,['ORDER','BRANCH','PRODUCT','QTY','UNIT PRICE','LINE TOTAL','STATUS','ACTION'],x=>'<tr><td><b>#'+escapeHtml(x.id)+'</b>'+(x.group_ref?'<div class="muted">Group '+escapeHtml(String(x.group_ref).slice(0,8))+'</div>':'')+'</td><td>'+escapeHtml(x.branch_name||'—')+'</td><td>'+escapeHtml(x.product_name||x.sku)+'</td><td>'+fmt(x.qty)+' '+escapeHtml(x.unit)+'</td><td>'+money(x.unit_price_snapshot)+'</td><td>'+money(x.unit_price_snapshot==null?null:Number(x.qty)*Number(x.unit_price_snapshot))+'</td><td>'+escapeHtml(x.status)+'</td><td>'+actions(x,canManage,isManager)+'</td></tr>','No ready product requests yet.')+
    '<p class="muted" style="margin-top:14px">Finished goods require recorded batch, expiry and available Central Kitchen stock before dispatch. Branch stock increases only after receipt.</p></div>';
  }
  function actions(x,canManage,isManager){
