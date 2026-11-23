@@ -1,0 +1,30 @@
+name: KITCH test-branch quality gate
+on:
+  push:
+    branches:
+      - recipe-yield-test
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Install Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run structural checks and Ready Products tests
+        run: npm run check
+      - name: Build KITCH website
+        run: npm run build
+      - name: Confirm output exists
+        run: test -f public/index.html && test -f public/assets/kitch-ready-products.js
