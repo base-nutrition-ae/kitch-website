@@ -1,6 +1,15 @@
 import fs from 'node:fs';
 const dir='public/assets';
-const payload=Buffer.from(fs.readFileSync('office-source.html','utf8')).toString('base64');
+// Graphite-glass presentation layer. Do not alter app event handlers, data bindings, or auth.
+const officeTheme=fs.readFileSync('design/office-glass.css','utf8');
+const kitchenTheme=fs.readFileSync('design/kitch-glass.css','utf8');
+const officeHtml=fs.readFileSync('office-source.html','utf8').replace('</head>',`<style id="kitch-glass-office">${officeTheme}</style></head>`);
+const payload=Buffer.from(officeHtml).toString('base64');
+const indexPath='public/index.html';
+let page=fs.readFileSync(indexPath,'utf8');
+page=page.replace(/<style id="kitch-glass-kitchen">[\s\S]*?<\/style>/g,'');
+page=page.replace('</head>',`<style id="kitch-glass-kitchen">${kitchenTheme}</style></head>`);
+fs.writeFileSync(indexPath,page);
 const match=/const KITCH_OFFICE_EMBED\s*=\s*'[^']+'/;
 const files=fs.readdirSync(dir).filter(n=>n.endsWith('.js'));
 let found=0;
@@ -15,4 +24,4 @@ for (const name of files){
   }
 }
 if(found!==1) throw new Error(`Expected one Main Office embed, found ${found}`);
-console.log('PASS: Main Office source embedded into application.');
+console.log('PASS: Main Office source embedded and KITCH graphite-glass theme applied.');
