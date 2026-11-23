@@ -134,7 +134,7 @@ async function syncPackageFromCloud(){
   const hasStore=rows.some(b=>String(b.branch_type||'').toLowerCase()==='central_store');
   const restaurantBranch=rows.find(b=>String(b.branch_type||'').toLowerCase()!=='central_store')||rows[0]||null;
   localStorage.setItem(PACKAGE_KEY,hasStore?'multi':'restaurant');
-  if(restaurantBranch){
+  if(restaurantBranch&&!teamCloudAuth?.staff_name){
    cloud.branch_id=restaurantBranch.id;
    localStorage.setItem('kitch_cloud_branch_name',restaurantBranch.name||'Main Restaurant');
    if(cloud.user?.id){
@@ -157,7 +157,11 @@ async function cloudLoadIngredients(){
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin){
   const response=await sb.rpc('kitch_team_inventory_read',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
   error=response.error;teamSnapshot=response.data;
-  if(!error&&(String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id)||String(teamSnapshot?.branch_id)!==String(cloud.branch_id)))error={message:'Inventory location does not match login'};
+  if(!error&&String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id))error={message:'Inventory workspace does not match login'};
+  if(!error&&teamSnapshot?.branch_id){
+   // The PIN-verified inventory response is authoritative for a staff member's location.
+   cloud.branch_id=teamSnapshot.branch_id;
+  }
   if(!error&&!Array.isArray(teamSnapshot?.ingredients))error={message:'Staff catalog response is unavailable'};
   data=teamSnapshot?.ingredients;
  }else{
@@ -398,9 +402,9 @@ function contextStockCanonical(ing){
  return session==='store'?centralStockCanonical(ing):branchStockCanonical(ing);
 }
 const roles={
- owner:{name:'Main Office',label:'Owner / Main Office',nav:['Ready Products','Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
- manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Ready Products','Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
- store:{name:'Central Store Manager',label:'Central Store Manager',nav:['Ready Products','Inventory','Receiving','Expiry & Batches','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
+ owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Ready Products','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
+ manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Dashboard','Ready Products','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
+ store:{name:'Central Store Manager',label:'Central Store Manager',nav:['Inventory','Ready Products','Receiving','Expiry & Batches','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
  production:{name:'Production Staff',label:'Production Staff',nav:['Recipes','Production','Label']}
 };
 let session=null;
@@ -519,12 +523,12 @@ async function teamLogin(){
   await cloudLoadIngredients();
   await kitchLoadSyncedRecipes();
   enter(r);
-  openPage(roles[r].nav[0]);
+  openPage(roles[r].nav.includes('Dashboard')?'Dashboard':roles[r].nav[0]);
  }catch(e){console.error('KITCH team login error',e);say('Unable to sign in: '+(e?.message||String(e)));}
  finally{if(button){button.disabled=false;button.textContent='Team sign in';}}
 }
 function enter(r){closePublicModal();session=r;login.classList.add('hidden');document.getElementById('publicLanding')?.classList.add('hidden');app.classList.remove('hidden');userName.textContent=currentStaff?.name||roles[r].name;userRole.textContent=(currentStaff?`${currentStaff.role} · ${currentStaff.location_name||locationName(currentStaff.location_id)}`:roles[r].label);userScope.textContent=currentStaff?.workspace_name||cloud.workspace_code||primaryRestaurantName();renderNav();const firstSetup=r==='manager'&&!window.__kitchInventoryLoadError&&ingredients().length===0;
-openPage(firstSetup?'Inventory':roles[r].nav[0]);
+openPage('Dashboard' in Object.fromEntries(roles[r].nav.map(x=>[x,true]))?'Dashboard':roles[r].nav[0]);
 if(firstSetup)setTimeout(()=>{if(session==='manager'&&ingredients().length===0&&!document.getElementById('excelFile'))openImport()},180)}
 async function logout(){toggleAppMobileMenu(false);window.__kitchTeamLiveStock=null;try{sessionStorage.removeItem('kitch_last_view');if(cloud.user?.id)sessionStorage.removeItem('kitch_owner_page_'+cloud.user.id)}catch(e){}session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
 function renderNav(){
