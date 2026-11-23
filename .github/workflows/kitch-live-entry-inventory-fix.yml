@@ -1,0 +1,56 @@
+name: Fix KITCH live dashboard and staff inventory
+on:
+  push:
+    branches: [recipe-yield-test]
+    paths:
+      - .github/workflows/kitch-live-entry-inventory-fix.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: recipe-yield-test
+      - name: Apply guarded changes to actual published source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/assets/kitch-1.js')
+          src=p.read_text(encoding='utf-8')
+          edits=[
+            ("if(restaurantBranch){\n   cloud.branch_id=restaurantBranch.id;",
+             "if(restaurantBranch&&!teamCloudAuth?.staff_name){\n   cloud.branch_id=restaurantBranch.id;"),
+            ("if(!error&&(String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id)||String(teamSnapshot?.branch_id)!==String(cloud.branch_id)))error={message:'Inventory location does not match login'};",
+             "if(!error&&String(teamSnapshot?.restaurant_id)!==String(cloud.restaurant_id))error={message:'Inventory workspace does not match login'};\n  if(!error&&teamSnapshot?.branch_id){\n   // The PIN-verified inventory response is authoritative for a staff member's location.\n   cloud.branch_id=teamSnapshot.branch_id;\n  }"),
+            ("nav:['Ready Products','Dashboard','Suppliers & Purchasing'",
+             "nav:['Dashboard','Ready Products','Suppliers & Purchasing'"),
+            ("nav:['Ready Products','Inventory','Receiving'",
+             "nav:['Inventory','Ready Products','Receiving'"),
+            ("openPage(firstSetup?'Inventory':roles[r].nav[0]);",
+             "openPage('Dashboard' in Object.fromEntries(roles[r].nav.map(x=>[x,true]))?'Dashboard':roles[r].nav[0]);"),
+            ("  openPage(roles[r].nav[0]);\n }catch(e){console.error('KITCH team login error'",
+             "  openPage(roles[r].nav.includes('Dashboard')?'Dashboard':roles[r].nav[0]);\n }catch(e){console.error('KITCH team login error'")
+          ]
+          for before,after in edits:
+              hits=src.count(before)
+              expected=2 if before=="nav:['Ready Products','Dashboard','Suppliers & Purchasing'" else 1
+              if hits!=expected: raise SystemExit(f'Safety check failed: expected {expected}, got {hits}: {before[:60]}')
+              src=src.replace(before,after)
+          p.write_text(src,encoding='utf-8')
+          print('Corrected live kitchen script: dashboard-first login and server-verified stock location')
+          PY
+      - name: Verify source and syntax
+        run: |
+          node --check public/assets/kitch-1.js
+          npm run check
+          npm run build
+      - name: Commit changed kitchen script
+        run: |
+          git config user.name "KITCH Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/kitch-1.js
+          git diff --cached --check
+          git diff --cached --quiet || git commit -m "Fix published kitchen dashboard landing and staff inventory location"
+          git push
