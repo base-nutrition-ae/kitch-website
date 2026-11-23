@@ -541,7 +541,12 @@ async function start(){
     window.__kitchOfficeStartupPhase='loading authentication';
     await window.kitchOfficeLoadAuthLibrary();
     if(!window.supabase?.createClient)throw new Error('Authentication library unavailable. Please retry.');
-    db=window.supabase.createClient(URL,KEY);db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
+    try{
+      const parentClient=window.parent!==window?window.parent.__kitchSharedSupabaseClient:null;
+      db=parentClient?.auth?.getSession?parentClient:null;
+    }catch(e){db=null;}
+    if(!db)db=window.supabase.createClient(URL,KEY);
+    db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
     window.__kitchOfficeStartupPhase='checking saved session';
     const {data:{session},error}=await Promise.race([
       db.auth.getSession(),
