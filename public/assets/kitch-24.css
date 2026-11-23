@@ -1168,3 +1168,11 @@ html body #app.app:not(.hidden)>.main #content :is(button.primary,.btn.primary,b
 @media(max-width:1220px) and (min-width:851px){html body #app.app:not(.hidden)>.main #content .k26-metrics{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
 @media(max-width:850px){html body #app.app:not(.hidden)>.main #content .k26-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important}html body #app.app:not(.hidden)>.main #content .k26-body{grid-template-columns:1fr!important}html body #app.app:not(.hidden)>.side #nav.nav button.active{background:#25262e!important;color:#fff!important}}
 @media(max-width:470px){html body #app.app:not(.hidden)>.main #content .k26-metrics{grid-template-columns:1fr!important}}
+
+
+/* KITCH_SINGLE_DASHBOARD_HEADER: no duplicate dashboard title row. */
+@media(min-width:851px){
+html body #app.app:not(.hidden):has(.kitch2026-dashboard)>.main>.top{display:none!important}
+html body #app.app:not(.hidden):has(.kitch2026-dashboard)>.main #content .k26-heading{min-height:79px!important;margin:0 0 13px!important;padding:11px 4px!important}
+html body #app.app:not(.hidden):has(.kitch2026-dashboard)>.main #content .k26-heading h2{font-size:27px!important;font-weight:800!important;letter-spacing:-.055em!important;margin:4px 0!important}
+}
