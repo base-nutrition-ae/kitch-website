@@ -1,0 +1,30 @@
+/* KITCH graphite-glass theme for Main Office */
+:root{--bg:#e8e8ee!important;--panel:#fff!important;--ink:#26262e!important;--muted:#7c7d87!important;--orange:#26272d!important;--line:#e9e9ef!important}
+body{background:radial-gradient(ellipse at 80% 0%,#fafafd,#e9e9ef 58%,#dddde5)!important;color:#272831!important;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif!important}
+#officeApp.frame{max-width:none!important;padding:20px!important;margin:0 auto!important;min-height:100vh!important}
+#officeApp .app{position:relative!important;display:block!important;max-width:none!important;width:100%!important;min-height:calc(100vh - 40px)!important;background:transparent!important;box-shadow:none!important;border-radius:0!important;overflow:visible!important;padding-left:252px!important}
+#officeApp .content{padding:18px 18px 38px!important;min-width:0!important}
+#officeApp .header{display:flex!important;align-items:center!important;justify-content:space-between!important;grid-template-columns:none!important;gap:12px!important;border:1px solid #ffffffdf!important;background:#ffffffbf!important;box-shadow:0 9px 28px #2a293309!important;border-radius:20px!important;padding:20px 24px!important;min-height:82px!important;margin-bottom:18px!important;position:relative!important}
+#officeApp .header>strong{font-size:20px!important;font-weight:800!important;color:#25262d!important;letter-spacing:-.05em!important}
+#officeApp .header .profile{display:flex!important;align-items:center!important;gap:8px!important;color:#4b4b55!important}
+#officeApp .header .avatar{background:#efeff4!important;color:#26272d!important}
+#officeApp .header .topnav{position:absolute!important;top:0!important;left:-252px!important;width:234px!important;height:calc(100vh - 40px)!important;max-width:234px!important;min-width:234px!important;display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;justify-content:flex-start!important;align-items:stretch!important;gap:7px!important;margin:0!important;padding:105px 12px 20px!important;border:1px solid #fff!important;border-radius:24px!important;background:#ffffffc4!important;box-shadow:0 12px 29px #2525350c!important;overflow-y:auto!important;overflow-x:hidden!important;backdrop-filter:blur(16px);z-index:2!important}
+#officeApp .header .topnav::before{content:'MAIN MENU';font-size:10px;letter-spacing:.14em;color:#9899a3;position:absolute;top:76px;left:23px;font-weight:700}
+#officeApp .header .topnav button{width:100%!important;flex:0 0 auto!important;min-width:0!important;min-height:43px!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;white-space:normal!important;text-align:left!important;border-radius:12px!important;border:0!important;font-size:13px!important;font-weight:600!important;padding:12px 15px!important;background:transparent!important;color:#5b5c67!important;box-shadow:none!important;letter-spacing:0!important}
+#officeApp .header .topnav button:hover{background:#fff!important;color:#25252c!important}
+#officeApp .header .topnav button.active{background:#fff!important;border-left:3px solid #26272d!important;color:#1c1d23!important;box-shadow:0 4px 16px #33334310!important}
+#officeApp .hero{margin:0 0 17px!important;padding:4px 4px 0!important}
+#officeApp .hero h1{font-size:clamp(25px,2.3vw,33px)!important;font-weight:700!important;color:#24252d!important;letter-spacing:-.045em!important}
+#officeApp .hero p{color:#898a94!important}
+#officeApp .card,#officeApp .overview-kpis .card,#officeApp .overview-panels .card,#officeApp .overview-bottom .card,#officeApp .note{border:1px solid #fff!important;border-radius:19px!important;background:#ffffffce!important;box-shadow:0 9px 26px #22223c0a!important;color:#292a32!important;backdrop-filter:blur(7px)}
+#officeApp .note{color:#73747f!important;line-height:1.5!important}
+#officeApp .card .number{color:#25262d!important;font-weight:750!important}
+#officeApp .tag,#officeApp .ghost{background:#ffffffd6!important;border:1px solid #eaeaf0!important;color:#666773!important}
+#officeApp button:focus-visible{outline:2px solid #34353f!important;outline-offset:2px!important}
+#officeApp :is(.btn,button.primary,button[type=submit]){background:#25262d!important;color:#fff!important;border-radius:11px!important}
+#officeApp input,#officeApp select{border-color:#e5e5eb!important;border-radius:11px!important}
+#officeApp th{background:#f5f5f8!important;color:#777882!important}
+#officeApp .bar,#officeApp .dot{background:#25262d!important}
+#officeApp .card.featured{background:#282931!important;color:#fff!important}
+@media(max-width:780px){#officeApp.frame{padding:10px!important}#officeApp .app{padding-left:0!important;min-height:100vh!important}#officeApp .content{padding:0 4px 20px!important}#officeApp .header{display:flex!important;flex-direction:column!important;align-items:flex-start!important;padding:16px!important;gap:12px!important}#officeApp .header .topnav{position:static!important;min-width:0!important;max-width:100%!important;width:100%!important;height:auto!important;min-height:0!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;gap:5px!important;padding:7px!important;border-radius:14px!important;background:#f6f6f9!important;box-shadow:none!important}#officeApp .header .topnav::before{display:none!important}#officeApp .header .topnav button{flex:0 0 auto!important;width:auto!important;white-space:nowrap!important;min-height:38px!important;padding:9px 12px!important;font-size:12px!important}#officeApp .header .profile{align-self:flex-end!important}#officeApp .hero{margin:18px 0 16px!important}#officeApp .overview-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:500px){#officeApp .overview-kpis{grid-template-columns:1fr!important}#officeApp .hero{flex-wrap:wrap!important}#officeApp .header .profile{display:none!important}}
