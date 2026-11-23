@@ -1,3 +1,4 @@
+window.__kitchOfficeRuntimeStarted=true;
 
 // KITCH Main Office: authenticated, owner-scoped read access. No service role keys in browser.
 (function(){
