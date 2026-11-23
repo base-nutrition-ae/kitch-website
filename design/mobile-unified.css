@@ -115,3 +115,22 @@
  #login .heroCopy h1{font-size:clamp(36px,9.7vw,44px)!important}
  #login .heroCopy p{font-size:14px!important}
 }
+
+
+/* Compact mobile access — no large homepage CTA section */
+#login .kitchHeroAccess{display:none!important}
+#login .kitchMobileTopActions{display:flex;align-items:center;gap:9px;margin-left:auto}
+#login .kitchMobileTopSignIn{display:none;background:#fff!important;color:#16171c!important;border:1px solid #fff!important;border-radius:999px!important;padding:9px 15px!important;min-height:42px!important;white-space:nowrap!important;font-size:13px!important;font-weight:750!important;line-height:1!important;cursor:pointer}
+@media(max-width:850px){
+ #login .publicTop{display:flex!important;justify-content:space-between!important;align-items:flex-start!important;gap:8px!important}
+ #login .publicBrand{min-width:0!important;flex:1 1 auto!important}
+ #login .kitchMobileTopActions{display:flex!important;flex:0 0 auto!important;gap:8px!important;align-items:center!important;z-index:10!important}
+ #login .kitchMobileTopSignIn{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:42px!important;padding:10px 16px!important}
+ #login .kitchMobileTopActions .mobileMenuBtn{display:flex!important;flex:0 0 44px!important;width:44px!important;height:44px!important;min-height:44px!important}
+ #login .heroCopy{padding-bottom:90px!important}
+}
+@media(max-width:390px){
+ #login .kitchMobileTopActions{gap:6px!important}
+ #login .kitchMobileTopSignIn{font-size:12px!important;padding:10px 12px!important}
+ #login .kitchMobileTopActions .mobileMenuBtn{width:40px!important;height:40px!important;flex-basis:40px!important}
+}
