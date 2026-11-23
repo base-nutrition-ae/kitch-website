@@ -1,0 +1,49 @@
+name: Guard KITCH staff workspace from owner auth refresh
+on:
+  push:
+    branches: [recipe-yield-test]
+    paths:
+      - .github/workflows/kitch-staff-workspace-guard.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: recipe-yield-test
+      - name: Apply minimal guarded session fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/assets/kitch-1.js')
+          s=p.read_text(encoding='utf-8')
+          fixes=[
+            ("async function loadCloudWorkspace(){\n const {data:{user},error:userError}=await sb.auth.getUser();",
+             "async function loadCloudWorkspace(){\n // Never replace the PIN-verified Team workspace with a stale owner browser session.\n if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return true;\n const {data:{user},error:userError}=await sb.auth.getUser();"),
+            ("sb.auth.onAuthStateChange((event,authSession)=>{\n if(authSession?.user){",
+             "sb.auth.onAuthStateChange((event,authSession)=>{\n // Team and owner sessions have different server-verified location scopes.\n // Owner authentication refresh must never alter an active PIN staff session.\n if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return;\n if(authSession?.user){"),
+            ("   setTimeout(async()=>{\n     const ok=await loadCloudWorkspace().catch(()=>false);",
+             "   setTimeout(async()=>{\n     if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return;\n     const ok=await loadCloudWorkspace().catch(()=>false);"),
+            ("  const r=(role==='kitchen_manager'||role==='executive_chef')?'manager':((role==='store_manager'||role==='receiving_staff')?'store':'production');\n  await cloudLoadIngredients();",
+             "  const r=(role==='kitchen_manager'||role==='executive_chef')?'manager':((role==='store_manager'||role==='receiving_staff')?'store':'production');\n  // Reset to the verified staff login's workspace after any in-flight owner refresh.\n  cloud.restaurant_id=row.restaurant_id;cloud.branch_id=row.branch_id;\n  await cloudLoadIngredients();")
+          ]
+          for old,new in fixes:
+              if s.count(old)!=1:raise SystemExit('Safety check failed: '+old[:70])
+              s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Verify and build
+        run: |
+          node --check public/assets/kitch-1.js
+          npm run check
+          npm run build
+      - name: Commit published source only
+        run: |
+          git config user.name "KITCH Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/kitch-1.js
+          git diff --cached --check
+          git diff --cached --quiet || git commit -m "Prevent owner auth refresh from overwriting staff workspace"
+          git push
