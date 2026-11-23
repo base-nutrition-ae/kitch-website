@@ -151,3 +151,24 @@
  #login.publicLanding .publicTop .publicLinks :is(button,a){flex:0 0 auto!important;white-space:nowrap!important}
  #login.publicLanding .publicTop .kitchMobileTopActions{display:none!important}
 }
+
+
+/* KITCH Pro Ready Products: same black-and-white system as Main Office. */
+.kitchReadyPage .kitchReadyHeading{display:flex;align-items:flex-start;justify-content:space-between;gap:15px;flex-wrap:wrap;margin-bottom:18px}
+.kitchReadyPage .kitchReadyHeading h2{font-size:25px!important;letter-spacing:-.045em!important;font-weight:800!important;margin:4px 0!important}
+.kitchReadyPage .kitchReadyHeading .actions{display:flex;gap:8px;flex-wrap:wrap}
+.kitchReadyPage .kitchReadyHeading .btn{border-radius:11px!important;min-height:38px!important}
+.kitchReadyPage .kitchReadyScroll{width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;border-radius:13px}
+.kitchReadyPage .kitchReadyScroll table{min-width:680px;width:100%;border-collapse:collapse}
+.kitchReadyPage .kitchReadyScroll th{background:#f5f5f7!important;font-size:10px;color:#777984!important;white-space:nowrap}
+.kitchReadyPage .kitchReadyScroll td{padding:11px 10px;border-bottom:1px solid #e9e9ee}
+.kitchReadyPage .kitchReadyScroll .btn{background:#25262e;color:#fff;border-radius:10px;min-height:35px}
+.kitchReadyPage .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.kitchReadyPage .grid .card{min-width:0;background:#fff;border-radius:14px}
+@media(max-width:850px){
+ .kitchReadyPage{padding:14px!important}
+ .kitchReadyPage .kitchReadyHeading h2{font-size:23px!important}
+ .kitchReadyPage .kitchReadyHeading .actions{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ .kitchReadyPage .kitchReadyHeading .actions button{white-space:normal;min-height:42px}
+ .kitchReadyPage .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+}
