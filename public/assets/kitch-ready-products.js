@@ -7,7 +7,7 @@
  const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:3});
  let catalog=[],requests=[],ready=false,loading=false,error='';
- let markupPercent=50,priceLookup=Object.create(null);
+ let markupPercent=50,defaultMarkup=50,pricingBranches=[],priceLookup=Object.create(null);
  const maxImport=500;
  const units=['pcs','portion','pack','kg','g','ltr','ml'];
  const headings=['SKU','Product Name','Category','Unit','Pack Size','Unit Cost AED','Source','Shelf Life Days','Storage','Active'];
@@ -59,6 +59,8 @@
   try{
    const [result,prices]=await Promise.all([rpc('overview'),commerce('overview')]);
    markupPercent=Number(prices?.markup_percent??50);
+   defaultMarkup=Number(prices?.default_markup_percent??50);
+   pricingBranches=Array.isArray(prices?.branches)?prices.branches:[];
    priceLookup=Object.fromEntries((prices?.pricing||[]).map(x=>[x.sku,x]));
    catalog=(Array.isArray(result?.catalog)?result.catalog:[]).map(x=>({...x,costPrice:priceLookup[x.sku]?.cost==null?null:Number(priceLookup[x.sku].cost),salePrice:priceLookup[x.sku]?.price==null?null:Number(priceLookup[x.sku].price)}));
    requests=Array.isArray(result?.requests)?result.requests:[];
@@ -192,28 +194,39 @@
     alert('Ready Product request sent: '+result.count+' items · '+money(result.total)+'. Order '+String(result.group_ref).slice(0,8));
   }catch(e){alert('Request not saved: '+e.message);if(btn)btn.disabled=false}
  };
+
  window.kitchReadySetMarkup=()=>{
-  if(session!=='owner')return alert('Only Main Office owner can change markup.');
-  modal('<div class="modalHead"><h2>Ready Products Pricing</h2><button class="close" onclick="closeModal()">×</button></div>'+
-    '<p class="muted">Company-wide markup on recipe production cost. Saved requests keep their original prices.</p>'+
-    '<div class="field"><label>MARKUP ON COST (%)</label><input id="kitchReadyMarkupInput" type="number" min="0" max="500" step="0.1" value="'+markupPercent+'" oninput="kitchReadyPreviewMarkup()"></div>'+
-    '<div id="kitchReadyMarkupPreview" class="note"></div>'+
-    '<button class="primary" id="kitchReadyMarkupSave" onclick="kitchReadySaveMarkup()">Save Markup</button>');
+  if(session!=='owner')return alert('Only the company owner can change client markup.');
+  const choices='<option value="">Default markup (all clients without an override)</option>'+
+   pricingBranches.map(x=>'<option value="'+escapeHtml(x.id)+'">'+escapeHtml(x.name)+' ('+(x.markup_percent==null?'uses default':fmt(x.markup_percent)+'%')+')</option>').join('');
+  modal('<div class="modalHead"><h2>Ready Product Client Pricing</h2><button class="close" onclick="closeModal()">×</button></div>'+
+   '<p class="muted">Set a markup for a specific receiving restaurant, or change the default. Only the owner can edit prices.</p>'+
+   '<div class="field"><label>CLIENT / RESTAURANT</label><select id="kitchReadyPricingBranch" onchange="kitchReadyPricingBranchChanged()">'+choices+'</select></div>'+
+   '<div class="field"><label>MARKUP ON PRODUCTION COST (%)</label><input id="kitchReadyMarkupInput" type="number" min="0" max="500" step="0.1" value="'+defaultMarkup+'" oninput="kitchReadyPreviewMarkup()"></div>'+
+   '<div id="kitchReadyMarkupPreview" class="note"></div>'+
+   '<button class="primary" id="kitchReadyMarkupSave" onclick="kitchReadySaveMarkup()">Save Client Pricing</button>');
+  kitchReadyPreviewMarkup();
+ };
+ window.kitchReadyPricingBranchChanged=()=>{
+  const id=$('kitchReadyPricingBranch')?.value;
+  const branch=pricingBranches.find(x=>x.id===id);
+  if($('kitchReadyMarkupInput'))$('kitchReadyMarkupInput').value=branch?.markup_percent??defaultMarkup;
   kitchReadyPreviewMarkup();
  };
  window.kitchReadyPreviewMarkup=()=>{
   const pct=Number($('kitchReadyMarkupInput')?.value);
   const valid=Number.isFinite(pct)&&pct>=0&&pct<=500;
   const box=$('kitchReadyMarkupPreview');
-  if(box)box.textContent=valid?'Example: AED 7.00 cost + '+pct+'% = '+money(7*(1+pct/100)):'Enter markup between 0% and 500%.';
+  if(box)box.textContent=valid?'Example: AED 7.00 production cost + '+pct+'% markup = '+money(7*(1+pct/100)):'Enter markup between 0% and 500%.';
   const btn=$('kitchReadyMarkupSave');if(btn)btn.disabled=!valid;
  };
  window.kitchReadySaveMarkup=async()=>{
   if(session!=='owner')return alert('Owner only.');
   const percent=Number($('kitchReadyMarkupInput')?.value);
+  const branch_id=$('kitchReadyPricingBranch')?.value||null;
   if(!Number.isFinite(percent)||percent<0||percent>500)return alert('Invalid markup.');
   const btn=$('kitchReadyMarkupSave');if(btn)btn.disabled=true;
-  try{await commerce('set_markup',{percent});closeModal();await refresh(true)}
+  try{await commerce('set_markup',{percent,...(branch_id?{branch_id}:{})});closeModal();await refresh(true)}
   catch(e){alert('Markup not saved: '+e.message);if(btn)btn.disabled=false}
  };
 
