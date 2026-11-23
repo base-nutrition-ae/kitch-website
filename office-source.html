@@ -245,8 +245,10 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
    if(!boot)return;
    const box=boot.firstElementChild;
    if(!box)return;
+   const phase=String(window.__kitchOfficeStartupPhase||'connecting').replace(/[&<>"']/g,'');
    box.innerHTML='<strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>'+
-     '<div style="font-size:15px;margin-bottom:12px">Main Office is taking longer than expected.</div>'+
+     '<div style="font-size:15px;margin-bottom:8px">Main Office is taking longer than expected.</div>'+
+     '<div style="font-size:12px;color:#777;margin-bottom:14px">Step: '+phase+'</div>'+
      '<button type="button" id="officeBootRetry" style="background:#25262e;color:#fff;border:0;border-radius:10px;padding:11px 18px;font-weight:700;cursor:pointer">Retry connection</button>';
    document.getElementById('officeBootRetry')?.addEventListener('click',function(){location.reload()});
  },20000);
@@ -362,6 +364,21 @@ const URL='https://rtovpjgrezwxuvantxgt.supabase.co';
 const KEY='sb_publishable_ERMt86IhOTqRSRXE05CQ-A_JXi27ode';
 const el=id=>document.getElementById(id);
 const msg=el('officeAuthMessage');
+window.__kitchOfficeStartupPhase='initializing interface';
+window.addEventListener('error',function(e){
+  if(!document.getElementById('officeBoot'))return;
+  const issue=(e && e.message)||'A startup component failed';
+  window.__kitchOfficeStartupPhase='interface error: '+String(issue).slice(0,160);
+});
+/* Start auth independently of secondary UI handlers. A broken optional widget
+   must not prevent the owner login from initializing. */
+setTimeout(function(){
+  start().catch(function(e){
+    document.getElementById('officeBoot')?.remove();
+    setVisible(false);
+    say(e?.message||'Unable to start Main Office.');
+  });
+},0);
 let db=null;let officeRid=null,officeBranches=[],officeStaff=[];let officeRestaurantName='';
 function say(t){msg.textContent=t||'';}
 function setVisible(on){el('officeAuth').classList.toggle('officeHidden',on);el('officeApp').classList.toggle('officeHidden',!on);}
@@ -373,7 +390,13 @@ async function loadOwner(){
  const {data:members,error:me}=await db.from('kitch_office_owners').select('restaurant_id,role').eq('user_id',user.id).eq('is_active',true).limit(1);
  if(me){setVisible(false);say('Main Office database setup is required. Run the supplied SQL and assign your owner account. '+me.message);return;}
  if(!members?.length){setVisible(false);say('Your email is signed in but has not been assigned as a KITCH Main Office owner. Ask the administrator to link your account.');return;}
- const rid=members[0].restaurant_id;officeRid=rid; // Ingredient Master is always initialized for the owner, not only on a hash route.
+ const rid=members[0].restaurant_id;officeRid=rid;
+ // Owner access is confirmed; show the workspace immediately. KPI and inventory
+ // requests populate asynchronously and must not keep the full-screen boot visible.
+ window.__kitchOfficeStartupPhase='loading dashboard data';
+ setVisible(true);
+ document.getElementById('officeBoot')?.remove();
+ // Ingredient Master is always initialized for the owner, not only on a hash route.
  refreshIngredients().catch(err=>{const status=document.getElementById('officeIngredientStatus');if(status)status.textContent='Ingredient load failed: '+err.message;});
  const [r,b,staff,inventory,ings,recipes,receipts,production,purchaseRequests,purchaseOrders,purchaseOrderItems]=await Promise.all([
  db.from('restaurants').select('name,currency').eq('id',rid).single(),
@@ -511,9 +534,11 @@ el('officeStaffForm').onsubmit=async e=>{e.preventDefault();const id=el('staffRe
 async function start(){
   const boot=document.getElementById('officeBoot');
   try{
+    window.__kitchOfficeStartupPhase='loading authentication';
     await window.kitchOfficeLoadAuthLibrary();
     if(!window.supabase?.createClient)throw new Error('Authentication library unavailable. Please retry.');
     db=window.supabase.createClient(URL,KEY);db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
+    window.__kitchOfficeStartupPhase='checking saved session';
     const {data:{session},error}=await Promise.race([
       db.auth.getSession(),
       new Promise((_,reject)=>setTimeout(()=>reject(Error('Cloud session is slow. Please retry the connection.')),15000))
@@ -916,6 +941,6 @@ officePurchaseEl('officeSuppliers').addEventListener('click',e=>{
 const originalOfficeShowPage=showPage;
 showPage=function(page){originalOfficeShowPage(page);if(page==='purchasing'&&officeRid)officePurchaseLoad()};
 
-start().catch(e=>{document.getElementById('officeBoot')?.remove();say(e.message)});
+// Startup is scheduled near the beginning so unrelated widget errors cannot block sign-in.
 })();
 </script></body></html>
