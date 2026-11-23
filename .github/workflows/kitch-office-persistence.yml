@@ -1,0 +1,40 @@
+name: KITCH office session persistence
+on:
+  push:
+    branches: [recipe-yield-test]
+    paths:
+      - .github/workflows/kitch-office-persistence.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: recipe-yield-test
+      - name: Patch embedded office auth configuration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,base64
+          p=Path('index.html')
+          page=p.read_text()
+          m=re.search(r"const KITCH_OFFICE_EMBED='([^']+)'",page)
+          if not m: raise SystemExit('No embedded Main Office')
+          office=base64.b64decode(m.group(1)).decode()
+          before='db=window.supabase.createClient(URL,KEY);'
+          after="db=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,storage:window.localStorage}});"
+          if office.count(before)!=1: raise SystemExit('Unexpected auth initialization')
+          office=office.replace(before,after,1)
+          encoded=base64.b64encode(office.encode()).decode()
+          p.write_text(page[:m.start(1)]+encoded+page[m.end(1):])
+          PY
+      - name: Commit change
+        run: |
+          git config user.name "KITCH Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --check
+          git diff --cached --quiet || git commit -m "Persist Main Office authenticated session across refresh"
+          git push
