@@ -1,0 +1,37 @@
+name: Verify Ready Products pricing and publish fresh assets
+on:
+  push:
+    branches: [recipe-yield-test]
+    paths: [.github/workflows/kitch-ready-pricing-validation.yml]
+permissions:
+  contents: write
+jobs:
+  validate-and-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: recipe-yield-test
+      - name: Validate new multi-item and markup UI
+        run: |
+          node --check public/assets/kitch-ready-products.js
+          npm run check
+          npm run build
+      - name: Bump Ready Products cache version
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/index.html')
+          text=p.read_text(encoding='utf-8')
+          old='assets/kitch-ready-products.js?v=20261123-ready-v1'
+          new='assets/kitch-ready-products.js?v=20261123-multi-item-markup-v2'
+          if text.count(old)!=1:
+              raise SystemExit('Expected Ready Products script reference not found once')
+          p.write_text(text.replace(old,new),encoding='utf-8')
+          PY
+          git config user.name "KITCH Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          git diff --cached --check
+          git commit -m "Refresh Ready Products pricing and multi-item script cache"
+          git push
