@@ -139,16 +139,84 @@
   try{await rpc('batch',{sku,batch_no,produced_on,expiry_date,qty});closeModal();await refresh(true);alert('Finished-product batch recorded in Central Kitchen.')}
   catch(e){alert('Batch was not saved: '+e.message)}
  };
+
  window.kitchReadyNewRequest=()=>{
-  if(session!=='manager'||!ready||!catalog.some(x=>x.active))return alert('No active saved recipes available. Ask the kitchen to save a recipe with a kg or litre yield.');
-  modal('<div class="modalHead"><h2>Ready Product Request</h2><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>From:</b> Central Kitchen<br><b>To:</b> '+escapeHtml(currentBranchName())+'</div><div class="formGrid"><div class="field"><label>READY PRODUCT</label><select id="kitchReadySku" onchange="kitchReadyUnitChanged()">'+productOptions()+'</select></div><div class="field"><label>QUANTITY</label><input id="kitchReadyQty" type="number" min="0.001" max="100000" step=".001"></div><div class="field"><label>UNIT</label><input id="kitchReadyUnit" readonly></div></div><button class="primary" onclick="kitchReadySaveRequest()">Send Request</button>');window.kitchReadyUnitChanged();
+  if(session!=='manager'||!ready||!catalog.some(x=>x.active&&x.salePrice!=null))return alert('No price-ready recipes found. Check ingredient costs and recipe yields.');
+  modal('<div class="modalHead"><h2>Request Ready Products</h2><button class="close" onclick="closeModal()">×</button></div>'+
+   '<div class="note"><b>From:</b> Central Kitchen · <b>To:</b> '+escapeHtml(currentBranchName())+'<p class="muted">Select several items, order by kg or litre. Company markup: +'+fmt(markupPercent)+'%.</p></div>'+
+   '<div id="kitchReadyCartLines" style="display:grid;gap:10px;margin:16px 0"></div>'+
+   '<button class="btn" onclick="kitchReadyAddLine()">+ Add Item</button>'+
+   '<div id="kitchReadyCartTotal" class="note" style="margin:16px 0;font-size:16px;font-weight:750">Total AED 0.00</div>'+
+   '<button class="primary" id="kitchReadyCartSubmit" onclick="kitchReadySaveRequest()">Send Multi-Item Request</button>');
+  kitchReadyAddLine();
  };
- window.kitchReadyUnitChanged=()=>{const x=catalog.find(p=>p.sku===$('kitchReadySku')?.value);if($('kitchReadyUnit'))$('kitchReadyUnit').value=x?.unit||''};
+ window.kitchReadyAddLine=()=>{
+  const wrap=$('kitchReadyCartLines');if(!wrap)return;
+  if(wrap.children.length>=30)return alert('Maximum 30 items');
+  const opts=catalog.filter(x=>x.active&&x.salePrice!=null&&x.costPrice>0)
+   .map(x=>'<option value="'+escapeHtml(x.sku)+'">'+escapeHtml(x.name)+' · '+escapeHtml(x.unit)+'</option>').join('');
+  const line=document.createElement('div');
+  line.className='kitchReadyCartLine';
+  line.style.cssText='display:grid;grid-template-columns:minmax(0,2fr) minmax(110px,1fr) auto;gap:12px;padding:14px;border:1px solid #e5e5e8;border-radius:16px;background:#fafafa;align-items:end';
+  line.innerHTML='<div class="field" style="margin:0;min-width:0"><label>PREPARED ITEM</label><select class="readyCartSku" onchange="kitchReadyUpdateTotals()">'+opts+'</select></div>'+
+    '<div class="field" style="margin:0;min-width:0"><label>QUANTITY</label><input class="readyCartQty" type="number" step="0.001" min="0.001" placeholder="2.5" oninput="kitchReadyUpdateTotals()"></div>'+
+    '<button class="btn" aria-label="Remove item" onclick="this.closest(\'.kitchReadyCartLine\').remove();kitchReadyUpdateTotals()">Remove</button>'+
+    '<div class="readyCartPrice muted" style="grid-column:1/-1"></div>';
+  wrap.appendChild(line);kitchReadyUpdateTotals();
+ };
+ window.kitchReadyUpdateTotals=()=>{
+  const lines=[...document.querySelectorAll('#kitchReadyCartLines .kitchReadyCartLine')];
+  let total=0,valid=lines.length>0;const seen=new Set();
+  for(const line of lines){
+   const sku=line.querySelector('.readyCartSku')?.value;
+   const raw=line.querySelector('.readyCartQty')?.value;
+   const qty=Number(raw),item=catalog.find(x=>x.sku===sku);
+   const duplicate=seen.has(sku);seen.add(sku);
+   const ok=Boolean(item&&raw&&Number.isFinite(qty)&&qty>0&&qty<=100000&&item.salePrice!=null&&!duplicate);
+   if(!ok)valid=false;
+   const amount=ok?Number((item.salePrice*qty).toFixed(2)):0;total+=amount;
+   line.querySelector('.readyCartPrice').textContent=duplicate?'Select a different item; duplicates are not allowed.':(item?money(item.salePrice)+' / '+item.unit+' · Line total '+money(ok?amount:null):'Select a product');
+  }
+  const display=$('kitchReadyCartTotal');if(display)display.textContent='Order Total: '+money(total)+' · '+lines.length+' item(s)';
+  const btn=$('kitchReadyCartSubmit');if(btn)btn.disabled=!valid;
+ };
  window.kitchReadySaveRequest=async()=>{
-  const x=catalog.find(p=>p.sku===$('kitchReadySku')?.value),qty=Number($('kitchReadyQty')?.value);
-  if(!x||!Number.isFinite(qty)||qty<=0||qty>100000)return alert('Select a ready product and valid quantity.');
-  try{await rpc('create',{sku:x.sku,qty,unit:x.unit});closeModal();await refresh(true)}catch(e){alert(e.message)}
+  const lines=[...document.querySelectorAll('#kitchReadyCartLines .kitchReadyCartLine')];
+  const items=lines.map(line=>({sku:line.querySelector('.readyCartSku').value,qty:Number(line.querySelector('.readyCartQty').value)}));
+  if(!items.length||items.length>30||new Set(items.map(x=>x.sku)).size!==items.length||
+    items.some(x=>!Number.isFinite(x.qty)||x.qty<=0||x.qty>100000))return alert('Choose 1–30 different products and enter valid quantities.');
+  const btn=$('kitchReadyCartSubmit');if(btn)btn.disabled=true;
+  try{
+    const result=await commerce('create_many',{items});
+    closeModal();await refresh(true);
+    alert('Ready Product request sent: '+result.count+' items · '+money(result.total)+'. Order '+String(result.group_ref).slice(0,8));
+  }catch(e){alert('Request not saved: '+e.message);if(btn)btn.disabled=false}
  };
+ window.kitchReadySetMarkup=()=>{
+  if(session!=='owner')return alert('Only Main Office owner can change markup.');
+  modal('<div class="modalHead"><h2>Ready Products Pricing</h2><button class="close" onclick="closeModal()">×</button></div>'+
+    '<p class="muted">Company-wide markup on recipe production cost. Saved requests keep their original prices.</p>'+
+    '<div class="field"><label>MARKUP ON COST (%)</label><input id="kitchReadyMarkupInput" type="number" min="0" max="500" step="0.1" value="'+markupPercent+'" oninput="kitchReadyPreviewMarkup()"></div>'+
+    '<div id="kitchReadyMarkupPreview" class="note"></div>'+
+    '<button class="primary" id="kitchReadyMarkupSave" onclick="kitchReadySaveMarkup()">Save Markup</button>');
+  kitchReadyPreviewMarkup();
+ };
+ window.kitchReadyPreviewMarkup=()=>{
+  const pct=Number($('kitchReadyMarkupInput')?.value);
+  const valid=Number.isFinite(pct)&&pct>=0&&pct<=500;
+  const box=$('kitchReadyMarkupPreview');
+  if(box)box.textContent=valid?'Example: AED 7.00 cost + '+pct+'% = '+money(7*(1+pct/100)):'Enter markup between 0% and 500%.';
+  const btn=$('kitchReadyMarkupSave');if(btn)btn.disabled=!valid;
+ };
+ window.kitchReadySaveMarkup=async()=>{
+  if(session!=='owner')return alert('Owner only.');
+  const percent=Number($('kitchReadyMarkupInput')?.value);
+  if(!Number.isFinite(percent)||percent<0||percent>500)return alert('Invalid markup.');
+  const btn=$('kitchReadyMarkupSave');if(btn)btn.disabled=true;
+  try{await commerce('set_markup',{percent});closeModal();await refresh(true)}
+  catch(e){alert('Markup not saved: '+e.message);if(btn)btn.disabled=false}
+ };
+
  window.kitchReadyAdvance=async(id,action)=>{
   if(action!=='accept'||!confirm('Accept ready-product request #'+id+'?'))return;
   try{await rpc(action,{request_id:id});await refresh(true)}catch(e){alert(e.message)}
