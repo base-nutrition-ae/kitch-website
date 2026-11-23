@@ -80,10 +80,11 @@ for(const [label,passed] of mobileChecks)if(!passed)throw new Error('Missing KIT
 console.log('PASS: Mobile layout, navigation, responsive tables and logout contracts.');
 
 
-if(!page.includes('class="kitchMobileTopSignIn"')||!page.includes('onclick="openPublicSignIn()">Sign In</button>')) throw new Error('Compact mobile header Sign In missing');
-if(page.includes('class="kitchHeroAccess"')) throw new Error('Oversized public hero CTA section must stay removed');
-if(!mobileCss.includes('Compact mobile access')||!mobileCss.includes('#login .kitchMobileTopSignIn'))throw new Error('Compact mobile Sign In styling missing');
-console.log('PASS: Mobile access remains available from compact header without oversized CTAs.');
+if(page.includes('class="kitchMobileTopSignIn"')) throw new Error('Extra mobile top Sign In button must remain removed');
+if(!page.includes('class="mobileMenuBtn"')||!page.includes('toggleMobileMenu(false);openPublicSignIn()')) throw new Error('Mobile drawer Sign In missing');
+if(!page.includes('<button class="solid" onclick="openPublicSignIn()">Sign In</button>')) throw new Error('Desktop Sign In missing');
+if(page.includes('class="kitchHeroAccess"')) throw new Error('Oversized public hero CTAs must remain removed');
+console.log('PASS: Desktop Sign In preserved; mobile Sign In remains only inside drawer.');
 
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} static asset references, and Main Office embed.`);
