@@ -110,6 +110,12 @@ if(!officeNav.includes("window.kitchOfficeLoadAuthLibrary()"))throw new Error('M
 if(!officeNav.includes("Cloud session is slow. Please retry the connection."))throw new Error('Main Office session timeout recovery missing');
 if(officeNav.includes('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/dist/umd/supabase.min.js"></script>'))throw new Error('Blocking duplicate auth library script must remain removed');
 console.log('PASS: Main Office startup reuses parent auth, has fallback and does not block indefinitely.');
+if(!app.includes('window.__kitchSharedSupabaseClient=sb'))throw new Error('Main Kitchen must provide shared authenticated Supabase client');
+if(!officeNav.includes('window.parent.__kitchSharedSupabaseClient'))throw new Error('Main Office must reuse existing same-origin cloud client');
+if(!officeNav.includes('if(session)await loadOwner(session.user)'))throw new Error('Main Office startup should reuse session user');
+if(!officeNav.includes('setVisible(true);\n document.getElementById(\'officeBoot\')?.remove();'))throw new Error('Owner shell should appear before secondary KPI requests');
+console.log('PASS: Main Office reuses session and displays verified owner shell before KPI loading.');
+
 
 console.log('PASS: Desktop navigation and authenticated owner refresh-page restoration contracts.');
 
