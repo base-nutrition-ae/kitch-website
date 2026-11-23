@@ -385,8 +385,12 @@ function setVisible(on){el('officeAuth').classList.toggle('officeHidden',on);el(
 function money(n){return 'AED '+Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2,minimumFractionDigits:2});}
 function setKpi(label,value){const cards=[...document.querySelectorAll('#overview .overview-kpis .card')];const card=cards.find(c=>c.querySelector('small')?.textContent.trim()===label);if(card)card.querySelector('.number').textContent=value;}
 function safe(t){return String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-async function loadOwner(){
- const {data:{user},error:ue}=await db.auth.getUser();if(ue||!user){setVisible(false);return;}
+async function loadOwner(initialUser){
+ // Reuse the already-validated session user. A second getUser() network request
+ // during embedded startup can stall before the owner workspace is shown.
+ let user=initialUser;
+ if(!user){const result=await db.auth.getUser();user=result.data?.user;if(result.error||!user){setVisible(false);return;}}
+ if(!user){setVisible(false);return;}
  const {data:members,error:me}=await db.from('kitch_office_owners').select('restaurant_id,role').eq('user_id',user.id).eq('is_active',true).limit(1);
  if(me){setVisible(false);say('Main Office database setup is required. Run the supplied SQL and assign your owner account. '+me.message);return;}
  if(!members?.length){setVisible(false);say('Your email is signed in but has not been assigned as a KITCH Main Office owner. Ask the administrator to link your account.');return;}
@@ -544,11 +548,11 @@ async function start(){
       new Promise((_,reject)=>setTimeout(()=>reject(Error('Cloud session is slow. Please retry the connection.')),15000))
     ]);
     if(error)throw error;
-    if(session)await loadOwner();
+    if(session)await loadOwner(session.user);
   }catch(e){setVisible(false);say(e.message||'Unable to open Main Office. Please retry.');}
   finally{if(boot)boot.remove();}
 }
-el('officeLoginForm').addEventListener('submit',async e=>{e.preventDefault();say('Signing in…');if(!db){say('Authentication is not ready.');return;}const {error}=await db.auth.signInWithPassword({email:el('officeEmail').value.trim(),password:el('officePassword').value});if(error){say(error.message);return;}say('');await loadOwner();});
+el('officeLoginForm').addEventListener('submit',async e=>{e.preventDefault();say('Signing in…');if(!db){say('Authentication is not ready.');return;}const {data,error}=await db.auth.signInWithPassword({email:el('officeEmail').value.trim(),password:el('officePassword').value});if(error){say(error.message);return;}say('');await loadOwner(data?.user);});
 
 // Owner-only Ingredient Master. Server RPC checks the signed-in owner's restaurant.
 let officeIngredients=[];
