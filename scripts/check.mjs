@@ -114,6 +114,7 @@ const readyChecks=[
  ['Request, dispatch, receipt',["rpc('create'","rpc('dispatch'","rpc('receive'"].every(t=>readySource.includes(t))],
  ['Separate tables',["kitch_ready_products","kitch_ready_batches","kitch_ready_requests","kitch_ready_movements"].every(t=>readySQL.includes(t))],
  ['Database RLS',readySQL.includes('enable row level security')],
+ ['Single complete SQL function',readySQL.split('create or replace function public.kitch_ready_product_action').length===2&&readySQL.split('$function$;').length===2],
  ['Permission checked RPC',readySQL.includes('security definer')&&readySQL.includes('kitch_office_owners')&&readySQL.includes('staff_access')],
  ['No ingredient movement side effect',!readySQL.includes('insert into public.inventory_movements')]
 ];
