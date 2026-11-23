@@ -140,7 +140,8 @@
  };
  window.kitchReadyDispatch=id=>{
   const x=requests.find(r=>Number(r.id)===id);if(!x)return;
-  modal('<div class="modalHead"><h2>Dispatch Ready Products</h2><button class="close" onclick="closeModal()">×</button></div><p>Request #'+id+' · '+escapeHtml(x.product_name||x.sku)+'</p><div class="note">Enter the actual production batch and expiry date. Dispatch cannot exceed available batch stock.</div><div class="formGrid"><div class="field"><label>BATCH NUMBER</label><input id="kitchReadyBatch" maxlength="80" placeholder="Batch from production"></div><div class="field"><label>EXPIRY DATE</label><input id="kitchReadyExpiry" type="date"></div><div class="field"><label>DISPATCH QUANTITY</label><input id="kitchReadyDispatchQty" type="number" min=".001" step=".001" max="'+fmt(x.qty)+'" value="'+fmt(x.qty)+'"></div></div><button class="primary" onclick="kitchReadyConfirmDispatch('+id+')">Confirm Dispatch</button>');
+  const maxQty=Number(x.qty);
+  modal('<div class="modalHead"><h2>Dispatch Ready Products</h2><button class="close" onclick="closeModal()">×</button></div><p>Request #'+id+' · '+escapeHtml(x.product_name||x.sku)+'</p><div class="note">Enter the actual production batch and expiry date. Dispatch cannot exceed available batch stock.</div><div class="formGrid"><div class="field"><label>BATCH NUMBER</label><input id="kitchReadyBatch" maxlength="80" placeholder="Batch from production"></div><div class="field"><label>EXPIRY DATE</label><input id="kitchReadyExpiry" type="date"></div><div class="field"><label>DISPATCH QUANTITY</label><input id="kitchReadyDispatchQty" type="number" min=".001" step=".001" max="'+maxQty+'" value="'+maxQty+'"></div></div><button class="primary" onclick="kitchReadyConfirmDispatch('+id+')">Confirm Dispatch</button>');
  };
  window.kitchReadyConfirmDispatch=async id=>{
   const batch=$('kitchReadyBatch')?.value.trim(),expiry=$('kitchReadyExpiry')?.value,qty=Number($('kitchReadyDispatchQty')?.value);
@@ -149,11 +150,13 @@
  };
  window.kitchReadyReceive=id=>{
   const x=requests.find(r=>Number(r.id)===id);if(!x)return;
-  modal('<div class="modalHead"><h2>Receive Ready Products</h2><button class="close" onclick="closeModal()">×</button></div><p>Request #'+id+' · '+escapeHtml(x.product_name||x.sku)+'</p><div class="note">Verify batch and expiry before accepting. Stock updates only for the confirmed quantity.</div><div class="formGrid"><div class="field"><label>ACCEPTED QUANTITY</label><input id="kitchReadyReceivedQty" type="number" min="0" step=".001" max="'+fmt(x.sent_qty)+'" value="'+fmt(x.sent_qty)+'"></div><div class="field"><label>REJECTED QUANTITY</label><input id="kitchReadyRejectedQty" type="number" min="0" step=".001" value="0"></div></div><button class="primary" onclick="kitchReadyConfirmReceive('+id+')">Confirm Receipt</button>');
+  const sentQty=Number(x.sent_qty);
+  modal('<div class="modalHead"><h2>Receive Ready Products</h2><button class="close" onclick="closeModal()">×</button></div><p>Request #'+id+' · '+escapeHtml(x.product_name||x.sku)+'</p><div class="note">Verify batch and expiry before accepting. Accepted plus rejected must equal the dispatched quantity.</div><div class="formGrid"><div class="field"><label>ACCEPTED QUANTITY</label><input id="kitchReadyReceivedQty" type="number" min="0" step=".001" max="'+sentQty+'" value="'+sentQty+'"></div><div class="field"><label>REJECTED QUANTITY</label><input id="kitchReadyRejectedQty" type="number" min="0" step=".001" value="0"></div></div><button class="primary" onclick="kitchReadyConfirmReceive('+id+')">Confirm Receipt</button>');
  };
  window.kitchReadyConfirmReceive=async id=>{
   const received=Number($('kitchReadyReceivedQty')?.value),rejected=Number($('kitchReadyRejectedQty')?.value);
-  if(!Number.isFinite(received)||received<0||!Number.isFinite(rejected)||rejected<0)return alert('Enter valid accepted and rejected quantities.');
+  const sent=Number(requests.find(x=>Number(x.id)===id)?.sent_qty);
+  if(!Number.isFinite(received)||received<0||!Number.isFinite(rejected)||rejected<0||!Number.isFinite(sent)||Math.abs(received+rejected-sent)>0.000001)return alert('Accepted plus rejected must equal the dispatched quantity.');
   try{await rpc('receive',{request_id:id,accepted_qty:received,rejected_qty:rejected});closeModal();await refresh(true)}catch(e){alert(e.message)}
  };
 })();
