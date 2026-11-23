@@ -527,14 +527,14 @@ async function logout(){toggleAppMobileMenu(false);window.__kitchTeamLiveStock=n
 function renderNav(){
  let items=[...roles[session].nav];
  if(!hasCentralStore()){
-   items=items.filter(x=>x!=='Stock Transfer'&&x!=='Stock Requests');
+   items=items.filter(x=>x!=='Stock Transfer'&&x!=='Stock Requests'&&x!=='Ready Products','Ready Products');
  }else{
    if(session==='manager'){
      items=items.filter(x=>x!=='Stock Transfer');
-     const i=Math.max(1,items.indexOf('Inventory')+1);items.splice(i,0,'Stock Requests');
+     const i=Math.max(1,items.indexOf('Inventory')+1);items.splice(i,0,'Stock Requests','Ready Products');
    }
    if(session==='store'){
-     const i=items.indexOf('Receiving')+1;items.splice(i,0,'Stock Requests','Stock Transfer');
+     const i=items.indexOf('Receiving')+1;items.splice(i,0,'Stock Requests','Ready Products','Stock Transfer');
    }
  }
  const preferred=session==='store'?['Dashboard','Receiving','Inventory','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
@@ -545,7 +545,7 @@ function renderNav(){
  const makeButton=x=>{
    const b=document.createElement('button');
    b.type='button';b.textContent=x;b.title=x;
-   b.dataset.short=({'Dashboard':'⌂','Inventory':'▦','Suppliers & Purchasing':'⇄','Production':'▤','Recipes':'▣','Label':'▧','Receiving':'↓','Stock Requests':'↗','Stock Transfer':'⇄','Waste & Adjustments':'◌','Reports':'▥','Notifications':'◉'}[x]||x.slice(0,1).toUpperCase());
+   b.dataset.short=({'Dashboard':'⌂','Inventory':'▦','Suppliers & Purchasing':'⇄','Production':'▤','Recipes':'▣','Label':'▧','Receiving':'↓','Stock Requests':'↗','Ready Products':'▣','Stock Transfer':'⇄','Waste & Adjustments':'◌','Reports':'▥','Notifications':'◉'}[x]||x.slice(0,1).toUpperCase());
    b.setAttribute('aria-label',x);
    b.addEventListener('click',()=>{openPage(x)});
    return b;
@@ -727,8 +727,9 @@ function kitchLastOwnerPage(){
  try{return sessionStorage.getItem('kitch_owner_page_'+cloud.user?.id)||'Dashboard'}catch(e){return 'Dashboard'}
 }
 function openPage(name){
- if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}
+ if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Ready Products','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}
  if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();
+ if(name==='Ready Products'&&(!hasCentralStore()||session==='production'))return alert('Ready Products are available to authorized KITCH Pro workspaces only.');
  if(name==='Dashboard'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchRefreshProductionDashboard();
  if(name==='Label'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchLoadCloudProductionRecords();
  if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}
@@ -754,6 +755,7 @@ function page(n){
  if(n==='Receiving')return (roles[session]?.nav.includes('Suppliers & Purchasing')?`<div style="margin:0 0 14px"><button class="btn" onclick="openPage('Suppliers & Purchasing')">← Suppliers & Purchasing</button></div>`:'')+receivingPage();
  if(n==='Expiry & Batches')return batchesPage();
  if(n==='Stock Requests')return stockRequestsPage();
+ if(n==='Ready Products')return typeof window.kitchReadyProductsPage==='function'?window.kitchReadyProductsPage():'<div class="panel">Ready Products is not loaded. Please refresh.</div>';
  if(n==='Stock Transfer')return transferPage();
  if(n==='Recipes')return recipesPage();
  if(n==='Production')return productionPage();
@@ -2616,7 +2618,7 @@ async function kitchRefreshStockRequests(){
    return {...prior,...x,id:Number(x.id),ref:'REQ-'+String(x.id).slice(-6),branch:b?.name||prior.branch||currentBranchName(),ingredient:ing?.name||x.sku,requested_by:prior.requested_by||'KITCH Team',cloud_saved:true,...(x.details||{})};
   });
   setArr(STOCK_REQUEST_KEY,updated);
-  if(pageTitle?.textContent==='Stock Requests')content.innerHTML=page('Stock Requests');
+  if(pageTitle?.textContent==='Stock Requests')content.innerHTML=page('Stock Requests','Ready Products');
  }catch(e){console.error('Stock requests sync',e);alert('Stock Requests cloud sync failed: '+e.message);}
 }
 
@@ -2665,7 +2667,7 @@ function stockRequestsPage(){
  const all=getArr(STOCK_REQUEST_KEY),req=(session==='manager'?all.filter(x=>x.branch===currentBranchName()):all).slice().reverse(),isBranch=session==='manager',isStore=session==='store',isOwner=session==='owner';
  const open=req.filter(x=>!['Received','Completed'].includes(x.status)).length,done=req.filter(x=>['Received','Completed'].includes(x.status)).length;
  return `<div class="grid"><div class="card"><span>OPEN PROCESS</span><b>${open}</b></div><div class="card"><span>COMPLETED</span><b>${done}</b></div><div class="card"><span>FLOW</span><b style="font-size:14px">Request → Store → Receive</b></div><div class="card"><span>PACKAGE</span><b style="font-size:16px">Business</b></div></div>
- <div class="panel"><h2>${isBranch?'Internal Stock Requests & Receiving':isStore?'Internal Branch Stock Requests':'Internal Stock Request Control'}</h2><p class="muted">${isOwner?'Main Office sees the complete request, dispatch and restaurant receiving audit trail.':isBranch?'Request existing inventory from Central Store (not an external supplier order), then confirm the stock physically received at your restaurant.':'Accept branch requests, then send the stock. Branch inventory updates only after the restaurant confirms receipt.'}</p>${isBranch?'<div class="actions"><button class="btn black" onclick="openStockRequest()">+ Request from Central Store</button></div>':''}
+ <div class="panel"><div class="actions" style="justify-content:flex-end"><button class="btn" onclick="openPage('Ready Products')">Ready Products · Central Kitchen →</button></div><h2>${isBranch?'Internal Stock Requests & Receiving':isStore?'Internal Branch Stock Requests':'Internal Stock Request Control'}</h2><p class="muted">${isOwner?'Main Office sees the complete request, dispatch and restaurant receiving audit trail.':isBranch?'Request existing inventory from Central Store (not an external supplier order), then confirm the stock physically received at your restaurant.':'Accept branch requests, then send the stock. Branch inventory updates only after the restaurant confirms receipt.'}</p>${isBranch?'<div class="actions"><button class="btn black" onclick="openStockRequest()">+ Request from Central Store</button></div>':''}
  <table><tr><th>REQUEST</th><th>BRANCH</th><th>INGREDIENT</th><th>REQUESTED</th><th>STATUS</th><th>REQUESTED BY</th><th>ACTION</th></tr>${req.map(x=>{
  let action=`<button class="btn" onclick="viewStockRequest(${x.id})">View Details</button>`;
  if(isStore&&x.status==='Requested')action=`<button class="btn black" onclick="acceptStockRequest(${x.id})">Accept</button> `+action;
@@ -2681,14 +2683,14 @@ function openStockRequest(){
 function stockRequestIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('srIng')?.value),e=document.getElementById('srUnit');if(x&&e)e.innerHTML=stockTransferUnitOptions(x,stockTransferUnits(x)[0]);}
 async function saveStockRequest(){
  const sku=document.getElementById('srIng')?.value,x=ingredients().find(i=>i.sku===sku),q=Number(document.getElementById('srQty')?.value||0),u=document.getElementById('srUnit')?.value,branch=currentBranch();if(!x||stockTransferCanonical(q,u,x)===null)return alert('Enter a valid quantity and compatible unit.');if(!branch)return alert('Branch not found.');
- let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});try{await kitchStockRpc('create',a[a.length-1],q)}catch(e){return alert('Cloud request failed: '+e.message)}a[a.length-1].cloud_saved=true;setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests');
+ let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});try{await kitchStockRpc('create',a[a.length-1],q)}catch(e){return alert('Cloud request failed: '+e.message)}a[a.length-1].cloud_saved=true;setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests','Ready Products');
 }
 async function acceptStockRequest(id){
  if(session!=='store'||!centralStockReady())return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Requested')return;
  const x=ingredients().find(i=>i.sku===r.sku);if(!x)return alert('Ingredient not found.');
  const need=stockTransferCanonical(r.qty,r.unit,x),have=centralStockCanonical(x);if(need===null)return alert('This unit requires a valid Master List pack conversion.');if(need>have+1e-9)return alert(`Not enough Central Store stock. Available: ${cleanQty(fromCanonical(have,x.base_unit))} ${x.base_unit}`);
  try{await kitchStockRpc('accept',r)}catch(e){return alert('Cloud approval failed: '+e.message)}
- r.status='Accepted';r.accepted_by=currentActor();r.accepted_at=new Date().toISOString();setArr(STOCK_REQUEST_KEY,req);openPage('Stock Requests');
+ r.status='Accepted';r.accepted_by=currentActor();r.accepted_at=new Date().toISOString();setArr(STOCK_REQUEST_KEY,req);openPage('Stock Requests','Ready Products');
 }
 function previewTransferDispatchPhoto(file){
  transferDispatchPhotoData='';const p=document.getElementById('tsPhotoPreview');if(p)p.innerHTML='';
@@ -2745,7 +2747,7 @@ async function confirmStockRequestDispatch(id){
    from:'Central Store',to:r.branch,to_location_id:r.branch_id,staff:currentActor(),sent_by:currentActor(),sent_at:now,status:'In Transfer',
    batch,expiry_date:expiry,dispatch_temperature:temp,note,dispatch_photo:transferDispatchPhotoData});
  setArr(TRANSFER_KEY,tr);
- closeModal();openPage('Stock Requests');alert(`${cleanQty(q)} ${r.unit} ${r.ingredient} sent to ${r.branch}. Waiting for restaurant receiving confirmation.`);
+ closeModal();openPage('Stock Requests','Ready Products');alert(`${cleanQty(q)} ${r.unit} ${r.ingredient} sent to ${r.branch}. Waiting for restaurant receiving confirmation.`);
 }
 function previewTransferReceiptPhoto(file){
  transferReceiptPhotoData='';const p=document.getElementById('trPhotoPreview');if(p)p.innerHTML='';
@@ -2783,7 +2785,7 @@ async function confirmTransferReceipt(id){
  const now=new Date().toISOString();Object.assign(r,{status:'Received',delivered_qty:delivered,rejected_qty:rejected,accepted_qty:accepted,transfer_variance_qty:variance,receiving_temperature:temp,temperature_check:tempCheck,packaging_check:pack,quality_check:quality,receiving_note:note,receiving_photo:transferReceiptPhotoData,received_by:currentActor(),received_at:now});setArr(STOCK_REQUEST_KEY,req);
  let tr=getArr(TRANSFER_KEY),t=tr.find(x=>x.request_id===r.id);if(t)Object.assign(t,{status:'Received',delivered_qty:delivered,rejected_qty:rejected,accepted_qty:accepted,variance_qty:variance,temperature:temp,temperature_check:tempCheck,packaging_check:pack,quality_check:quality,note,photo:transferReceiptPhotoData,received_by:currentActor(),received_at:now});setArr(TRANSFER_KEY,tr);
  let mv=getArr('kitch_demo_inventory_movements_v1');mv.push({id:Date.now(),type:'Central Store Transfer Received',sku:x.sku,ingredient:x.name,qty:accepted,unit:r.unit,location:r.branch,from:'Central Store',request:r.ref,staff:currentActor(),created_at:now});setArr('kitch_demo_inventory_movements_v1',mv);
- closeModal();openPage('Stock Requests');alert(`${cleanQty(accepted)} ${r.unit} accepted into ${r.branch} inventory.${Math.abs(variance)>.000001?' Transfer variance recorded: '+cleanQty(variance)+' '+r.unit+'.':''}`);
+ closeModal();openPage('Stock Requests','Ready Products');alert(`${cleanQty(accepted)} ${r.unit} accepted into ${r.branch} inventory.${Math.abs(variance)>.000001?' Transfer variance recorded: '+cleanQty(variance)+' '+r.unit+'.':''}`);
 }
 function viewStockRequest(id){
  const r=getArr(STOCK_REQUEST_KEY).find(x=>x.id===id);if(!r)return;
@@ -3565,7 +3567,7 @@ async function requestProductionShortages(){
    await kitchStockRpc('create',r,Number(r.qty));r.cloud_saved=true;
   }
  }catch(e){return alert('Cloud request failed: '+e.message)}
- setArr(STOCK_REQUEST_KEY,req);closeModal();openPage('Stock Requests');alert('Stock request sent to Central Store for:\n'+created.join('\n'));
+ setArr(STOCK_REQUEST_KEY,req);closeModal();openPage('Stock Requests','Ready Products');alert('Stock request sent to Central Store for:\n'+created.join('\n'));
 }
 
 function deductFEFO(sku,need){
