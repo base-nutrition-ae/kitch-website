@@ -102,5 +102,23 @@ const accessChecks=[
 for(const [label,ok] of accessChecks)if(!ok)throw new Error('Missing KITCH desktop/session behavior: '+label);
 console.log('PASS: Desktop navigation and authenticated owner refresh-page restoration contracts.');
 
+
+const readySource=fs.readFileSync('public/assets/kitch-ready-products.js','utf8');
+const readySQL=fs.readFileSync('sql/kitch-ready-products-v1.review.sql','utf8');
+const readyChecks=[
+ ['Ready Products script tag',page.includes('src="assets/kitch-ready-products.js')],
+ ['Ready Products navigation',app.includes("if(n==='Ready Products')")&&app.includes("'Ready Products'")],
+ ['Separate import preview',readySource.includes('kitchReadyPreviewImport')],
+ ['Dedicated cloud RPC',readySource.includes("sb.rpc('kitch_ready_product_action'")],
+ ['Batch record workflow',readySource.includes('kitchReadyOpenBatch')&&readySource.includes("rpc('batch'")],
+ ['Request, dispatch, receipt',["rpc('create'","rpc('dispatch'","rpc('receive'"].every(t=>readySource.includes(t))],
+ ['Separate tables',["kitch_ready_products","kitch_ready_batches","kitch_ready_requests","kitch_ready_movements"].every(t=>readySQL.includes(t))],
+ ['Database RLS',readySQL.includes('enable row level security')],
+ ['Permission checked RPC',readySQL.includes('security definer')&&readySQL.includes('kitch_office_owners')&&readySQL.includes('staff_access')],
+ ['No ingredient movement side effect',!readySQL.includes('insert into public.inventory_movements')]
+];
+for(const [label,ok] of readyChecks)if(!ok)throw new Error('Missing KITCH Ready Products feature: '+label);
+console.log('PASS: Ready Products catalog, requests, batch flow and isolated SQL migration staged.');
+
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} static asset references, and Main Office embed.`);
