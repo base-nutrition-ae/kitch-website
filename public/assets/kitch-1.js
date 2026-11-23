@@ -523,7 +523,7 @@ async function teamLogin(){
 function enter(r){closePublicModal();session=r;login.classList.add('hidden');document.getElementById('publicLanding')?.classList.add('hidden');app.classList.remove('hidden');userName.textContent=currentStaff?.name||roles[r].name;userRole.textContent=(currentStaff?`${currentStaff.role} · ${currentStaff.location_name||locationName(currentStaff.location_id)}`:roles[r].label);userScope.textContent=currentStaff?.workspace_name||cloud.workspace_code||primaryRestaurantName();renderNav();const firstSetup=r==='manager'&&!window.__kitchInventoryLoadError&&ingredients().length===0;
 openPage(firstSetup?'Inventory':roles[r].nav[0]);
 if(firstSetup)setTimeout(()=>{if(session==='manager'&&ingredients().length===0&&!document.getElementById('excelFile'))openImport()},180)}
-async function logout(){toggleAppMobileMenu(false);window.__kitchTeamLiveStock=null;session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
+async function logout(){toggleAppMobileMenu(false);window.__kitchTeamLiveStock=null;try{sessionStorage.removeItem('kitch_last_view');if(cloud.user?.id)sessionStorage.removeItem('kitch_owner_page_'+cloud.user.id)}catch(e){}session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
 function renderNav(){
  let items=[...roles[session].nav];
  if(!hasCentralStore()){
@@ -717,6 +717,15 @@ async function kitchRefreshProductionPageData(){
  kitchProductionLoadStatus=errors.length?'error':'ready';
  if(pageTitle?.textContent==='Production')content.innerHTML=page('Production');
 }
+function kitchRememberOwnerPage(name){
+ // Store only the selected page name. Supabase securely restores the auth session.
+ if(session==='owner'&&cloud.user?.id&&typeof name==='string'){
+  try{sessionStorage.setItem('kitch_owner_page_'+cloud.user.id,name)}catch(e){}
+ }
+}
+function kitchLastOwnerPage(){
+ try{return sessionStorage.getItem('kitch_owner_page_'+cloud.user?.id)||'Dashboard'}catch(e){return 'Dashboard'}
+}
 function openPage(name){
  if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}
  if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();
@@ -725,6 +734,7 @@ function openPage(name){
  if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}
  void refreshKitchTrialStatus();
  pageTitle.textContent=name;
+ kitchRememberOwnerPage(name);
  [...nav.children].forEach(b=>b.classList.toggle('active',b.textContent===name));
  document.querySelectorAll('#kitchIconRail [data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
  content.innerHTML=page(name);
@@ -4624,7 +4634,19 @@ async function completeStripeReturn(){
   await syncPackageFromCloud();
   ensureStructure();
   await cloudLoadIngredients();
-  if(session && !app.classList.contains('hidden')) openPage(document.getElementById('pageTitle')?.textContent?.trim()||'Dashboard');
+  // A valid authenticated owner should reopen the same workspace rather than
+  // staying on the public homepage after refresh.
+  const lastPage=kitchLastOwnerPage();
+  const lastView=(()=>{try{return sessionStorage.getItem('kitch_last_view')}catch(e){return null}})();
+  currentStaff=null;
+  enter('owner');
+  if(lastPage&&lastPage!=='Dashboard'&&roles.owner.nav.includes(lastPage))openPage(lastPage);
+  if(lastView==='office'){
+   // Only reopen Main Office if this signed-in user is an active owner.
+   const membership=await sb.from('kitch_office_owners')
+    .select('restaurant_id').eq('user_id',cloud.user.id).eq('is_active',true).limit(1);
+   if(!membership.error&&membership.data?.length)openKitchMainOffice();
+  }
  }catch(e){
   console.warn('KITCH workspace restore:',e?.message||e);
   session=null;currentStaff=null;
