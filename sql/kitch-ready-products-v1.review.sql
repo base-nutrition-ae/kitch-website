@@ -181,6 +181,7 @@ begin
   insert into public.kitch_ready_batches(restaurant_id,product_id,branch_id,batch_no,produced_on,expiry_date)
    values(v_restaurant,v_product.id,v_central,v_batch_no,v_produced,v_expiry)
    on conflict(restaurant_id,product_id,branch_id,batch_no) do nothing;
+  if not found then raise exception 'This production batch has already been recorded. Use a new batch number to avoid double-counting stock';end if;
   select * into v_batch from public.kitch_ready_batches b where b.restaurant_id=v_restaurant and b.product_id=v_product.id and b.branch_id=v_central and b.batch_no=v_batch_no for update;
   if v_batch.produced_on<>v_produced or v_batch.expiry_date<>v_expiry then raise exception 'Existing batch date mismatch';end if;
   insert into public.kitch_ready_movements(restaurant_id,branch_id,product_id,batch_id,kind,qty_delta,recorded_by)
