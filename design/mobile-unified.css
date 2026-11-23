@@ -88,3 +88,30 @@
 @media(prefers-reduced-motion:reduce){
  #officeApp .officeSidebar,body #app.app:not(.hidden)>.side{transition:none!important}
 }
+
+
+/* Public landing mobile entry: sign-in must be visible without scrolling or opening navigation */
+#login .kitchHeroAccess{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:24px}
+#login .kitchHeroAccess button{cursor:pointer;border-radius:999px;min-height:48px;padding:13px 21px;font:750 14px/1.2 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#login .kitchHeroSignIn{display:inline-flex;align-items:center;justify-content:center;gap:14px;background:#fff;color:#16171c;border:1px solid #fff;box-shadow:0 6px 18px #0003}
+#login .kitchHeroSignIn span{font-size:20px}
+#login .kitchHeroSubscribe{background:#ffffff15;color:#fff;border:1px solid #ffffffb0}
+@media(max-width:850px){
+ #login.publicLanding{min-height:100dvh!important;overflow-x:hidden!important}
+ #login .publicTop{position:relative!important;padding:24px 22px 0!important;align-items:center!important;gap:10px!important}
+ #login .publicBrand{max-width:calc(100% - 62px)!important}
+ #login .mobileMenuBtn{display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;gap:4px!important;width:44px!important;height:44px!important;min-width:44px!important;border-radius:12px!important;background:#ffffff21!important;border:1px solid #ffffff75!important;color:#fff!important;z-index:10!important}
+ #login .mobileMenuBtn span{display:block!important;width:20px!important;height:2px!important;min-height:2px!important;background:#fff!important;border-radius:2px!important}
+ #login .heroCopy{position:relative!important;max-width:100%!important;padding:clamp(76px,12vh,140px) 22px 105px!important;margin:0!important}
+ #login .heroCopy h1{font-size:clamp(39px,10.1vw,60px)!important;line-height:1.02!important;letter-spacing:-.052em!important;margin:0 0 20px!important;overflow-wrap:normal!important}
+ #login .heroCopy p{font-size:clamp(14px,3.75vw,18px)!important;line-height:1.45!important;max-width:100%!important;margin:0!important;overflow-wrap:break-word!important}
+ #login .kitchHeroAccess{margin-top:22px!important;display:flex!important;gap:10px!important}
+ #login .kitchHeroAccess .kitchHeroSignIn{display:flex!important;flex:1 1 100%!important;width:100%!important;min-height:52px!important;font-size:15px!important}
+ #login .kitchHeroAccess .kitchHeroSubscribe{display:flex!important;align-items:center!important;justify-content:center!important;flex:1 1 100%!important;width:100%!important;min-height:48px!important}
+ #login .publicFooter{position:relative!important;margin-top:18px!important;padding:20px 22px!important}
+}
+@media(max-width:390px){
+ #login .heroCopy{padding:65px 18px 80px!important}
+ #login .heroCopy h1{font-size:clamp(36px,9.7vw,44px)!important}
+ #login .heroCopy p{font-size:14px!important}
+}
