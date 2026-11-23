@@ -4,7 +4,11 @@ const dir='public/assets';
 const unifiedTheme=fs.readFileSync('design/unified-workspace.css','utf8');
 const officeTheme=fs.readFileSync('design/office-glass.css','utf8');
 const kitchenTheme=fs.readFileSync('design/kitch-glass.css','utf8');
-const officeHtml=fs.readFileSync('office-source.html','utf8').replace('</head>',`<style id="kitch-glass-office">${officeTheme}</style><style id="kitch-shared-office">${unifiedTheme}</style></head>`);
+const mobileTheme=fs.readFileSync('design/mobile-unified.css','utf8');
+const officeMobileScript=fs.readFileSync('design/office-mobile.js','utf8');
+const officeHtml=fs.readFileSync('office-source.html','utf8')
+ .replace('</head>',`<style id="kitch-glass-office">${officeTheme}</style><style id="kitch-shared-office">${unifiedTheme}</style></head>`)
+ .replace('</body>',`<style id="kitch-mobile-office">${mobileTheme}</style><script id="kitch-office-mobile-script">${officeMobileScript}</script></body>`);
 const payload=Buffer.from(officeHtml).toString('base64');
 const indexPath='public/index.html';
 let page=fs.readFileSync(indexPath,'utf8');
@@ -13,10 +17,12 @@ let page=fs.readFileSync(indexPath,'utf8');
 page=page
  .replace(/<style id="kitch-glass-kitchen">[\s\S]*?<\/style>/g,'')
  .replace(/<style id="kitch-shared-kitchen">[\s\S]*?<\/style>/g,'')
- .replace(/<style id="kitch-design-release-marker">[\s\S]*?<\/style>/g,'');
+ .replace(/<style id="kitch-design-release-marker">[\s\S]*?<\/style>/g,'')
+ .replace(/<style id="kitch-mobile-kitchen">[\s\S]*?<\/style>/g,'');
 if(!page.includes('</body>')) throw new Error('Missing body closing tag');
 page=page.replace('</body>',`<style id="kitch-glass-kitchen">${kitchenTheme}</style>
 <style id="kitch-shared-kitchen">${unifiedTheme}</style>
+<style id="kitch-mobile-kitchen">${mobileTheme}</style>
 <style id="kitch-design-release-marker">/* KITCH-UNIFIED-20261123-BODY-LAST */</style>
 </body>`);
 fs.writeFileSync(indexPath,page);
