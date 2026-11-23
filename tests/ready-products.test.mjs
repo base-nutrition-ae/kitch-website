@@ -36,14 +36,14 @@ test('inventory totals are tenant and branch isolated',()=>{
  assert.equal(g.balance(rows,{restaurantId:'A',branchId:'branch',batchId:'X'}),10);
 });
 const sql=fs.readFileSync(new URL('../sql/kitch-ready-products-v1.review.sql',import.meta.url),'utf8');
-test('migration defines four separate ready-product tables',()=>assert.equal((sql.match(/create table if not exists public\\.kitch_ready_/g)||[]).length,4));
+test('migration defines four separate ready-product tables',()=>assert.equal((sql.match(/create table if not exists public\.kitch_ready_/g)||[]).length,4));
 test('migration does not write to raw ingredient inventory',()=>assert.equal(sql.includes('insert into public.inventory_movements'),false));
 test('migration blocks duplicate dispatch and receipt using status checks',()=>{
  assert.ok(sql.includes("v_request.status<>'Accepted'"));
  assert.ok(sql.includes("v_request.status<>'In Transfer'"));
 });
 test('migration has complete authorization and single function body',()=>{
- assert.equal((sql.match(/\\$function\\$;/g)||[]).length,1);
+ assert.equal((sql.match(/\$function\$;/g)||[]).length,1);
  assert.ok(sql.includes("p_pin !~ '^[0-9]{4}$' then raise exception"));
  assert.ok(sql.includes('enable row level security'));
 });
