@@ -395,9 +395,9 @@ function contextStockCanonical(ing){
  return session==='store'?centralStockCanonical(ing):branchStockCanonical(ing);
 }
 const roles={
- owner:{name:'Main Office',label:'Owner / Main Office',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
- manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
- store:{name:'Central Store Manager',label:'Central Store Manager',nav:['Inventory','Receiving','Expiry & Batches','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
+ owner:{name:'Main Office',label:'Owner / Main Office',nav:['Ready Products','Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Locations & Departments','Staff & Access','Notifications','Reports']},
+ manager:{name:'Kitchen Manager',label:'Kitchen Manager / Head Chef',nav:['Ready Products','Dashboard','Suppliers & Purchasing','Invoice Matching','Supplier Performance','Price Alerts','Inventory','Receiving','Expiry & Batches','Recipes','Production','Label','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
+ store:{name:'Central Store Manager',label:'Central Store Manager',nav:['Ready Products','Inventory','Receiving','Expiry & Batches','Waste & Adjustments','Stock Count','Variance & Reconciliation','Notifications','Reports']},
  production:{name:'Production Staff',label:'Production Staff',nav:['Recipes','Production','Label']}
 };
 let session=null;
@@ -537,7 +537,7 @@ function renderNav(){
      const i=items.indexOf('Receiving')+1;items.splice(i,0,'Stock Requests','Ready Products','Stock Transfer');
    }
  }
- const preferred=session==='store'?['Dashboard','Receiving','Inventory','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
+ const preferred=session==='store'?['Inventory','Ready Products','Receiving','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
  const mainItems=preferred.filter(x=>items.includes(x)).slice(0,4);
  for(const x of items){if(mainItems.length>=4)break;if(!mainItems.includes(x))mainItems.push(x)}
  const extra=items.filter(x=>!mainItems.includes(x)&&!(items.includes('Suppliers & Purchasing')&&x==='Receiving'));
