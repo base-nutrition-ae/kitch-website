@@ -8,8 +8,17 @@ const officeHtml=fs.readFileSync('office-source.html','utf8').replace('</head>',
 const payload=Buffer.from(officeHtml).toString('base64');
 const indexPath='public/index.html';
 let page=fs.readFileSync(indexPath,'utf8');
-page=page.replace(/<style id="kitch-glass-kitchen">[\s\S]*?<\/style>/g,'').replace(/<style id="kitch-shared-kitchen">[\s\S]*?<\/style>/g,'');
-page=page.replace('</head>',`<style id="kitch-glass-kitchen">${kitchenTheme}</style><style id="kitch-shared-kitchen">${unifiedTheme}</style></head>`);
+// The kitchen loads a late CSS file (kitch-24.css) after the <head>.
+// Append the two design layers at the END of the document, not the head.
+page=page
+ .replace(/<style id="kitch-glass-kitchen">[\s\S]*?<\/style>/g,'')
+ .replace(/<style id="kitch-shared-kitchen">[\s\S]*?<\/style>/g,'')
+ .replace(/<style id="kitch-design-release-marker">[\s\S]*?<\/style>/g,'');
+if(!page.includes('</body>')) throw new Error('Missing body closing tag');
+page=page.replace('</body>',`<style id="kitch-glass-kitchen">${kitchenTheme}</style>
+<style id="kitch-shared-kitchen">${unifiedTheme}</style>
+<style id="kitch-design-release-marker">/* KITCH-UNIFIED-20261123-BODY-LAST */</style>
+</body>`);
 fs.writeFileSync(indexPath,page);
 const match=/const KITCH_OFFICE_EMBED\s*=\s*'[^']+'/;
 const files=fs.readdirSync(dir).filter(n=>n.endsWith('.js'));
