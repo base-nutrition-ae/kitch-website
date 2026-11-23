@@ -105,6 +105,12 @@ if(!officeNav.includes('Main Office is taking longer than expected.'))throw new 
 if(officeNav.includes("msg.textContent='Main Office connection is taking too long. Reload the page or sign in again.'"))throw new Error('Old forced sign-in timeout still present');
 if(officeScript.includes("if(auth)auth.classList.remove('officeHidden');"))throw new Error('Iframe watchdog must not expose login during session restore');
 console.log('PASS: Main Office timeout cannot reveal sign-in over a loading dashboard.');
+if(!officeNav.includes("window.parent.supabase?.createClient"))throw new Error('Embedded Main Office must reuse parent authentication library');
+if(!officeNav.includes("window.kitchOfficeLoadAuthLibrary()"))throw new Error('Main Office auth loader must be awaited');
+if(!officeNav.includes("Cloud session is slow. Please retry the connection."))throw new Error('Main Office session timeout recovery missing');
+if(officeNav.includes('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/dist/umd/supabase.min.js"></script>'))throw new Error('Blocking duplicate auth library script must remain removed');
+console.log('PASS: Main Office startup reuses parent auth, has fallback and does not block indefinitely.');
+
 console.log('PASS: Desktop navigation and authenticated owner refresh-page restoration contracts.');
 
 
