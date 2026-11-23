@@ -41,5 +41,24 @@ const releaseChecks = [
 for (const [name, pattern] of releaseChecks) {
  if (!app.includes(pattern)) throw new Error('Missing KITCH release feature: '+name);
 }
+
+const finalKitchenCss=fs.readFileSync('public/assets/kitch-24.css','utf8');
+const finalOfficeHtml=fs.readFileSync('office-source.html','utf8');
+const finalShared=fs.readFileSync('design/unified-workspace.css','utf8');
+const finalBuild=fs.readFileSync('scripts/build.mjs','utf8');
+const finalDesignChecks=[
+ ['kitchen parity stylesheet',finalKitchenCss.includes('KITCH_FINAL_PARITY_20261123')],
+ ['dashboard single heading stylesheet',finalKitchenCss.includes('KITCH_SINGLE_DASHBOARD_HEADER')],
+ ['kitchen dashboard heading',app.includes('<h2>Kitchen Dashboard</h2>')],
+ ['office logout button',finalOfficeHtml.includes('id="officeSidebarLogout"')],
+ ['office logout handler',finalOfficeHtml.includes("logout=el('officeSidebarLogout')")],
+ ['office plain KITCH brand',finalOfficeHtml.includes('class="officeWordmark"')&&!finalOfficeHtml.includes('class="officeBrandMark">K')],
+ ['kitchen plain KITCH brand',page.includes('class="kitchNavBrand"')&&!page.includes('<img class="kitchSideLogo" src="data:image/png;base64')],
+ ['shared stylesheet',finalShared.includes('KITCH UNIFIED DESIGN v1')],
+ ['shared build injection',finalBuild.includes('kitch-shared-kitchen')&&finalBuild.includes('kitch-shared-office')]
+];
+for (const [name,ok] of finalDesignChecks)if(!ok)throw new Error('Missing unified design feature: '+name);
+console.log('PASS: Unified Main Office / Main Kitchen branding, layout, dashboard and logout contracts.');
+
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} static asset references, and Main Office embed.`);
