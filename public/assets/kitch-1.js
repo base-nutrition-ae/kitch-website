@@ -4636,16 +4636,22 @@ async function completeStripeReturn(){
   await cloudLoadIngredients();
   // A valid authenticated owner should reopen the same workspace rather than
   // staying on the public homepage after refresh.
+  // Never infer owner rights from saved browser UI or a cached workspace.
+  const ownerAccess=await sb.from('kitch_office_owners')
+   .select('restaurant_id').eq('user_id',cloud.user.id).eq('is_active',true).limit(1);
+  if(ownerAccess.error||!ownerAccess.data?.length){
+   session=null;currentStaff=null;
+   app.classList.add('hidden');login.classList.remove('hidden');
+   return;
+  }
   const lastPage=kitchLastOwnerPage();
   const lastView=(()=>{try{return sessionStorage.getItem('kitch_last_view')}catch(e){return null}})();
   currentStaff=null;
   enter('owner');
   if(lastPage&&lastPage!=='Dashboard'&&roles.owner.nav.includes(lastPage))openPage(lastPage);
   if(lastView==='office'){
-   // Only reopen Main Office if this signed-in user is an active owner.
-   const membership=await sb.from('kitch_office_owners')
-    .select('restaurant_id').eq('user_id',cloud.user.id).eq('is_active',true).limit(1);
-   if(!membership.error&&membership.data?.length)openKitchMainOffice();
+   // Scripts are loaded before the async session restore settles.
+   if(typeof openKitchMainOffice==='function')openKitchMainOffice();
   }
  }catch(e){
   console.warn('KITCH workspace restore:',e?.message||e);
