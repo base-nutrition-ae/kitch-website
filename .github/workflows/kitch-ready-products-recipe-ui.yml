@@ -1,0 +1,55 @@
+name: KITCH Ready Products from recipes UI
+on:
+  push:
+    branches: [recipe-yield-test]
+    paths:
+      - .github/workflows/kitch-ready-products-recipe-ui.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: recipe-yield-test
+      - name: Remove import-first workflow from Ready Products
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('public/assets/kitch-ready-products.js')
+          s=p.read_text(encoding='utf-8')
+          replacements=[
+            ("Prepared products from Central Kitchen, separate from the Ingredient Master.",
+             "Ready products are created automatically from saved recipes. Available stock comes only from completed chef production."),
+            ("+(canManage?'<button class=\"btn black\" onclick=\"kitchReadyOpenImport()\">Import Ready Products</button><button class=\"btn\" onclick=\"kitchReadyOpenBatch()\">Record Finished Batch</button>':'')",
+             ""),
+            ("Ready Products Master</h3>","Ready Products from Recipes</h3>"),
+            ("'No ready products imported.')","'No saved recipes with a valid kg or litre yield yet.')"),
+            ("if(session!=='manager'||!ready||!catalog.some(x=>x.active))return alert('Import ready products before placing a request.');",
+             "if(session!=='manager'||!ready||!catalog.some(x=>x.active))return alert('No active saved recipes available. Ask the kitchen to save a recipe with a kg or litre yield.');"),
+            ("Separate ready-product Excel master. Import does not alter ingredients, recipes, or existing inventory.",
+             "Ready Products now come directly from saved recipes. Separate Excel import is not required."),
+            ("Ready Products catalog must be loaded before recording a batch.",
+             "Save the recipe and complete a production batch with QC; finished stock is recorded automatically.")
+          ]
+          for old,new in replacements:
+            count=s.count(old)
+            if count != 1:
+              raise SystemExit(f'Unexpected match count {count} for {old[:65]}')
+            s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Verify JavaScript and tests
+        run: |
+          node --check public/assets/kitch-ready-products.js
+          npm run check
+          npm run build
+      - name: Commit only Ready Products page
+        run: |
+          git config user.name "KITCH Fix Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/kitch-ready-products.js
+          git diff --cached --check
+          git diff --cached --quiet || git commit -m "Show recipe-driven Ready Products without Excel import"
+          git push
