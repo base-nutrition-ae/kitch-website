@@ -44,6 +44,8 @@ for (const [name, pattern] of releaseChecks) {
 
 const finalKitchenCss=fs.readFileSync('public/assets/kitch-24.css','utf8');
 const finalOfficeHtml=fs.readFileSync('office-source.html','utf8');
+const officeRuntime=fs.readFileSync('public/assets/kitch-office-runtime.js','utf8');
+
 const finalShared=fs.readFileSync('design/unified-workspace.css','utf8');
 const finalBuild=fs.readFileSync('scripts/build.mjs','utf8');
 const finalDesignChecks=[
@@ -51,7 +53,7 @@ const finalDesignChecks=[
  ['dashboard single heading stylesheet',finalKitchenCss.includes('KITCH_SINGLE_DASHBOARD_HEADER')],
  ['kitchen dashboard heading',app.includes('<h2>Kitchen Dashboard</h2>')],
  ['office logout button',finalOfficeHtml.includes('id="officeSidebarLogout"')],
- ['office logout handler',finalOfficeHtml.includes("logout=el('officeSidebarLogout')")],
+ ['office logout handler',officeRuntime.includes("logout=el('officeSidebarLogout')")],
  ['office plain KITCH brand',finalOfficeHtml.includes('class="officeWordmark"')&&!finalOfficeHtml.includes('class="officeBrandMark">K')],
  ['kitchen plain KITCH brand',page.includes('class="kitchNavBrand"')&&!page.includes('<img class="kitchSideLogo" src="data:image/png;base64')],
  ['shared stylesheet',finalShared.includes('KITCH UNIFIED DESIGN v1')],
@@ -96,7 +98,7 @@ const accessChecks=[
  ['owner page restored',app.includes('const lastPage=kitchLastOwnerPage()')],
  ['owner verified on restoration',app.includes("const ownerAccess=await sb.from('kitch_office_owners')")],
  ['main office view remembered',officeScript.includes("sessionStorage.setItem('kitch_last_view','office')")],
- ['main office section remembered',officeNav.includes("sessionStorage.setItem('kitch_office_last_section'")],
+ ['main office section remembered',fs.readFileSync('office-source.html','utf8').includes("sessionStorage.setItem('kitch_office_last_section'")],
  ['owner logout clears view',app.includes("sessionStorage.removeItem('kitch_last_view')")]
 ];
 for(const [label,ok] of accessChecks)if(!ok)throw new Error('Missing KITCH desktop/session behavior: '+label);
@@ -106,15 +108,17 @@ if(officeNav.includes("msg.textContent='Main Office connection is taking too lon
 if(officeScript.includes("if(auth)auth.classList.remove('officeHidden');"))throw new Error('Iframe watchdog must not expose login during session restore');
 console.log('PASS: Main Office timeout cannot reveal sign-in over a loading dashboard.');
 if(!officeNav.includes("window.parent.supabase?.createClient"))throw new Error('Embedded Main Office must reuse parent authentication library');
-if(!officeNav.includes("window.kitchOfficeLoadAuthLibrary()"))throw new Error('Main Office auth loader must be awaited');
-if(!officeNav.includes("Cloud session is slow. Please retry the connection."))throw new Error('Main Office session timeout recovery missing');
+if(!officeRuntime.includes("window.kitchOfficeLoadAuthLibrary()"))throw new Error('Main Office auth loader must be awaited');
+if(!officeRuntime.includes("Cloud session is slow. Please retry the connection."))throw new Error('Main Office session timeout recovery missing');
 if(officeNav.includes('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/dist/umd/supabase.min.js"></script>'))throw new Error('Blocking duplicate auth library script must remain removed');
 console.log('PASS: Main Office startup reuses parent auth, has fallback and does not block indefinitely.');
 if(!app.includes('window.__kitchSharedSupabaseClient=sb'))throw new Error('Main Kitchen must provide shared authenticated Supabase client');
-if(!officeNav.includes('window.parent.__kitchSharedSupabaseClient'))throw new Error('Main Office must reuse existing same-origin cloud client');
-if(!officeNav.includes('if(session)await loadOwner(session.user)'))throw new Error('Main Office startup should reuse session user');
-if(!officeNav.includes('setVisible(true);\n document.getElementById(\'officeBoot\')?.remove();'))throw new Error('Owner shell should appear before secondary KPI requests');
-console.log('PASS: Main Office reuses session and displays verified owner shell before KPI loading.');
+if(!officeRuntime.includes('window.parent.__kitchSharedSupabaseClient'))throw new Error('Main Office must reuse existing same-origin cloud client');
+if(!officeRuntime.includes('if(session)await loadOwner(session.user)'))throw new Error('Main Office startup should reuse session user');
+if(!officeRuntime.includes('setVisible(true);\n document.getElementById(\'officeBoot\')?.remove();'))throw new Error('Owner shell should appear before secondary KPI requests');
+if(!officeNav.includes('src="/assets/kitch-office-runtime.js'))throw new Error('Main Office external runtime script missing');
+if(officeNav.includes("async function start(){"))throw new Error('Main Office startup should not be inline');
+console.log('PASS: Main Office external runtime loaded and startup contracts preserved.');
 
 
 console.log('PASS: Desktop navigation and authenticated owner refresh-page restoration contracts.');
