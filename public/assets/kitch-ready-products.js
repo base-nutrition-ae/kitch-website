@@ -145,7 +145,11 @@
  };
  window.kitchReadyConfirmDispatch=async id=>{
   const batch=$('kitchReadyBatch')?.value.trim(),expiry=$('kitchReadyExpiry')?.value,qty=Number($('kitchReadyDispatchQty')?.value);
-  if(!batch||!/^\d{4}-\d{2}-\d{2}$/.test(expiry)||!Number.isFinite(qty)||qty<=0)return alert('Enter production batch, expiry date and quantity.');
+  const req=requests.find(x=>Number(x.id)===id);
+  const guard=window.KitchReadyEngine;
+  if(!batch||!guard||!guard.dateOnly(expiry)||!req||!Number.isFinite(qty)||qty<=0||qty>Number(req.qty))
+   return alert('Enter a valid production batch, expiry date and dispatch quantity.');
+  if(expiry<guard.todayUTC())return alert('Expired batches cannot be dispatched.');
   try{await rpc('dispatch',{request_id:id,batch_no:batch,expiry_date:expiry,qty});closeModal();await refresh(true)}catch(e){alert(e.message)}
  };
  window.kitchReadyReceive=id=>{
@@ -156,7 +160,8 @@
  window.kitchReadyConfirmReceive=async id=>{
   const received=Number($('kitchReadyReceivedQty')?.value),rejected=Number($('kitchReadyRejectedQty')?.value);
   const sent=Number(requests.find(x=>Number(x.id)===id)?.sent_qty);
-  if(!Number.isFinite(received)||received<0||!Number.isFinite(rejected)||rejected<0||!Number.isFinite(sent)||Math.abs(received+rejected-sent)>0.000001)return alert('Accepted plus rejected must equal the dispatched quantity.');
+  const decision=window.KitchReadyEngine?.receipt({sent,accepted:received,rejected});
+  if(!decision?.ok)return alert(decision?.error||'Accepted plus rejected must equal the dispatched quantity.');
   try{await rpc('receive',{request_id:id,accepted_qty:received,rejected_qty:rejected});closeModal();await refresh(true)}catch(e){alert(e.message)}
  };
 })();
