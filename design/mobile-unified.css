@@ -1,0 +1,90 @@
+/* KITCH MOBILE FINAL — shared navigation, cards, tables; desktop untouched. */
+@media(max-width:850px){
+ html,body{max-width:100%!important;overflow-x:clip!important}
+ body #app.app:not(.hidden){display:block!important;min-width:0!important;width:100%!important;padding:0!important;margin:0!important;overflow-x:clip!important;background:#e9e9ef!important}
+ body #app.app:not(.hidden)>.main{display:block!important;min-width:0!important;width:100%!important;max-width:100%!important;padding:calc(72px + env(safe-area-inset-top,0px)) 12px calc(30px + env(safe-area-inset-bottom,0px))!important;margin:0!important;background:transparent!important}
+ body #app.app:not(.hidden)>.main>.top{display:flex!important;min-width:0!important;max-width:100%!important;min-height:64px!important;padding:14px 16px!important;margin:0 0 12px!important;border-radius:17px!important;background:#fff!important;border:1px solid #fff!important}
+ body #app.app:not(.hidden)>.main>.top h1{font-size:clamp(20px,5.2vw,27px)!important;line-height:1.18!important;letter-spacing:-.045em!important;overflow-wrap:anywhere!important}
+ body #app.app:not(.hidden)>.main #content{max-width:100%!important;min-width:0!important;overflow-x:clip!important}
+ body #app.app:not(.hidden) #appMobileMenu.appMobileMenu{position:fixed!important;z-index:1502!important;top:calc(14px + env(safe-area-inset-top,0px))!important;right:14px!important;left:auto!important;display:flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;border-radius:12px!important;background:#25262e!important;color:#fff!important;border:0!important;box-shadow:0 4px 14px #22222c24!important}
+ body #app.app:not(.hidden) #appMobileMenu.appMobileMenu::after{content:"☰"!important;font-size:21px!important;font-weight:650!important;line-height:1!important}
+ body #app.app:not(.hidden).mobileMenuOpen #appMobileMenu.appMobileMenu{right:calc(min(320px,90vw) - 58px)!important;top:calc(14px + env(safe-area-inset-top,0px))!important;z-index:1515!important;width:40px!important;height:40px!important;min-width:40px!important;min-height:40px!important}
+ body #app.app:not(.hidden).mobileMenuOpen #appMobileMenu.appMobileMenu::after{content:"×"!important;font-size:26px!important;font-weight:450!important}
+ body #app.app:not(.hidden)>.side{position:fixed!important;z-index:1510!important;top:0!important;right:0!important;left:auto!important;bottom:0!important;display:flex!important;flex-direction:column!important;width:min(320px,90vw)!important;max-width:90vw!important;height:100dvh!important;min-height:0!important;padding:calc(18px + env(safe-area-inset-top,0px)) 12px calc(14px + env(safe-area-inset-bottom,0px))!important;margin:0!important;transform:translateX(105%)!important;transition:transform .2s ease!important;visibility:visible!important;opacity:1!important;background:#fff!important;border-radius:19px 0 0 19px!important;border:0!important;box-shadow:-6px 0 30px #26263124!important;overflow:hidden!important}
+ body #app.app:not(.hidden).mobileMenuOpen>.side{transform:translateX(0)!important}
+ body #app.app:not(.hidden)>.side .sideLogoWrap{flex:0 0 auto!important;min-height:66px!important;padding:7px 9px 16px!important;margin:0 42px 10px 0!important;border-bottom:1px solid #e9e9ee!important}
+ body #app.app:not(.hidden)>.side #nav.nav{flex:1 1 auto!important;min-height:0!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;gap:3px!important;padding:4px 0!important}
+ body #app.app:not(.hidden)>.side #nav.nav button{min-height:43px!important;padding:11px 13px!important;border-radius:11px!important;font-size:13px!important}
+ body #app.app:not(.hidden)>.side .user{flex:0 0 auto!important;margin-top:8px!important;padding:10px 12px!important}
+ body #app.app:not(.hidden)>.side .sideUtility{flex:0 0 auto!important;display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;padding:9px 0 0!important;margin:8px 0 0!important}
+ body #app.app:not(.hidden)>.side .sideUtility button{width:100%!important;min-height:40px!important;min-width:0!important;white-space:normal!important}
+ body #app.app:not(.hidden)>.side .sideUtility button[onclick*="logout"]{grid-column:1/-1!important;display:block!important;width:100%!important;background:#25262e!important;color:#fff!important;border-radius:11px!important;min-height:42px!important;margin:0!important}
+ body #app.app:not(.hidden) .appSideBackdrop{z-index:1507!important}
+ body #app.app:not(.hidden).mobileMenuOpen .appSideBackdrop{display:block!important;position:fixed!important;inset:0!important;background:#1718208c!important}
+ body #app.app:not(.hidden)>.main #content .kitch2026-dashboard{min-width:0!important;max-width:100%!important}
+ body #app.app:not(.hidden)>.main #content .k26-heading{margin:0 0 13px!important;padding:0 3px!important;display:flex!important;flex-wrap:wrap!important;gap:7px!important}
+ body #app.app:not(.hidden)>.main #content .k26-heading h2{font-size:clamp(22px,5.7vw,29px)!important;line-height:1.16!important}
+ body #app.app:not(.hidden)>.main #content .k26-heading p{font-size:12px!important}
+ body #app.app:not(.hidden)>.main #content .k26-metrics{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+ body #app.app:not(.hidden)>.main #content .k26-metric{min-width:0!important;min-height:147px!important;padding:14px!important;overflow:hidden!important}
+ body #app.app:not(.hidden)>.main #content .k26-metric strong{font-size:clamp(19px,5.2vw,25px)!important;overflow-wrap:anywhere!important}
+ body #app.app:not(.hidden)>.main #content .k26-metric small{white-space:normal!important;font-size:9px!important;line-height:1.4!important}
+ body #app.app:not(.hidden)>.main #content .k26-metric em{white-space:normal!important;overflow-wrap:anywhere!important;font-size:10px!important}
+ body #app.app:not(.hidden)>.main #content .k26-body{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:10px!important}
+ body #app.app:not(.hidden)>.main #content .k26-panel{min-width:0!important;padding:16px!important;border-radius:16px!important;overflow-x:auto!important}
+ body #app.app:not(.hidden)>.main #content .k26-action-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+ body #app.app:not(.hidden)>.main #content .k26-action-grid button{min-width:0!important;min-height:42px!important;padding:9px 8px!important;white-space:normal!important}
+ body #app.app:not(.hidden)>.main #content :is(.grid,.cards,.stats-grid){grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+ body #app.app:not(.hidden)>.main #content :is(.panel,.card,.surface){min-width:0!important;max-width:100%!important}
+ body #app.app:not(.hidden)>.main #content :is(.inventoryTableWrap,.kitchReceivingTableWrap,.productionTableWrap,.kitchProductionTableScroll,.tableWrap,.table-scroll){display:block!important;max-width:100%!important;width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-x:contain!important}
+ body #app.app:not(.hidden)>.main #content :is(.inventoryTableWrap,.kitchReceivingTableWrap,.productionTableWrap,.kitchProductionTableScroll,.tableWrap,.table-scroll)>table{width:max-content!important;min-width:640px!important;max-width:none!important}
+ body #app.app:not(.hidden)>.main #content .panel:has(>table){overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
+ body #app.app:not(.hidden)>.main #content .panel>table{width:max-content!important;min-width:630px!important;max-width:none!important}
+ body #app.app:not(.hidden)>.main #content :is(input,select,textarea){max-width:100%!important;min-width:0!important;font-size:16px!important}
+ body #app.app:not(.hidden)>.main #content button{min-height:36px}
+ /* Main Office mobile uses one compact fixed header and a proper drawer. */
+ #officeApp.frame{width:100%!important;max-width:none!important;min-height:100dvh!important;padding:10px!important;margin:0!important;background:#e9e9ef!important}
+ #officeApp .app{display:block!important;width:100%!important;min-width:0!important;min-height:100dvh!important;padding:0!important;margin:0!important;background:transparent!important;overflow:visible!important}
+ #officeApp .content{display:block!important;min-width:0!important;max-width:100%!important;width:100%!important;padding:65px 0 26px!important;margin:0!important;overflow-x:clip!important}
+ #officeApp .header{min-width:0!important;max-width:100%!important;width:100%!important;min-height:64px!important;padding:15px 16px!important;margin:0 0 13px!important;border-radius:18px!important;background:#fff!important;display:flex!important;align-items:center!important}
+ #officeApp .header>strong{font-size:19px!important}
+ #officeApp .hero{min-width:0!important;max-width:100%!important;margin:0 0 13px!important;padding:7px 4px!important;gap:8px!important;flex-wrap:wrap!important}
+ #officeApp .hero h1{font-size:clamp(24px,6.2vw,31px)!important;line-height:1.13!important}
+ #officeApp .hero p{font-size:12px!important}
+ #officeApp .note{padding:13px 15px!important;line-height:1.5!important;margin:0 0 12px!important;overflow-wrap:anywhere!important}
+ #officeApp .overview-kpis{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important;margin-bottom:11px!important}
+ #officeApp .overview-kpis .card{min-width:0!important;min-height:132px!important;padding:15px!important}
+ #officeApp .overview-kpis .card .number{font-size:clamp(21px,5.8vw,27px)!important;overflow-wrap:anywhere!important}
+ #officeApp .overview-kpis .card .foot{font-size:10px!important}
+ #officeApp .overview-panels,#officeApp .overview-bottom{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:11px!important}
+ #officeApp :is(.card,.note,.overview-scroll,.overview-panels,.overview-bottom){min-width:0!important;max-width:100%!important}
+ #officeApp .card:has(table),#officeApp .overview-scroll{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-x:contain!important}
+ #officeApp .card:has(table) table,#officeApp .overview-scroll table{min-width:510px!important;width:max-content!important}
+ #officeApp :is(input,select,textarea){max-width:100%!important;font-size:16px!important}
+ #officeApp .officeSidebar{position:fixed!important;z-index:1900!important;left:auto!important;right:0!important;top:0!important;bottom:0!important;display:flex!important;flex-direction:column!important;width:min(320px,90vw)!important;max-width:90vw!important;height:100dvh!important;min-height:0!important;max-height:none!important;margin:0!important;padding:calc(18px + env(safe-area-inset-top,0px)) 13px calc(15px + env(safe-area-inset-bottom,0px))!important;transform:translateX(105%)!important;transition:transform .2s ease!important;overflow:hidden!important;background:#fff!important;border-radius:20px 0 0 20px!important;box-shadow:-5px 0 24px #22222c24!important}
+ #officeApp.officeMobileOpen .officeSidebar{transform:translateX(0)!important}
+ #officeApp .officeSidebarBrand{min-height:65px!important;margin:0 40px 10px 0!important;padding:5px 8px 14px!important;flex:0 0 auto!important}
+ #officeApp .officeSidebarLabel{display:block!important;flex:0 0 auto!important;margin:10px 0!important}
+ #officeApp .officeSidebar .topnav{display:flex!important;flex-direction:column!important;align-items:stretch!important;flex-wrap:nowrap!important;gap:5px!important;min-height:0!important;flex:1 1 auto!important;max-height:none!important;overflow-y:auto!important;overflow-x:hidden!important;margin:0!important;padding:0!important;background:transparent!important;border:0!important;box-shadow:none!important}
+ #officeApp .officeSidebar .topnav button{width:100%!important;min-height:44px!important;flex:0 0 auto!important;white-space:normal!important;text-align:left!important;padding:12px 14px!important;font-size:13px!important}
+ #officeApp .officeSidebarFooter{flex:0 0 auto!important;display:flex!important;margin-top:10px!important;padding:11px!important}
+ #officeApp .officeSidebarFooter .officeLogoutButton{min-height:43px!important}
+ #officeMobileMenu{position:fixed!important;z-index:1905!important;top:calc(14px + env(safe-area-inset-top,0px))!important;right:14px!important;left:auto!important;display:flex!important;align-items:center!important;justify-content:center!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;background:#25262e!important;color:#fff!important;border:0!important;border-radius:12px!important;box-shadow:0 4px 14px #22222c24!important;font-size:22px!important;cursor:pointer!important}
+ #officeApp.officeMobileOpen #officeMobileMenu{right:calc(min(320px,90vw) - 58px)!important}
+ #officeMobileBackdrop{display:none!important;position:fixed!important;inset:0!important;z-index:1890!important;background:#1718208c!important}
+ #officeApp.officeMobileOpen #officeMobileBackdrop{display:block!important}
+}
+@media(min-width:851px){
+ #officeMobileMenu,#officeMobileBackdrop{display:none!important}
+}
+@media(max-width:390px){
+ body #app.app:not(.hidden)>.main{padding-left:9px!important;padding-right:9px!important}
+ body #app.app:not(.hidden)>.main #content .k26-metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+ body #app.app:not(.hidden)>.main #content .k26-metric{padding:12px!important}
+ #officeApp.frame{padding:8px!important}
+ #officeApp .overview-kpis{gap:7px!important}
+ #officeApp .overview-kpis .card{padding:12px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ #officeApp .officeSidebar,body #app.app:not(.hidden)>.side{transition:none!important}
+}
