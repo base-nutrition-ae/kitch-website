@@ -245,9 +245,10 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
    if(!boot)return;
    const box=boot.firstElementChild;
    if(!box)return;
-   const phase=String(window.__kitchOfficeStartupPhase||'connecting').replace(/[&<>"']/g,'');
    const runtime=document.getElementById('kitchOfficeRuntime');
-   if(runtime&&!window.__kitchOfficeRuntimeStarted&&phase==='connecting')window.__kitchOfficeStartupPhase='Main Office runtime did not initialize';
+   if(runtime&&!window.__kitchOfficeRuntimeStarted&&(!window.__kitchOfficeStartupPhase||window.__kitchOfficeStartupPhase==='connecting'))
+     window.__kitchOfficeStartupPhase='Main Office runtime did not initialize';
+   const phase=String(window.__kitchOfficeStartupPhase||'connecting').replace(/[&<>"']/g,'');
    box.innerHTML='<strong style="display:block;font-size:26px;color:#111;margin-bottom:12px">KITCH</strong>'+
      '<div style="font-size:15px;margin-bottom:8px">Main Office is taking longer than expected.</div>'+
      '<div style="font-size:12px;color:#777;margin-bottom:14px">Step: '+phase+'</div>'+
