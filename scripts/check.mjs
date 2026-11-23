@@ -79,5 +79,10 @@ const mobileChecks=[
 for(const [label,passed] of mobileChecks)if(!passed)throw new Error('Missing KITCH mobile feature: '+label);
 console.log('PASS: Mobile layout, navigation, responsive tables and logout contracts.');
 
+
+if(!page.includes('class="kitchHeroSignIn"')||!page.includes('onclick="openPublicSignIn()">Sign In to KITCH')) throw new Error('Public mobile Sign In CTA missing');
+if(!mobileCss.includes('Public landing mobile entry')||!mobileCss.includes('#login .kitchHeroAccess .kitchHeroSignIn'))throw new Error('Mobile landing CTA styling missing');
+console.log('PASS: Mobile public entry is accessible from the hero without opening navigation.');
+
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
 console.log(`PASS: ${scripts.length} JS scripts, ${checked} static asset references, and Main Office embed.`);
