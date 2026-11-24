@@ -2439,12 +2439,31 @@ function openPO(){openPurchaseRequest()}
 function poIngredientChanged(){}
 function savePO(){}
 let kitchReceivingHistory=[];
+let kitchPendingReceivingOrders=[];
+let kitchSelectedReceivingPO=null;
+async function kitchLoadPendingReceivingOrders(){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return;
+ const target=document.getElementById('kitchPendingPOs');
+ try{
+  const {data,error}=await sb.rpc('kitch_team_pending_receiving_orders',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+  if(error)throw error;
+  kitchPendingReceivingOrders=Array.isArray(data)?data:[];
+  if(!target)return;
+  if(!kitchPendingReceivingOrders.length){target.textContent='No orders awaiting receiving for this location.';return;}
+  target.innerHTML=kitchPendingReceivingOrders.map(x=>'<div class="kitchPendingPOLine"><div><b>'+esc(x.po_no)+'</b> · '+esc(x.supplier)+'<div>'+esc(x.ingredient)+' · Ordered '+esc(x.ordered)+' '+esc(x.unit)+' · Received '+esc(x.received)+' · Remaining '+esc(x.remaining)+' '+esc(x.unit)+'</div></div><button class="kitchReceivingBtn isPrimary" type="button" data-po-item="'+esc(x.item_id)+'">Receive item</button></div>').join('');
+  target.querySelectorAll('[data-po-item]').forEach(b=>b.onclick=()=>openKitchNewReceiving(b.dataset.poItem));
+ }catch(e){if(target)target.textContent='Pending orders unavailable: '+(e.message||e);}
+}
+
 async function kitchLoadReceivingHistory(){
  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return;
  try{const {data,error}=await sb.rpc('kitch_team_receiving_history',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});if(error)throw error;kitchReceivingHistory=Array.isArray(data)?data:[];if(document.getElementById('kitchReceivingRows'))kitchRenderReceivingRows();}catch(e){const n=document.getElementById('kitchReceivingMessage');if(n)n.textContent='Cloud history unavailable: '+e.message;}
 }
 function kitchRenderReceivingRows(){const t=document.getElementById('kitchReceivingRows');if(!t)return;t.innerHTML=kitchReceivingHistory.map(x=>`<tr><td>${esc(new Date(x.date).toLocaleDateString())}</td><td>${esc(x.invoice)}</td><td>${esc(x.supplier)}</td><td>${esc(x.ingredient)}</td><td>${esc(x.accepted)} ${esc(x.unit)}</td><td>${money(x.total)}</td><td>${esc(x.expiry||'—')}</td><td>${x.has_attachment?`<button class="kitchReceivingBtn small" onclick="kitchDownloadInvoice('${esc(x.id)}')">Invoice</button>`:'—'}</td><td><button class="kitchReceivingBtn small" onclick="kitchPrintReceipt('${esc(x.id)}')">PDF</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">No receiving records yet. Click + New Receiving.</td></tr>';}
-function receivingPage(){setTimeout(kitchLoadReceivingHistory,80);return `<style>
+function receivingPage(){setTimeout(()=>{kitchLoadReceivingHistory();kitchLoadPendingReceivingOrders();},80);return `<style>
+.kitchReceivingPage .kitchPendingPOLine{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:15px;border:1px solid #e5e5e5;border-radius:13px;margin:10px 0;font-size:13px}
+.kitchReceivingPage .kitchPendingPOLine div div{color:#666;margin-top:7px}
+@media(max-width:590px){.kitchReceivingPage .kitchPendingPOLine{align-items:flex-start;flex-direction:column}}
 .kitchReceivingPage .kitchReceivingButtons{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:18px 0}
 .kitchReceivingPage .kitchReceivingBtn{appearance:none;flex:0 0 auto;width:auto;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:0 17px;border-radius:999px;border:1px solid #dedede;background:#fff;color:#171717;font-size:12px;font-weight:750;line-height:1.2;letter-spacing:-.01em;cursor:pointer;transition:background .15s ease,border-color .15s ease,transform .15s ease}
 .kitchReceivingPage .kitchReceivingBtn:hover{background:#f1f1f1;border-color:#bdbdbd}
@@ -2458,7 +2477,7 @@ function receivingPage(){setTimeout(kitchLoadReceivingHistory,80);return `<style
 .kitchReceivingPage .kitchReceivingTable th,.kitchReceivingPage .kitchReceivingTable td{padding:12px 11px;text-align:left;vertical-align:middle}
 .kitchReceivingPage .kitchReceivingTable tr:last-child td{border-bottom:0}
 @media(max-width:600px){.kitchReceivingPage .kitchReceivingButtons{gap:8px}.kitchReceivingPage .kitchReceivingBtn{font-size:11px;padding:0 13px}}
-</style><div class="panel kitchReceivingPage"><h2>Receiving</h2><p class="muted">Receive supplier deliveries into your assigned location. Confirmed quantities update live inventory.</p><div class="kitchReceivingButtons"><button class="kitchReceivingBtn isPrimary" onclick="openKitchNewReceiving()">+ New Receiving</button><button class="kitchReceivingBtn" onclick="kitchLoadReceivingHistory()">↻ Refresh History</button></div><div class="kitchReceivingTableWrap"><table class="kitchReceivingTable"><thead><tr><th>DATE</th><th>INVOICE</th><th>SUPPLIER</th><th>INGREDIENT</th><th>ACCEPTED</th><th>TOTAL</th><th>EXPIRY</th><th>FILE</th><th>REPORT</th></tr></thead><tbody id="kitchReceivingRows"><tr><td colspan="9">Loading cloud history…</td></tr></tbody></table></div><p id="kitchReceivingMessage" class="muted" style="font-size:12px;margin-top:12px">History is saved in Supabase and available across devices for your assigned location. PDF uses your browser's Print → Save as PDF.</p></div>`;}
+</style><div class="panel kitchReceivingPage"><h2>Receiving</h2><p class="muted">Receive supplier deliveries into your assigned location. Confirmed quantities update live inventory.</p><div class="kitchReceivingButtons"><button class="kitchReceivingBtn isPrimary" onclick="openKitchNewReceiving()">+ New Receiving</button><button class="kitchReceivingBtn" onclick="kitchLoadReceivingHistory()">↻ Refresh History</button></div><section style="margin-top:22px"><h3>Pending Purchase Orders</h3><p class="muted">Sent purchase orders awaiting delivery to this kitchen.</p><div id="kitchPendingPOs">Loading purchase orders…</div></section><h3 style="margin:25px 0 8px">Receiving History</h3><div class="kitchReceivingTableWrap"><table class="kitchReceivingTable"><thead><tr><th>DATE</th><th>INVOICE</th><th>SUPPLIER</th><th>INGREDIENT</th><th>ACCEPTED</th><th>TOTAL</th><th>EXPIRY</th><th>FILE</th><th>REPORT</th></tr></thead><tbody id="kitchReceivingRows"><tr><td colspan="9">Loading cloud history…</td></tr></tbody></table></div><p id="kitchReceivingMessage" class="muted" style="font-size:12px;margin-top:12px">History is saved in Supabase and available across devices for your assigned location. PDF uses your browser's Print → Save as PDF.</p></div>`;}
 async function kitchDownloadInvoice(id){try{const {data,error}=await sb.rpc('kitch_team_receiving_download',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_receipt_id:id});if(error)throw error;const bytes=Uint8Array.from(atob(data.base64),c=>c.charCodeAt(0));const url=URL.createObjectURL(new Blob([bytes],{type:data.mime}));const a=document.createElement('a');a.href=url;a.download=data.filename||'invoice';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){alert('Cannot download invoice: '+e.message)}}
 function kitchPrintReceipt(id){const x=kitchReceivingHistory.find(r=>r.id===id);if(!x)return;const w=window.open('','_blank');if(!w)return alert('Allow pop-ups to export PDF.');w.document.write(`<!doctype html><html><head><title>KITCH Receiving ${esc(x.invoice)}</title><style>body{font:15px Arial,sans-serif;color:#222;padding:38px;max-width:760px;margin:auto}header{border-bottom:2px solid #222;padding-bottom:16px;margin-bottom:32px}h1{font-size:30px;margin:0}table{width:100%;border-collapse:collapse;margin-top:20px}td,th{text-align:left;padding:12px;border-bottom:1px solid #ddd}.muted{color:#777}footer{margin-top:65px;color:#888;font-size:12px}@media print{button{display:none}}</style></head><body><header><h1>KITCH</h1><div class="muted">Receiving Report · ${esc(currentBranchName())}</div></header><h2>Invoice ${esc(x.invoice)}</h2><p>Supplier: ${esc(x.supplier)}<br>Received: ${esc(new Date(x.date).toLocaleDateString())}</p><table><tr><th>Ingredient</th><th>Accepted</th><th>Unit price</th><th>Total</th></tr><tr><td>${esc(x.ingredient)}</td><td>${esc(x.accepted)} ${esc(x.unit)}</td><td>${money(x.price)}</td><td>${money(x.total)}</td></tr></table><p>Rejected: ${esc(x.rejected)} ${esc(x.unit)}<br>Production: ${esc(x.production_date||'—')}<br>Expiry: ${esc(x.expiry||'—')}<br>Temperature: ${x.temperature==null?'—':esc(x.temperature)+' °C'}</p><footer>Powered by KITCH · Generated ${new Date().toLocaleString()}</footer><button onclick="window.print()">Print / Save as PDF</button></body></html>`);w.document.close();}
 function kitchReceivingConversion(){
@@ -2507,10 +2526,12 @@ function kitchReceivingUnitChanged(){
  kitchReceiveUpdateTotal();
 }
 async function kitchFileToBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(new Error('Unable to read invoice'));reader.readAsDataURL(file)})}
-function openKitchNewReceiving(){
+function openKitchNewReceiving(poItemId=null){
  if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud.branch_id)return alert('Please sign in with your Team account to receive stock for your assigned location.');
  const ing=sortedIngredients().filter(x=>x.cloud_id);
  if(!ing.length)return alert('Cloud Ingredient Master has not loaded. Refresh and sign in again.');
+ kitchSelectedReceivingPO=poItemId?kitchPendingReceivingOrders.find(x=>String(x.item_id)===String(poItemId)):null;
+ if(poItemId&&!kitchSelectedReceivingPO)return alert('Order item not found. Refresh pending orders.');
  modal(`<div class="modalHead"><h2>New Receiving</h2><button class="close" onclick="closeModal()">×</button></div>
  <div class="note">Location: <b>${esc(assignedLocationName())}</b>. Only confirmed accepted quantities will be added to inventory.</div>
  <div class="formGrid">
@@ -2530,6 +2551,21 @@ function openKitchNewReceiving(){
  </div><div class="note"><b>Accepted stock total: <span id="knrTotal">AED 0.00</span></b><div id="knrConversionPreview" style="margin-top:6px;font-size:12px">Receiving quantity converts to inventory base unit.</div></div><p id="knrStatus" class="muted" aria-live="polite"></p><button id="knrSubmit" class="primary" onclick="kitchSaveNewReceiving()">Confirm Receiving</button>`);
  const today=new Date();const localDate=new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);document.getElementById('knrDate').value=localDate;
  kitchReceiveIngredientChanged();
+ if(kitchSelectedReceivingPO){
+  const line=kitchSelectedReceivingPO;
+  document.getElementById('knrIng').value=String(line.ingredient_id);
+  kitchReceiveIngredientChanged();
+  document.getElementById('knrIng').disabled=true;
+  document.getElementById('knrSupplier').value=line.supplier;
+  document.getElementById('knrSupplier').readOnly=true;
+  document.getElementById('knrQty').value=String(line.remaining);
+  document.getElementById('knrReceivingUnit').value=line.unit;
+  document.getElementById('knrReceivingUnit').disabled=true;
+  kitchReceivingUnitChanged();
+  document.getElementById('knrPrice').value=String(line.unit_price);
+  document.getElementById('knrStatus').textContent='Receiving against '+line.po_no+'. Confirm actual delivered and rejected quantities. Do not accept more than the remaining order.';
+  kitchReceiveUpdateTotal();
+ }
 }
 function kitchReceiveIngredientChanged(){
  const ing=ingredients().find(x=>String(x.cloud_id)===String(document.getElementById('knrIng')?.value));
@@ -2561,7 +2597,11 @@ async function kitchSaveNewReceiving(){
  const file=el('knrFile').files?.[0];if(file&&(file.size>2*1024*1024||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))){status.textContent='Invoice must be a PDF/JPG/PNG/WebP under 2 MB.';return;}
  btn.disabled=true;status.textContent='Saving receiving to KITCH Cloud…';
  try{
- const {data,error}=await sb.rpc('kitch_team_receive_stock',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_ingredient_id:ingredient.cloud_id,p_supplier:supplier,p_invoice_number:invoice,p_invoice_filename:el('knrFile').files?.[0]?.name||null,p_delivered_qty:baseQty,p_rejected_qty:baseRejected,p_unit:ingredient.base_unit,p_unit_price:basePrice,p_expiry_date:expiry,p_temperature:temp});
+ const line=kitchSelectedReceivingPO;
+ const common={p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice_number:invoice,p_invoice_filename:el('knrFile').files?.[0]?.name||null,p_delivered_qty:baseQty,p_rejected_qty:baseRejected,p_unit:ingredient.base_unit,p_unit_price:basePrice,p_expiry_date:expiry,p_temperature:temp};
+ const {data,error}=line
+  ?await sb.rpc('kitch_team_receive_purchase_order',{...common,p_po_item_id:line.item_id})
+  :await sb.rpc('kitch_team_receive_stock',{...common,p_ingredient_id:ingredient.cloud_id});
  if(error)throw error;
  let attachError='';try{const base64=file?await kitchFileToBase64(file):null;const attachment=await sb.rpc('kitch_team_receiving_attach',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_receipt_id:data.id,p_filename:file?.name||'',p_mime:file?.type||null,p_base64:base64,p_production_date:el('knrProduction').value||null});if(attachment.error)throw attachment.error;}catch(e){attachError=' Receipt saved and stock updated, but invoice attachment failed: '+e.message;}
  const arr=getArr('kitch_receiving_local_history_v2');arr.unshift({id:data.id,branch_id:cloud.branch_id,date:new Date().toLocaleDateString(),invoice,supplier,ingredient:ingredient.name,accepted:data.accepted_qty,unit:ingredient.base_unit});setArr('kitch_receiving_local_history_v2',arr.slice(0,150));
