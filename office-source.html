@@ -333,8 +333,13 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
   <div class="kitchPOFields">
     <label class="kitchPOField"><span>Approved supplier</span><select id="officePOSupplier"></select></label>
     <label class="kitchPOField"><span>Primary email (To)</span><input id="officePOSupplierEmail" type="email" autocomplete="email" placeholder="Saved supplier email"></label>
-    <label class="kitchPOField"><span>Other To emails (comma-separated)</span><input id="officePOAdditionalTo" type="text" placeholder="Second supplier email"></label>
-    <label class="kitchPOField"><span>CC emails (comma-separated)</span><input id="officePOCC" type="text" placeholder="CC recipients"></label>
+    <details id="officePOExtraRecipients" style="grid-column:1/-1;min-width:0;padding:10px 14px;border:1px solid #e5e5e5;border-radius:12px;background:#fafafa">
+      <summary style="font-size:12px;font-weight:750;cursor:pointer">+ Add another email / CC (optional)</summary>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;padding-top:12px">
+        <label class="kitchPOField"><span>Additional To emails</span><input id="officePOAdditionalTo" type="text" placeholder="name@supplier.com"></label>
+        <label class="kitchPOField"><span>CC emails</span><input id="officePOCC" type="text" placeholder="accounts@supplier.com"></label>
+      </div>
+    </details>
     <label class="kitchPOField"><span>WhatsApp (country code)</span><input id="officePOWhatsapp" type="tel" placeholder="9715..."></label>
   </div>
   <div id="officePOSupplierContact" class="officeSupplierPreview">Choose a supplier to view saved contact details.</div><div style="padding:12px 15px;margin:10px 0;border-radius:12px;background:#f3f4f6"><strong>Delivery location &amp; address</strong><div id="officePODeliveryPreview" style="font-size:13px;margin-top:5px">Choose a purchase request</div></div><p style="font-size:12px;color:#777;margin:14px 0 15px">Chef's approved ingredient list · No prices or quantities to re-enter.</p>
