@@ -441,6 +441,46 @@ function applyActivatedSubscription(payload){
  [LOCATION_KEY,DEPT_KEY,STAFF_KEY].forEach(k=>localStorage.removeItem(k));
  ensureStructure();
 }
+async function kitchRequestPasswordReset(){
+ const field=document.getElementById('email');
+ const address=String(field?.value||'').trim().toLowerCase();
+ if(!/^\\S+@\\S+\\.\\S+$/.test(address)){alert('Enter your email address above, then select Forgot password.');field?.focus();return;}
+ const resetButton=document.querySelector('#publicModal button[onclick="kitchRequestPasswordReset()"]');
+ if(resetButton){resetButton.disabled=true;resetButton.textContent='Sending reset link…';}
+ try{
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await sb.auth.resetPasswordForEmail(address,{redirectTo});
+  if(error)throw error;
+  alert('If the email belongs to a KITCH account, you will receive a password reset link. Check your inbox and spam folder.');
+ }catch(e){alert('Could not send password reset email: '+String(e?.message||e));}
+ finally{if(resetButton){resetButton.disabled=false;resetButton.textContent='Forgot password?';}}
+}
+function kitchOpenRecoveryForm(){
+ if(document.getElementById('kitchRecoveryDialog'))return;
+ const background=document.createElement('div');background.id='kitchRecoveryDialog';
+ Object.assign(background.style,{position:'fixed',inset:'0',zIndex:'2147483647',display:'grid',placeItems:'center',background:'rgba(10,10,10,.75)',padding:'20px'});
+ const panel=document.createElement('div');Object.assign(panel.style,{boxSizing:'border-box',background:'#fff',color:'#252629',width:'min(460px,100%)',padding:'30px',borderRadius:'22px',fontFamily:'Inter,-apple-system,BlinkMacSystemFont,Arial,sans-serif'});
+ const title=document.createElement('h2');title.textContent='Set your new KITCH password';title.style.margin='0 0 12px';
+ const desc=document.createElement('p');desc.textContent='Enter a new password for your Management account.';desc.style.color='#777';
+ const label=document.createElement('label');label.textContent='NEW PASSWORD';label.setAttribute('for','kitchRecoveryPassword');
+ const input=document.createElement('input');input.id='kitchRecoveryPassword';input.type='password';input.autocomplete='new-password';input.minLength=8;input.placeholder='At least 8 characters';Object.assign(input.style,{display:'block',boxSizing:'border-box',width:'100%',border:'1px solid #ddd',padding:'14px',borderRadius:'12px',margin:'9px 0 16px'});
+ const btn=document.createElement('button');btn.type='button';btn.textContent='Save new password';Object.assign(btn.style,{background:'#252629',color:'#fff',border:0,borderRadius:'12px',padding:'14px',width:'100%',fontWeight:'700',cursor:'pointer'});
+ const status=document.createElement('p');status.setAttribute('role','status');status.style.fontSize='13px';
+ btn.onclick=async()=>{
+  if(input.value.length<8){status.textContent='Use at least 8 characters.';return;}
+  btn.disabled=true;btn.textContent='Saving…';
+  try{
+   const {error}=await sb.auth.updateUser({password:input.value});
+   if(error)throw error;
+   input.value='';status.textContent='Password updated. Sign in with your new password.';
+   try{await sb.auth.signOut({scope:'local'});}catch(e){console.warn('Recovery sign out:',e);}
+   window.history.replaceState(null,'',window.location.pathname);
+   setTimeout(()=>{background.remove();try{closePublicModal();openPublicSignIn('management');}catch(e){}},300);
+  }catch(e){status.textContent='Password change failed: '+String(e?.message||e);}
+  finally{btn.disabled=false;btn.textContent='Save new password';}
+ };
+ panel.append(title,desc,label,input,btn,status);background.append(panel);document.body.append(background);input.focus();
+}
 async function managementLogin(){
  const em=email.value.trim().toLowerCase(),pw=password.value;if(!em||!pw)return alert('Enter email and password.');
  const {data:loginData,error}=await sb.auth.signInWithPassword({email:em,password:pw});
@@ -818,7 +858,7 @@ function toggleMobileMenu(open){
  m.classList.toggle('open',!!open);
  document.body.classList.toggle('kitch-menu-open',!!open);
 }
-function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" onclick="closePublicModal();openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" onclick="closePublicModal();openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button type="button" id="kitchTeamSubmit" class="primary" onclick="teamLogin()">Team sign in</button><div id="kitchTeamStatus" role="status" aria-live="polite" style="display:none;margin-top:12px;font-size:13px;line-height:1.5"></div>`}`)}
+function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" onclick="closePublicModal();openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" onclick="closePublicModal();openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><button type="button" onclick="kitchRequestPasswordReset()" style="display:block;margin:14px auto 0;border:0;background:transparent;color:#333;text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;font-size:13px;font-weight:650">Forgot password?</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button type="button" id="kitchTeamSubmit" class="primary" onclick="teamLogin()">Team sign in</button><div id="kitchTeamStatus" role="status" aria-live="polite" style="display:none;margin-top:12px;font-size:13px;line-height:1.5"></div>`}`)}
 function openCreateWorkspace(){closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>NEW WORKSPACE</span></div><h2>Create your KITCH</h2><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="newCompany"></div><div class="field"><label>FIRST BRANCH NAME</label><input id="newBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="newEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="newPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('newPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="createWorkspace()">Create workspace</button>`)}
 async function createWorkspace(){
  const company=newCompany.value.trim(),branch=newBranch.value.trim(),em=newEmail.value.trim(),pw=newPassword.value;
@@ -4720,6 +4760,10 @@ async function completeStripeReturn(){
   // Preserve this browser's scoped workspace data across refreshes. The signed-in
   // restaurant is resolved below before any operational screen is shown.
 
+  // Never resume an old workspace while Supabase processes a password recovery URL.
+  if(window.location.hash.includes('type=recovery')||window.location.search.includes('type=recovery')){
+   await ensureSupabaseAuth();return;
+  }
   const authOk=await ensureSupabaseAuth();
   if(!authOk){
     session=null;currentStaff=null;
@@ -4775,6 +4819,7 @@ async function completeStripeReturn(){
  }
 })();
 sb.auth.onAuthStateChange((event,authSession)=>{
+ if(event==='PASSWORD_RECOVERY'){setTimeout(kitchOpenRecoveryForm,0);return;}
  // Team and owner sessions have different server-verified location scopes.
  // Owner authentication refresh must never alter an active PIN staff session.
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return;
