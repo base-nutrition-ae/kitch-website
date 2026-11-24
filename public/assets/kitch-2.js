@@ -22,7 +22,6 @@ function openKitchMainOffice(){
   // Unified Master has one import entry point in Operations Inventory.
   // Preserve the embedded office code and hide legacy duplicate controls.
   html=html.replace('id="officeSupplierSync" type="button"','id="officeSupplierSync" type="button" hidden')
-    .replace('label class="btn" style="cursor:pointer">Import Excel / CSV','label class="btn" style="display:none">Import Excel / CSV')
     .replace(".eq('restaurant_id',officeRid).order('name');\n if(error){ig('officeIngredientCount')",".eq('restaurant_id',officeRid).eq('is_active',true).eq('is_current_master',true).order('name');\n if(error){ig('officeIngredientCount')");
   html=kitchOfficeApplyChatNavigation(html);
   // Parent watchdog must not interfere with Main Office's independent authentication.
