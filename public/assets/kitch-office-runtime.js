@@ -650,13 +650,27 @@ function officeOrderDestination(req){
  return {name:loc?.name||'Location not found',address:loc?.delivery_address||'',instructions:loc?.delivery_instructions||''};
 }
 function officeKitchenOrderText(req,supplierName){
- const restaurant=officeRestaurantName||'Restaurant';
- const items=req.lines.map((l,i)=>(i+1)+'. '+l.ingredient+' — '+l.quantity+' '+l.unit).join('\n');
+ const restaurant=String(officeRestaurantName||'Restaurant').trim();
+ const orderNumber=req.request_no||req.id;
  const destination=officeOrderDestination(req);
- return restaurant+' — PURCHASE ORDER\nRequest: '+(req.request_no||req.id)+
- '\nStatus: Approved\nSupplier: '+supplierName+'\nDelivery location: '+destination.name+'\nDelivery address: '+(destination.address||'Not provided — confirm before sending')+(destination.instructions?'\nDelivery instructions: '+destination.instructions:'')+'\n\nINGREDIENTS & QUANTITIES\n'+items+
- '\n\nNotes: '+(req.notes||req.note||req.request_notes||'None')+
- '\n\nPlease confirm availability and delivery details.\n\n'+restaurant+' Purchasing';
+ const items=req.lines.map((l,i)=>(i+1)+'. '+l.ingredient+' — '+l.quantity+' '+l.unit).join('\n');
+ const notes=String(req.notes||req.note||req.request_notes||'').trim();
+ return 'Dear '+supplierName+' Team,\n\n'+
+  'I hope this email finds you well.\n\n'+
+  'Please find below the purchase order from '+restaurant+'. Kindly review the requested items and confirm their availability and the expected delivery schedule.\n\n'+
+  'PURCHASE ORDER DETAILS\n'+
+  'Restaurant: '+restaurant+'\n'+
+  'Order reference: '+orderNumber+'\n'+
+  'Supplier: '+supplierName+'\n\n'+
+  'ITEMS & QUANTITIES\n'+items+'\n\n'+
+  'DELIVERY INFORMATION\n'+
+  'Delivery location: '+destination.name+'\n'+
+  'Delivery address: '+(destination.address||'Address pending confirmation')+'\n'+
+  (destination.instructions?'Delivery instructions: '+destination.instructions+'\n':'')+
+  (notes?'\nAdditional notes: '+notes+'\n':'')+
+  '\nPlease confirm receipt of this order, item availability and the expected delivery time.\n\n'+
+  'Thank you for your cooperation.\n\n'+
+  'Best regards,\n'+restaurant+'\nPurchasing Department';
 }
 function officeCurrentKitchenOrder(){
  const req=(officePurchaseState.requestGroups||[]).find(x=>String(x.id)===String(officeSelectedPurchaseRequest));
@@ -680,7 +694,7 @@ officePurchaseEl('officePOConfirm').addEventListener('click',()=>{
   cc=officeValidEmailList(officePurchaseEl('officePOCC').value);
   if(!to.length)throw Error('Enter at least one supplier To email.');
  }catch(e){message.textContent=e.message;return}
- const subject=(officeRestaurantName||'Restaurant')+' Purchase Order — '+(data.req.request_no||data.req.id);
+ const subject='Purchase Order '+(data.req.request_no||data.req.id)+' | '+(officeRestaurantName||'Restaurant');
  const body=officeKitchenOrderText(data.req,data.supplier.name);
  const mailto='mailto:'+to.map(encodeURIComponent).join(',')+'?'+(cc.length?'cc='+encodeURIComponent(cc.join(','))+'&':'')+'subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
  officeLastOrderChannel='email';
