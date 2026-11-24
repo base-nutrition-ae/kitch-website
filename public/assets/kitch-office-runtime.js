@@ -619,6 +619,7 @@ function officePOUpdateSupplier(){
  officePurchaseEl('officePOSupplierEmail').value=supplier?.email||'';
  officePurchaseEl('officePOAdditionalTo').value=supplier?.additional_to_emails||'';
  officePurchaseEl('officePOCC').value=supplier?.cc_emails||'';
+ officePurchaseEl('officePOExtraRecipients').open=!!(supplier?.additional_to_emails||supplier?.cc_emails);
  officePurchaseEl('officePOWhatsapp').value=supplier?.whatsapp_phone||supplier?.phone||'';
  const preview=officePurchaseEl('officePOSupplierContact');
  if(preview)preview.innerHTML=supplier?'<div><span>CONTACT PERSON</span><strong>'+safe(supplier.contact_name||'Not provided')+'</strong></div><div><span>PHONE</span><strong>'+safe(supplier.phone||'Not provided')+'</strong></div><div><span>SUPPLIER ADDRESS</span><strong>'+safe(supplier.address||'Not provided')+'</strong></div>':'Choose a supplier to view saved contact details.';
@@ -768,8 +769,7 @@ function officeSupplierProfileForm(id){
  '<label>Supplier / Company Name *<input required maxlength="120" name="name" placeholder="Supplier company name"></label>'+
  '<label>Contact Person<input maxlength="120" name="contact" placeholder="Full name"></label>'+
  '<label>Primary email (To)<input type="email" maxlength="320" name="email" placeholder="orders@supplier.com"></label>'+
- '<label class="wide">Additional To emails (comma-separated)<input maxlength="640" name="more_to" placeholder="sales@supplier.com"></label>'+
- '<label class="wide">CC emails (comma-separated)<input maxlength="640" name="cc" placeholder="accounts@supplier.com"></label>'+
+ '<details class="wide" id="officeSupplierExtraRecipients" style="grid-column:1/-1;border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px;background:#fafafa"><summary style="font-size:12px;font-weight:750;cursor:pointer">+ Add another email / CC (optional)</summary><div style="padding-top:12px;display:grid;gap:12px"><label>Additional To emails<input maxlength="640" name="more_to" placeholder="sales@supplier.com"></label><label>CC emails<input maxlength="640" name="cc" placeholder="accounts@supplier.com"></label></div></details>'+
  '<label>Supplier WhatsApp number (with country code)<input type="tel" maxlength="30" name="whatsapp" placeholder="+971501234567"></label>'+
  '<label>Phone / WhatsApp<input type="tel" maxlength="50" name="phone" placeholder="+971 ..."></label>'+
  '<label class="wide">Business Address<textarea maxlength="600" name="address" rows="2" placeholder="Street, area, city"></textarea></label>'+
@@ -781,6 +781,7 @@ function officeSupplierProfileForm(id){
  const form=overlay.querySelector('form');
  const fields={name:'name',contact_name:'contact',email:'email',phone:'phone',address:'address',trade_license:'license',notes:'notes',additional_to_emails:'more_to',cc_emails:'cc',whatsapp_phone:'whatsapp'};
  if(supplier)for(const [key,field] of Object.entries(fields))form.elements[field].value=supplier[key]||'';
+ if(supplier&&(supplier.additional_to_emails||supplier.cc_emails))overlay.querySelector('#officeSupplierExtraRecipients').open=true;
  const close=()=>overlay.remove();
  overlay.querySelector('#officeSupplierClose').onclick=close;
  overlay.querySelector('#officeSupplierCancel').onclick=close;
