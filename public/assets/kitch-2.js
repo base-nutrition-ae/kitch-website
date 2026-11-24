@@ -134,8 +134,12 @@ function kitchOfficeApplyChatNavigation(html){
  #officeApp .officeChatSidebar{
   width:220px!important;max-width:220px!important;
   height:calc(100dvh - 44px)!important;min-height:0!important;
-  position:sticky!important;top:0!important
+  position:fixed!important;top:22px!important;
+  left:max(21px,calc((100vw - 1540px)/2))!important;
+  bottom:22px!important;z-index:20!important;
+  overflow:hidden!important
  }
+ #officeApp .officeChatNav{overflow-y:auto!important;overscroll-behavior:contain!important}
  #officeApp .content{grid-column:2!important;min-width:0!important}
 }
 @media(max-width:800px){
