@@ -141,7 +141,7 @@ const readyChecks=[
 ];
 for(const [label,ok] of readyChecks)if(!ok)throw new Error('Missing KITCH Ready Products feature: '+label);
 if(!app.includes('items=[...new Set(items)]'))throw new Error('Workspace navigation must deduplicate items');
-if(!app.includes("items=items.filter(x=>!['Stock Transfer','Stock Requests','Ready Products'].includes(x))"))throw new Error('Pro-only navigation visibility check missing');
+if(!app.includes("if(!multi)items=items.filter(x=>!['Stock Requests','Stock Transfer'].includes(x))"))throw new Error('Pro-only navigation visibility check missing');
 if(!readySource.includes('disabled title="Cloud setup required"'))throw new Error('Unconfigured Ready Product requests must be blocked');
 console.log('PASS: Ready Products navigation unique and unconfigured requests disabled.');
 if(!readySource.includes('canDispatch=result?.can_dispatch===true')||!readySource.includes('centralKitchenStaff=result?.is_central_kitchen===true'))throw new Error('Central Kitchen dispatch permissions must come from cloud role and location.');
@@ -151,7 +151,7 @@ if(!officeRuntime.includes("x.branch_type==='central_kitchen'?'Central Kitchen'"
 console.log('PASS: Central Kitchen locations, dispatch permissions and multi-location UI contracts.');
 const ckDashboardChecks=[
  ['verified CK staff workspace flag',app.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")||readySource.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")],
- ['CK-specific sidebar entries',app.includes("items.splice(1,0,...CK_PAGES)")],
+ ['CK-specific sidebar entries',app.includes("items=['Dashboard','Incoming Branch Orders','Production Planning','Production'")],
  ['CK dashboard route',app.includes("window.kitchCentralKitchenPage('Dashboard')")],
  ['CK live request rendering',readySource.includes("window.kitchCentralKitchenPage=view=>")],
  ['branch-specific order rows',readySource.includes("escapeHtml(x.branch_name||'—')")],
