@@ -9,6 +9,14 @@ const KITCH_AUTH_BUILD='2026-10-02-final-all-in-one-v1';
 let cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
 let teamCloudAuth=null;
 
+async function kitchIsVerifiedMember(userId,restaurantId){
+ if(!userId||!restaurantId)return false;
+ const [office,member]=await Promise.all([
+  sb.from('kitch_office_owners').select('restaurant_id').eq('user_id',userId).eq('restaurant_id',restaurantId).eq('is_active',true).limit(1),
+  sb.from('restaurant_members').select('restaurant_id').eq('user_id',userId).eq('restaurant_id',restaurantId).eq('is_active',true).limit(1)
+ ]);
+ return (!office.error&&!!office.data?.length)||(!member.error&&!!member.data?.length);
+}
 async function loadCloudWorkspace(){
  // Never replace the PIN-verified Team workspace with a stale owner browser session.
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return true;
@@ -21,7 +29,7 @@ async function loadCloudWorkspace(){
  const cachedRestaurant=localStorage.getItem(cachePrefix+'restaurant_id');
  const cachedBranch=localStorage.getItem(cachePrefix+'branch_id');
  const cachedWorkspaceCode=localStorage.getItem(cachePrefix+'workspace_code');
- if(cachedRestaurant){
+ if(cachedRestaurant&&await kitchIsVerifiedMember(user.id,cachedRestaurant)){
   cloud.restaurant_id=cachedRestaurant;cloud.branch_id=cachedBranch||null;cloud.workspace_code=cachedWorkspaceCode||null;
   await syncPackageFromCloud();
   restoreScopedStaff();
@@ -32,7 +40,7 @@ async function loadCloudWorkspace(){
  try{
   const {data:rows,error}=await sb.rpc('kitch_current_workspace');
   const w=Array.isArray(rows)?rows[0]:rows;
-  if(!error&&w?.restaurant_id){
+  if(!error&&w?.restaurant_id&&await kitchIsVerifiedMember(user.id,w.restaurant_id)){
    cloud.restaurant_id=w.restaurant_id;
    cloud.branch_id=w.branch_id||null;
    cloud.workspace_code=w.workspace_code||null;
@@ -52,8 +60,12 @@ async function loadCloudWorkspace(){
  // Read only the signed-in user's permitted owner row; never grant access from browser cache.
  try{
   const {data:officeRows,error:officeError}=await sb.from('kitch_office_owners')
-   .select('restaurant_id').eq('user_id',user.id).eq('is_active',true).limit(1);
-  const office=officeRows?.[0];
+   .select('restaurant_id').eq('user_id',user.id).eq('is_active',true);
+  const preferred=sessionStorage.getItem('kitch_office_selected_'+user.id);
+  const office=(officeRows||[]).length===1?officeRows[0]:(officeRows||[]).find(row=>String(row.restaurant_id)===preferred);
+  if((officeRows||[]).length>1&&!office){
+   window.__kitchWorkspaceError='Select your workspace in Main Office before using the kitchen';return false;
+  }
   if(!officeError&&office?.restaurant_id){
    const {data:branches,error:branchError}=await sb.from('branches')
     .select('id,name,branch_type,is_active').eq('restaurant_id',office.restaurant_id).eq('is_active',true);
@@ -102,7 +114,7 @@ async function loadCloudWorkspace(){
  // 4) Last safe browser fallback: use IDs previously resolved for this signed-in session.
  const fallbackRestaurant=localStorage.getItem(cachePrefix+'restaurant_id');
  const fallbackBranch=localStorage.getItem(cachePrefix+'branch_id');
- if(fallbackRestaurant){
+ if(fallbackRestaurant&&await kitchIsVerifiedMember(user.id,fallbackRestaurant)){
   cloud.restaurant_id=fallbackRestaurant;cloud.branch_id=fallbackBranch||null;
   await syncPackageFromCloud();
   window.__kitchWorkspaceError='';return true;
