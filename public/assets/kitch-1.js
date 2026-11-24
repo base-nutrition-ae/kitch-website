@@ -2006,6 +2006,27 @@ async function kitchCloudPurchaseRpc(action,extra={}){
  if(error)throw Error(error.message);
  return data;
 }
+async function kitchShowCloudPurchaseDetail(kind,id){
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Sign in as a kitchen team member first.');
+ const row=kitchCloudPurchaseRows.find(x=>x.kind===kind&&String(x.id)===String(id));
+ if(!row)return alert('This purchase record is not available. Refresh Orders.');
+ try{
+  const {data,error}=await sb.rpc('kitch_team_purchase_detail',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_record_kind:kind,p_record_id:id});
+  if(error)throw error;
+  const lines=Array.isArray(data?.lines)?data.lines:[];
+  const total=lines.reduce((sum,x)=>sum+Number(x.total||0),0);
+  const date=data.date?new Date(data.date).toLocaleString():'Not recorded';
+  modal('<div class="modalHead"><div><div class="muted" style="font-size:11px;letter-spacing:.12em;font-weight:800">KITCH · PURCHASING</div><h2 style="margin:7px 0 0">'+esc(data.reference)+'</h2></div><button class="close" type="button" onclick="closeModal()">×</button></div>'+
+    '<div class="note" style="margin-bottom:17px"><b>'+esc(data.supplier)+'</b> · '+esc(data.status)+'<br><small>'+esc(date)+'</small></div>'+
+    (data.request_no?'<p class="muted">Linked request: '+esc(data.request_no)+'</p>':'')+
+    '<div style="overflow:auto"><table style="width:100%;min-width:440px"><thead><tr><th>INGREDIENT</th><th>QUANTITY</th><th>REFERENCE PRICE</th><th>ESTIMATED TOTAL</th></tr></thead><tbody>'+
+    lines.map(x=>'<tr><td><b>'+esc(x.ingredient)+'</b></td><td>'+esc(x.quantity)+' '+esc(x.unit)+'</td><td>'+(x.unit_price==null?'—':money(x.unit_price))+'</td><td>'+(x.total==null?'—':money(x.total))+'</td></tr>').join('')+
+    '</tbody></table></div>'+
+    (kind==='order'?'<div class="note" style="margin-top:15px"><b>Estimated order value: '+money(total)+'</b><br><small>Reference prices are estimates. Only confirmed Receiving updates actual stock and spending.</small></div>':'')+
+    '<div style="margin-top:16px"><b>Notes</b><p class="muted" style="white-space:pre-wrap">'+esc(data.notes||'No notes')+'</p></div>'+
+    '<div class="actions" style="margin-top:18px"><button type="button" class="btn black" onclick="closeModal();openPage(\'Receiving\')">Go to Receiving</button><button type="button" class="btn" onclick="closeModal()">Close</button></div>');
+ }catch(e){alert('Could not load order details: '+(e.message||e));}
+}
 function kitchCloudPurchaseActionButtons(x){
  const owner=kitchCloudPurchaseCatalog.role==='owner',manager=['owner','store_manager'].includes(kitchCloudPurchaseCatalog.role);
  const status=String(x.status||'').toLowerCase();
@@ -2013,7 +2034,7 @@ function kitchCloudPurchaseActionButtons(x){
   return `<button type="button" class="btn" onclick="kitchReviewCloudRequest('${esc(x.id)}','approve')">Approve</button> <button type="button" class="btn" onclick="kitchReviewCloudRequest('${esc(x.id)}','reject')">Reject</button>`;
  if(x.kind==='request'&&status==='approved'&&manager && !kitchCloudPurchaseCatalog.orders.some(o=>o.request_id===x.id && String(o.status).toLowerCase()!=='cancelled'))
   return `<button type="button" class="btn" onclick="kitchCreateCloudOrder('${esc(x.id)}')">Create PO</button>`;
- return '<span class="muted">—</span>';
+ return '<button type="button" class="btn" onclick="kitchShowCloudPurchaseDetail(\''+esc(x.kind)+'\',\''+esc(x.id)+'\')">View Details</button>';
 }
 async function kitchRefreshCloudPurchases(){
  const body=document.getElementById('kitchCloudPOBody');if(!body)return;
@@ -2054,7 +2075,7 @@ async function kitchRefreshCloudPurchases(){
     if(selected)x.supplier=selected.supplier_name;
   }
   kitchCloudPurchaseRows=[...grouped.values(),...requests];
-  body.innerHTML=kitchCloudPurchaseRows.map(x=>`<tr><td><b>${esc(x.order_ref)}</b></td><td>${esc(x.supplier)}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${esc(x.status)}</td><td>${kitchCloudPurchaseActionButtons(x)}</td></tr>`).join('')||
+  body.innerHTML=kitchCloudPurchaseRows.map(x=>`<tr><td><button type="button" class="btn" style="font-weight:800;text-decoration:underline;border:0;background:none;padding:0;min-height:28px" onclick="kitchShowCloudPurchaseDetail('${esc(x.kind)}','${esc(x.id)}')">${esc(x.order_ref)}</button></td><td>${esc(x.supplier)}</td><td>${Array.isArray(x.lines)?x.lines.length:0}</td><td>${esc(x.status)}</td><td>${kitchCloudPurchaseActionButtons(x)}</td></tr>`).join('')||
    '<tr><td colspan="5" class="empty">No cloud purchase records yet.</td></tr>';
   const label=document.getElementById('kitchCloudPurchaseRole');
   if(label)label.textContent='Cloud workspace · '+(data?.role||'staff')+' · '+requests.length+' requests · '+grouped.size+' purchase orders';
