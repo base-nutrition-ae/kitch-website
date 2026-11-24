@@ -23,6 +23,7 @@ setTimeout(function(){
 },0);
 let db=null;let officeRid=null,officeBranches=[],officeStaff=[];let officeRestaurantName='';
 let officeOpsSnapshot=null, officeOpsLoading=false;
+let officePlanStatus=null;
 
 let officeFlowData=null,officeFlowLoading=false;
 function officeFlowInstall(){
@@ -121,7 +122,7 @@ async function loadOwner(initialUser){
  officeRestaurantName=String(r.data?.name||'').trim();
  setVisible(true);
  const currentIds=new Set((ings.data||[]).map(x=>String(x.id)));
- const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=(inventory.data||[]).filter(x=>currentIds.has(String(x.ingredient_id)));officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();bindOfficeLocationOperations();refreshOfficeLocationOperations().catch(e=>console.warn('Office location report unavailable',e));
+ const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=(inventory.data||[]).filter(x=>currentIds.has(String(x.ingredient_id)));officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();void officeRefreshPackageStatus();bindOfficeLocationOperations();refreshOfficeLocationOperations().catch(e=>console.warn('Office location report unavailable',e));
  officeFlowInstall();void officeFlowRefresh();
  const val=bal.reduce((s,x)=>s+Number(x.quantity_on_hand||0)*Number(x.indicative_unit_cost||0),0);
  if(!bal.length){const note=document.querySelector('#overview .notice');if(note)note.textContent='No inventory rows are visible to this account yet. Check owner inventory permissions before interpreting AED 0.00 as a real balance.';}
@@ -274,13 +275,28 @@ function bindOfficeLocationOperations(){
 }
 
 function renderLocations(){const target=el('locations')?.querySelector('table tbody');if(!target)return;target.innerHTML=officeBranches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.branch_type==='central_store'?'Central Store':x.branch_type==='central_kitchen'?'Central Kitchen':'Restaurant / Branch')+' · '+safe(x.code||'—')+'</td><td>'+ (x.is_active?'Active':'Inactive')+' <button type="button" class="officeMini" data-location-edit="'+safe(x.id)+'">Edit</button> <button type="button" class="officeMini" data-location-toggle="'+safe(x.id)+'">'+(x.is_active?'Deactivate':'Activate')+'</button></td></tr>').join('')||'<tr><td colspan="3">No locations found</td></tr>';target.querySelectorAll('[data-location-edit]').forEach(btn=>btn.onclick=()=>openLocation(officeBranches.find(x=>x.id===btn.dataset.locationEdit)));target.querySelectorAll('[data-location-toggle]').forEach(btn=>btn.onclick=()=>toggleLocation(btn.dataset.locationToggle));}
+async function officeRefreshPackageStatus(){
+ if(!officeRid||!db)return;
+ const {data,error}=await db.rpc('kitch_owner_package_status');
+ if(error||String(data?.restaurant_id)!==String(officeRid)){
+  officePlanStatus=null;const n=el('officeLocationNote');if(n)n.textContent='Subscription information unavailable. KITCH Cloud checks the plan before permitting any location changes.';
+  return;
+ }
+ officePlanStatus=data;
+ const starter=data.plan==='starter',pro=data.plan==='pro';
+ const tag=el('officePackageLabel');if(tag)tag.textContent=starter?'KITCH Starter · 1 restaurant':pro?'KITCH Pro · Multi-location':'Subscription verification required';
+ const note=el('officeLocationNote');
+ if(note)note.textContent=starter?'KITCH Starter includes one complete Restaurant Kitchen. Main Office controls purchasing, recipes, inventory, receiving, production and reports. Upgrade to Pro to add locations.':pro?'KITCH Pro includes unlimited locations. Add Restaurant Branch, Central Kitchen or Central Store only when needed. Each has separate stock and staff permissions.':'Your package is not yet mapped. Contact KITCH support before adding locations.';
+ const add=el('officeAddLocation');
+ if(add){add.disabled=!pro || data.subscription_status==='not_active';add.title=starter?'Starter includes one full kitchen. Pro is required to add more locations.':pro?'Add another location': 'Verify subscription first';}
+}
 function openLocation(x){const d=el('officeLocationDialog');el('officeLocationForm').reset();el('officeLocationId').value=x?.id||'';el('officeLocationTitle').textContent=x?'Edit Location':'Add Location';el('officeLocationName').value=x?.name||'';el('officeLocationCode').value=x?.code||'';el('officeLocationType').value=x?.branch_type==='restaurant'?'branch':(x?.branch_type||'branch');el('officeLocationMessage').textContent='';d.showModal();}
 async function refreshLocations(){const [br,staff]=await Promise.all([db.from('branches').select('id,name,code,branch_type,is_active').eq('restaurant_id',officeRid),db.from('staff_access').select('id,staff_name,role,section,branch_id,is_active').eq('restaurant_id',officeRid)]);if(br.error){alert(br.error.message);return;}officeBranches=br.data||[];if(!staff.error)officeStaff=staff.data||[];renderLocations();renderStaff();setKpi('Active Locations',String(officeBranches.filter(x=>x.is_active).length).padStart(2,'0'));await loadOwner();}
 async function toggleLocation(id){const x=officeBranches.find(y=>y.id===id);if(!x)return;const action=x.is_active?'deactivate':'activate';if(!confirm((x.is_active?'Deactivate ':'Activate ')+x.name+'?'))return;const {error}=await db.rpc('kitch_office_manage_location',{p_action:action,p_restaurant_id:officeRid,p_branch_id:id});if(error){alert(error.message);return;}await refreshLocations();}
-el('officeAddLocation').onclick=()=>openLocation(null);
+el('officeAddLocation').onclick=()=>{if(officePlanStatus?.plan!=='pro')return alert('KITCH Pro is required to create additional locations.');openLocation(null);};
 el('officeLocationCancel').onclick=()=>el('officeLocationDialog').close();
 el('officeLocationX').onclick=()=>el('officeLocationDialog').close();
-el('officeLocationForm').onsubmit=async e=>{e.preventDefault();const btn=el('officeLocationSave'),id=el('officeLocationId').value;btn.disabled=true;el('officeLocationMessage').textContent='Saving…';const {error}=await db.rpc('kitch_office_manage_location',{p_action:id?'update':'create',p_restaurant_id:officeRid,p_branch_id:id||null,p_name:el('officeLocationName').value.trim(),p_code:el('officeLocationCode').value.trim()||null,p_branch_type:el('officeLocationType').value});btn.disabled=false;if(error){el('officeLocationMessage').textContent=error.message;return;}el('officeLocationDialog').close();await refreshLocations();};
+el('officeLocationForm').onsubmit=async e=>{e.preventDefault();if(!el('officeLocationId').value&&officePlanStatus?.plan!=='pro')return alert('Only Pro can add additional locations.');const btn=el('officeLocationSave'),id=el('officeLocationId').value;btn.disabled=true;el('officeLocationMessage').textContent='Saving…';const {error}=await db.rpc('kitch_office_manage_location',{p_action:id?'update':'create',p_restaurant_id:officeRid,p_branch_id:id||null,p_name:el('officeLocationName').value.trim(),p_code:el('officeLocationCode').value.trim()||null,p_branch_type:el('officeLocationType').value});btn.disabled=false;if(error){el('officeLocationMessage').textContent=error.message;return;}el('officeLocationDialog').close();await refreshLocations();};
 const staffRoles=['executive_chef','kitchen_manager','store_manager','production_staff','receiving_staff'];
 const staffRoleLabels={executive_chef:'Executive Chef',kitchen_manager:'Kitchen Manager',store_manager:'Store Manager',production_staff:'Production Staff',receiving_staff:'Receiving Staff'};
 const staffRoleLabel=r=>staffRoleLabels[r]||String(r||'').replaceAll('_',' ');

@@ -175,6 +175,14 @@ for(const [label,ok] of [
  ['Owner flow refresh',officeFlowSource.includes('function officeFlowRefresh()')],
  ['Owner flow guard',officeFlowSource.includes('No estimated totals shown.')]
 ])if(!ok)throw new Error('Owner flow dashboard check failed: '+label);
+const packageFrontend=fs.readFileSync('public/assets/kitch-office-runtime.js','utf8');
+for(const [label,ok] of [
+ ['two subscription plans',app.includes('kitchTwoPlans')],
+ ['starter checkout route',app.includes("startSubscription(\\'starter\\')")],
+ ['pro checkout route',app.includes("startSubscription(\\'business\\')")],
+ ['server package read',packageFrontend.includes("db.rpc('kitch_owner_package_status')")],
+ ['pro location gate',packageFrontend.includes("officePlanStatus?.plan!=='pro'")]
+])if(!ok)throw new Error('Package frontend check missing: '+label);
 const ckDashboardChecks=[
  ['verified CK staff workspace flag',app.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")||readySource.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")],
  ['CK-specific sidebar entries',app.includes("items=['Dashboard','Incoming Branch Orders','Production Planning','Production'")],
