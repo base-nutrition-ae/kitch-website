@@ -175,10 +175,11 @@ async function loadOwner(initialUser){
  updateSummary('Pending purchase orders',purchasingReady?String(waiting.length)+' purchase requests':'Cloud purchasing unavailable');
  const purchasingCard=[...document.querySelectorAll('#overview .overview-kpis .card')].find(c=>c.querySelector('small')?.textContent.trim()==='Monthly Purchasing');
  const currentMonth=new Date().toISOString().slice(0,7);
- const monthly=sharedOrders.filter(x=>String(x.ordered_at||x.created_at||'').slice(0,7)===currentMonth&&!['cancelled','rejected'].includes(String(x.status).toLowerCase()));
+ // Monthly Purchasing records accepted deliveries, never unreceived purchase orders.
+ // The PO's estimated amount remains visible under Purchasing until Receiving confirms stock.
  if(purchasingCard){
-  purchasingCard.querySelector('.number').textContent=purchasingReady?money(monthly.reduce((sum,x)=>sum+Number(orderTotals.get(String(x.id))||0),0)):'—';
-  purchasingCard.querySelector('.foot').textContent=purchasingReady?'Shared cloud purchase orders · Current month':'Cloud purchasing read unavailable';
+  purchasingCard.querySelector('.number').textContent=receivingConnected?money(receivedValue):'—';
+  purchasingCard.querySelector('.foot').textContent=receivingConnected?'Accepted receiving value · Current month':'Receiving data unavailable';
  }
  const summaryRoot=el('overview').querySelector('.summary-rows');
  let pendingDeliveries=el('ownerPendingDeliveries');if(!pendingDeliveries&&summaryRoot){pendingDeliveries=document.createElement('div');pendingDeliveries.id='ownerPendingDeliveries';summaryRoot.appendChild(pendingDeliveries);}
