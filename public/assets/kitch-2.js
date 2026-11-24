@@ -42,7 +42,14 @@ function openKitchMainOffice(){
 function closeKitchMainOffice(){try{sessionStorage.setItem('kitch_last_view','kitchen')}catch(e){}document.getElementById('kitchOfficeOverlay').classList.remove('open');document.body.style.overflow='';document.getElementById('login')?.classList.remove('hidden')}
 window.addEventListener('message',function(event){
   const frame=document.getElementById('kitchOfficeFrame');
-  if(!frame||event.source!==frame.contentWindow||event.data?.type!=='KITCH_OFFICE_SIGNED_OUT')return;
+  if(!frame||event.source!==frame.contentWindow)return;
+  if(event.data?.type==='KITCH_OFFICE_RETURN_TO_TEAM'){
+    closeKitchMainOffice();
+    try{closePublicModal()}catch(e){}
+    try{openPublicSignIn('team')}catch(e){console.error('Unable to open Team sign in',e)}
+    return;
+  }
+  if(event.data?.type!=='KITCH_OFFICE_SIGNED_OUT')return;
   closeKitchMainOffice();
   // The cached office has already reset its signed-out view.
   // Its own Supabase auth listener controls the signed-out view.
