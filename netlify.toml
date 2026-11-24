@@ -1,3 +1,5 @@
 [build]
   command = "npm run check && npm run build"
   publish = "public"
+
+# Release sync: deploy the verified Starter + Pro UI after Netlify usage pause.
