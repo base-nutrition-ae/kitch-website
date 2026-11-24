@@ -144,6 +144,12 @@ if(!app.includes('items=[...new Set(items)]'))throw new Error('Workspace navigat
 if(!app.includes("items=items.filter(x=>!['Stock Transfer','Stock Requests','Ready Products'].includes(x))"))throw new Error('Pro-only navigation visibility check missing');
 if(!readySource.includes('disabled title="Cloud setup required"'))throw new Error('Unconfigured Ready Product requests must be blocked');
 console.log('PASS: Ready Products navigation unique and unconfigured requests disabled.');
+if(!readySource.includes('canDispatch=result?.can_dispatch===true')||!readySource.includes('centralKitchenStaff=result?.is_central_kitchen===true'))throw new Error('Central Kitchen dispatch permissions must come from cloud role and location.');
+if(!readySource.includes('centralKitchenStaff||!ready'))throw new Error('Central Kitchen must not create requests to itself.');
+if(!officeSource.includes('<option value="central_kitchen">'))throw new Error('Central Kitchen location type missing from Main Office.');
+if(!officeRuntime.includes("x.branch_type==='central_kitchen'?'Central Kitchen'"))throw new Error('Central Kitchen location label missing.');
+console.log('PASS: Central Kitchen locations, dispatch permissions and multi-location UI contracts.');
+
 console.log('PASS: Ready Products catalog, requests, batch flow and isolated SQL migration staged.');
 
 console.log('PASS: Daily waste, recipe yield and cloud sync release features.');
