@@ -22,6 +22,7 @@ setTimeout(function(){
   });
 },0);
 let db=null;let officeRid=null,officeBranches=[],officeStaff=[];let officeRestaurantName='';
+let officeOpsSnapshot=null, officeOpsLoading=false;
 function say(t){msg.textContent=t||'';}
 function setVisible(on){el('officeAuth').classList.toggle('officeHidden',on);el('officeApp').classList.toggle('officeHidden',!on);}
 function money(n){return 'AED '+Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2,minimumFractionDigits:2});}
@@ -61,7 +62,7 @@ async function loadOwner(initialUser){
  officeRestaurantName=String(r.data?.name||'').trim();
  setVisible(true);
  const currentIds=new Set((ings.data||[]).map(x=>String(x.id)));
- const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=(inventory.data||[]).filter(x=>currentIds.has(String(x.ingredient_id)));officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();
+ const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=(inventory.data||[]).filter(x=>currentIds.has(String(x.ingredient_id)));officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();bindOfficeLocationOperations();refreshOfficeLocationOperations().catch(e=>console.warn('Office location report unavailable',e));
  const val=bal.reduce((s,x)=>s+Number(x.quantity_on_hand||0)*Number(x.indicative_unit_cost||0),0);
  if(!bal.length){const note=document.querySelector('#overview .notice');if(note)note.textContent='No inventory rows are visible to this account yet. Check owner inventory permissions before interpreting AED 0.00 as a real balance.';}
  setKpi('Active Locations',String(branches.length).padStart(2,'0'));
@@ -148,6 +149,68 @@ async function loadOwner(initialUser){
  const locRows=el('overview').querySelector('.overview-scroll tbody');if(locRows)locRows.innerHTML=branches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+money(bal.filter(y=>y.branch_id===x.id).reduce((s,y)=>s+Number(y.quantity_on_hand||0)*Number(y.indicative_unit_cost||0),0))+'</td><td>—</td><td>'+'—'+'</td><td>Active</td></tr>').join('')||'<tr><td colspan="5">No locations</td></tr>';
  const title=el('officeApp').querySelector('.profile');if(title)title.setAttribute('title',(r.data?.name||'KITCH')+' · '+user.email);
  const logout=el('officeSidebarLogout');if(logout)logout.onclick=async()=>{logout.disabled=true;try{const {error}=await db.auth.signOut({scope:'local'});if(error)throw error;setVisible(false);officeRid=null;officeRestaurantName='';officeIngredients=[];window.parent.postMessage({type:'KITCH_OFFICE_SIGNED_OUT'},'*');}catch(e){say('Log out failed: '+e.message);}finally{logout.disabled=false;}};
+}
+
+
+async function refreshOfficeLocationOperations(){
+ if(!officeRid||officeOpsLoading)return;
+ officeOpsLoading=true;
+ const status=el('officeOpsStatus');
+ if(status)status.textContent='Loading verified location data…';
+ try{
+  const {data,error}=await db.rpc('kitch_owner_location_operations');
+  if(error)throw error;
+  if(String(data?.restaurant_id)!==String(officeRid))throw Error('Wrong company report response');
+  officeOpsSnapshot=data;
+  renderOfficeLocationOperations();
+ }catch(e){
+  if(status)status.textContent='Location report unavailable: '+String(e.message||e);
+  if(el('officeOpsRows'))el('officeOpsRows').innerHTML='<tr><td colspan="8">Live records unavailable. No estimated totals shown.</td></tr>';
+  if(el('officeOpsActivity'))el('officeOpsActivity').innerHTML='<tr><td colspan="5">Could not load verified activity.</td></tr>';
+ }finally{officeOpsLoading=false}
+}
+function renderOfficeLocationOperations(){
+ const data=officeOpsSnapshot;
+ if(!data)return;
+ const locations=Array.isArray(data.locations)?data.locations:[];
+ const events=Array.isArray(data.activity)?data.activity:[];
+ const filter=el('officeOpsLocationFilter'),status=el('officeOpsStatus');
+ if(filter){
+  const current=filter.value||'all';
+  filter.innerHTML='<option value="all">All locations</option>'+locations.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+' ('+safe(x.branch_type)+')</option>').join('');
+  if(current==='all'||locations.some(x=>String(x.id)===current))filter.value=current;
+ }
+ const selected=filter?.value||'all';
+ const visible=selected==='all'?locations:locations.filter(x=>String(x.id)===selected);
+ const count=x=>Number(x||0).toLocaleString('en-AE');
+ const moneyOrDash=x=>x==null?'—':money(x);
+ const cells=visible.map(x=>'<tr><td><b>'+safe(x.name)+'</b><div style="font-size:11px;color:#888">'+safe(x.branch_type)+'</div></td><td>'+moneyOrDash(x.inventory_value)+'</td><td>'+count(x.production_runs)+'</td><td>'+moneyOrDash(x.production_stock_cost)+'</td><td>'+count(x.receiving_entries)+' · '+moneyOrDash(x.receiving_value)+'</td><td>'+count(x.ready_product_orders)+'</td><td>'+count(x.stock_counts)+'</td><td>'+count(x.stock_transfers)+'</td></tr>');
+ if(selected==='all'&&visible.length){
+  const sum=k=>visible.reduce((s,x)=>s+Number(x[k]||0),0);
+  cells.push('<tr style="font-weight:750;background:#f5f5f6"><td>ALL LOCATIONS</td><td>'+money(sum('inventory_value'))+'</td><td>'+count(sum('production_runs'))+'</td><td>'+money(sum('production_stock_cost'))+'</td><td>'+count(sum('receiving_entries'))+' · '+money(sum('receiving_value'))+'</td><td>'+count(sum('ready_product_orders'))+'</td><td>'+count(sum('stock_counts'))+'</td><td>—</td></tr>');
+ }
+ if(el('officeOpsRows'))el('officeOpsRows').innerHTML=cells.join('')||'<tr><td colspan="8">No matching locations.</td></tr>';
+ // Transfers appear per participating location; do not sum them as a company total.
+ const locationName=Object.fromEntries(locations.map(x=>[String(x.id),x.name]));
+ const activity=events.filter(x=>selected==='all'||String(x.branch_id)===selected);
+ if(el('officeOpsActivity'))el('officeOpsActivity').innerHTML=activity.slice(0,100).map(x=>'<tr><td>'+safe(String(x.at||'').replace('T',' ').slice(0,16))+'</td><td>'+safe(locationName[String(x.branch_id)]||'—')+'</td><td>'+safe(x.event_type)+'</td><td>'+safe(x.description)+'</td><td>'+safe(x.actor)+'</td></tr>').join('')||'<tr><td colspan="5">No transactions recorded for this location during the selected period.</td></tr>';
+ if(status)status.textContent='Verified cloud report · '+safe(data.month||'Current month');
+ if(el('officeOpsNote'))el('officeOpsNote').textContent='Current inventory balances; other counts month-to-date. Production runs measure raw ingredient deductions, not finished QC. Transfers are counted per participating location and not added to the company total. Multi-brand allocations are not yet connected.';
+ const cards=[...document.querySelectorAll('#reports .grid .card')];
+ if(cards[0])cards[0].querySelector('.number').textContent=money(visible.reduce((a,x)=>a+Number(x.inventory_value||0),0));
+ if(cards[1])cards[1].querySelector('.number').textContent=money(visible.reduce((a,x)=>a+Number(x.production_stock_cost||0),0));
+ // Purchase expenditure isn't derivable from the receiving ledger; avoid calling it purchasing.
+ if(cards[2]){cards[2].querySelector('small').textContent='Supplier Receiving Value';cards[2].querySelector('.number').textContent=money(visible.reduce((a,x)=>a+Number(x.receiving_value||0),0));}
+ if(cards[3]){cards[3].querySelector('small').textContent='Ready Product Requests';cards[3].querySelector('.number').textContent=count(visible.reduce((a,x)=>a+Number(x.ready_product_orders||0),0));}
+ const overviewRows=el('overview')?.querySelector('.overview-scroll tbody');
+ if(overviewRows&&locations.length){
+  overviewRows.innerHTML=locations.filter(x=>x.is_active).map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+money(x.inventory_value)+'</td><td>'+count(x.purchase_requests)+' requests</td><td>'+count(x.production_runs)+' runs</td><td>Active</td></tr>').join('');
+ }
+}
+function bindOfficeLocationOperations(){
+ const filter=el('officeOpsLocationFilter'),btn=el('officeOpsReload');
+ if(filter&&!filter.dataset.ready){filter.dataset.ready='yes';filter.onchange=renderOfficeLocationOperations;}
+ if(btn&&!btn.dataset.ready){btn.dataset.ready='yes';btn.onclick=()=>refreshOfficeLocationOperations();}
 }
 
 function renderLocations(){const target=el('locations')?.querySelector('table tbody');if(!target)return;target.innerHTML=officeBranches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.branch_type==='central_store'?'Central Store':x.branch_type==='central_kitchen'?'Central Kitchen':'Restaurant / Branch')+' · '+safe(x.code||'—')+'</td><td>'+ (x.is_active?'Active':'Inactive')+' <button type="button" class="officeMini" data-location-edit="'+safe(x.id)+'">Edit</button> <button type="button" class="officeMini" data-location-toggle="'+safe(x.id)+'">'+(x.is_active?'Deactivate':'Activate')+'</button></td></tr>').join('')||'<tr><td colspan="3">No locations found</td></tr>';target.querySelectorAll('[data-location-edit]').forEach(btn=>btn.onclick=()=>openLocation(officeBranches.find(x=>x.id===btn.dataset.locationEdit)));target.querySelectorAll('[data-location-toggle]').forEach(btn=>btn.onclick=()=>toggleLocation(btn.dataset.locationToggle));}
