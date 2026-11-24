@@ -7,7 +7,7 @@
  const $=id=>document.getElementById(id);
  const escapeHtml=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:3});
- let catalog=[],requests=[],ready=false,loading=false,error='';
+ let catalog=[],requests=[],ready=false,loading=false,error='',centralKitchenStaff=false,canDispatch=false;
  let markupPercent=50,defaultMarkup=50,pricingBranches=[],priceLookup=Object.create(null);
  const maxImport=500;
  const units=['pcs','portion','pack','kg','g','ltr','ml'];
@@ -65,6 +65,8 @@
    priceLookup=Object.fromEntries((prices?.pricing||[]).map(x=>[x.sku,x]));
    catalog=(Array.isArray(result?.catalog)?result.catalog:[]).map(x=>({...x,costPrice:priceLookup[x.sku]?.cost==null?null:Number(priceLookup[x.sku].cost),salePrice:priceLookup[x.sku]?.price==null?null:Number(priceLookup[x.sku].price)}));
    requests=Array.isArray(result?.requests)?result.requests:[];
+   centralKitchenStaff=result?.is_central_kitchen===true;
+   canDispatch=result?.can_dispatch===true;
    ready=true;
   }catch(e){error=e.message;ready=false;if(showAlert)alert(error)}
   finally{loading=false;if(typeof pageTitle!=='undefined'&&pageTitle?.textContent==='Ready Products'&&typeof content!=='undefined')content.innerHTML=render()}
@@ -72,10 +74,10 @@
  function productOptions(){return catalog.filter(x=>x.active).map(x=>'<option value="'+escapeHtml(x.sku)+'">'+escapeHtml(x.name)+' · '+escapeHtml(x.unit)+'</option>').join('')}
  function table(items,columns,renderRow,empty){return '<div class="kitchReadyScroll"><table><thead><tr>'+columns.map(c=>'<th>'+escapeHtml(c)+'</th>').join('')+'</tr></thead><tbody>'+(items.length?items.map(renderRow).join(''):'<tr><td colspan="'+columns.length+'" class="empty">'+escapeHtml(empty)+'</td></tr>')+'</tbody></table></div>'}
  function render(){
-  const isManager=typeof session!=='undefined'&&session==='manager';
-  const canManage=typeof session!=='undefined'&&['owner','store'].includes(session);
+  const isManager=typeof session!=='undefined'&&session==='manager'&&!centralKitchenStaff;
+  const canManage=canDispatch;
   const notices=!ready?'<div class="note"><b>Ready Products cloud setup required.</b> '+escapeHtml(error||'Checking access…')+' Existing ingredient requests remain available; finished-product transfers are disabled until this separate workflow is configured.</div>':'';
-  return '<div class="panel kitchReadyPage"><div class="kitchReadyHeading"><div><div class="sub">KITCH PRO · INTERNAL TRANSFERS</div><h2>Ready Products</h2><p class="muted">Ready products are created automatically from saved recipes. Available stock comes only from completed chef production.</p></div><div class="actions"><button class="btn" onclick="kitchReadyRefresh()">Refresh</button>'+(session==='owner'?'<button class="btn black" onclick="kitchReadySetMarkup()">Pricing · +'+fmt(markupPercent)+'%</button>':'')+(isManager?'<button class="btn black" onclick="kitchReadyNewRequest()" '+(!ready?'disabled title="Cloud setup required"':'')+'>+ Request Ready Products</button>':'')+'</div></div>'+notices+
+  return '<div class="panel kitchReadyPage"><div class="kitchReadyHeading"><div><div class="sub">KITCH PRO · INTERNAL TRANSFERS</div><h2>Ready Products</h2><p class="muted">'+(centralKitchenStaff?'Central Kitchen orders: review requests from all branches, accept and dispatch prepared food. Each receiving branch confirms its own delivery.':'Ready products come from saved recipes and completed production. Each branch receives into its own stock.')+'</p></div><div class="actions"><button class="btn" onclick="kitchReadyRefresh()">Refresh</button>'+(session==='owner'?'<button class="btn black" onclick="kitchReadySetMarkup()">Pricing · +'+fmt(markupPercent)+'%</button>':'')+(isManager?'<button class="btn black" onclick="kitchReadyNewRequest()" '+(!ready?'disabled title="Cloud setup required"':'')+'>+ Request Ready Products</button>':'')+'</div></div>'+notices+
    '<div class="grid"><div class="card"><span>READY PRODUCTS</span><b>'+catalog.length+'</b></div><div class="card"><span>ACTIVE REQUESTS</span><b>'+requests.filter(x=>!['Received','Cancelled'].includes(x.status)).length+'</b></div><div class="card"><span>FLOW</span><b style="font-size:13px">Kitchen → Branch → Receipt</b></div></div>'+
    '<h3 style="margin:22px 0 10px">Ready Products · Cost & Transfer Price <small class="muted">(+ '+fmt(markupPercent)+'% markup)</small></h3>'+table(catalog,['SKU','READY PRODUCT','UNIT','STORAGE','COST / UNIT','BRANCH PRICE / UNIT'],x=>'<tr><td>'+escapeHtml(x.sku)+'</td><td><b>'+escapeHtml(x.name)+'</b><div class="muted">'+escapeHtml(x.category||'')+'</div></td><td>'+escapeHtml(x.unit)+'</td><td>'+escapeHtml(x.storage)+'</td><td>'+money(x.costPrice)+'</td><td><b>'+money(x.salePrice)+'</b></td></tr>','No saved recipes with kg or litre yield.')+
    '<h3 style="margin:22px 0 10px">Branch Ready Product Requests</h3>'+table(requests,['ORDER','BRANCH','PRODUCT','QTY','UNIT PRICE','LINE TOTAL','STATUS','ACTION'],x=>'<tr><td><b>#'+escapeHtml(x.id)+'</b>'+(x.group_ref?'<div class="muted">Group '+escapeHtml(String(x.group_ref).slice(0,8))+'</div>':'')+'</td><td>'+escapeHtml(x.branch_name||'—')+'</td><td>'+escapeHtml(x.product_name||x.sku)+'</td><td>'+fmt(x.qty)+' '+escapeHtml(x.unit)+'</td><td>'+money(x.unit_price_snapshot)+'</td><td>'+money(x.unit_price_snapshot==null?null:Number(x.qty)*Number(x.unit_price_snapshot))+'</td><td>'+escapeHtml(x.status)+'</td><td>'+actions(x,canManage,isManager)+'</td></tr>','No ready product requests yet.')+
@@ -144,7 +146,7 @@
  };
 
  window.kitchReadyNewRequest=()=>{
-  if(session!=='manager'||!ready||!catalog.some(x=>x.active&&x.salePrice!=null))return alert('No price-ready recipes found. Check ingredient costs and recipe yields.');
+  if(session!=='manager'||centralKitchenStaff||!ready||!catalog.some(x=>x.active&&x.salePrice!=null))return alert('No price-ready recipes found. Check ingredient costs and recipe yields.');
   modal('<div class="modalHead"><h2>Request Ready Products</h2><button class="close" onclick="closeModal()">×</button></div>'+
    '<div class="note"><b>From:</b> Central Kitchen · <b>To:</b> '+escapeHtml(currentBranchName())+'<p class="muted">Select several items, order by kg or litre. Company markup: +'+fmt(markupPercent)+'%.</p></div>'+
    '<div id="kitchReadyCartLines" style="display:grid;gap:10px;margin:16px 0"></div>'+
