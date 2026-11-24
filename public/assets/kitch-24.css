@@ -1239,3 +1239,40 @@ html body #app.app:not(.hidden) > .side .sideUtility button[onclick*="logout"]{
  #modal .kitchReadyRequestForm .readyCartSummary{padding:13px}
  #modal .kitchReadyRequestForm .readyCartSummary .totalAmount{font-size:19px}
 }
+
+
+/* Central Kitchen dashboard — same KITCH operational UI, real cloud request data */
+#app .ckWorkspace{max-width:none}
+#app .ckWorkspace .k26-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 14px;padding:10px 2px}
+#app .ckWorkspace .k26-heading h2{font-size:27px;font-weight:800;letter-spacing:-.05em;margin:4px 0}
+#app .ckWorkspace .k26-heading p{color:#868993;font-size:12px;margin:5px 0;line-height:1.5}
+#app .ckWorkspace .ckLive{border-radius:10px;background:#fff;padding:12px 14px;font-size:10px;letter-spacing:.1em;font-weight:800;white-space:nowrap}
+#app .ckWorkspace .ckMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin-bottom:13px}
+#app .ckWorkspace .ckMetric{appearance:none;text-align:left;background:white;border:1px solid #e7e7ed;border-radius:15px;padding:19px 17px;display:flex;flex-direction:column;gap:13px;min-height:145px;color:#272830;cursor:pointer}
+#app .ckWorkspace .ckMetric small{font-size:10px;color:#8a8c97;font-weight:750;letter-spacing:.06em}
+#app .ckWorkspace .ckMetric strong{font-size:31px;letter-spacing:-.05em;font-weight:820}
+#app .ckWorkspace .ckMetric span{margin-top:auto;font-size:11px;color:#9295a0}
+#app .ckWorkspace .ckMetric:hover{background:#fafafd;border-color:#cccdd7}
+#app .ckWorkspace .ckPanel{background:white;border:1px solid #e7e7ed;border-radius:17px;padding:20px;margin:0 0 13px;min-width:0}
+#app .ckWorkspace .ckTitle{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+#app .ckWorkspace .ckTitle h3{font-size:17px;font-weight:800;letter-spacing:-.035em;margin:0}
+#app .ckWorkspace .ckTitle .btn,#app .ckWorkspace .ckPanelFoot .btn{border:1px solid #e1e1e8;border-radius:10px;padding:10px 13px;font-size:11px;font-weight:750;background:#f3f3f5;color:#292b32}
+#app .ckWorkspace .ckTitle .btn.black{background:#272830;color:#fff;border-color:#272830}
+#app .ckWorkspace .ckTableWrap{width:100%;overflow-x:auto}
+#app .ckWorkspace .ckTable{border-collapse:collapse;width:100%;min-width:680px}
+#app .ckWorkspace .ckTable th{background:#f5f5f8;color:#92949c;letter-spacing:.04em;font-size:10px;text-align:left;padding:13px}
+#app .ckWorkspace .ckTable td{font-size:12px;padding:13px;border-bottom:1px solid #eeeef2;color:#34363f}
+#app .ckWorkspace .ckTable td small{display:block;margin-top:4px;color:#9295a0}
+#app .ckWorkspace .ckAction{background:white;border:1px solid #dedee5;border-radius:10px;padding:9px 13px;font-size:11px;font-weight:750;color:#292b32;cursor:pointer}
+#app .ckWorkspace .ckAction.black{background:#272830;border-color:#272830;color:white}
+#app .ckWorkspace .ckStatus{border-radius:8px;padding:6px 9px;background:#f1f1f4;font-size:10px;font-weight:700;white-space:nowrap}
+#app .ckWorkspace .ckEmpty{padding:30px 15px;color:#727580;text-align:center;background:#f9f9fb;border-radius:12px}
+#app .ckWorkspace .ckEmpty p{font-size:11px}
+#app .ckWorkspace .ckPanelFoot{text-align:right;margin-top:15px}
+#app .ckWorkspace .ckTwoPanels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#app .ckWorkspace .ckBig{font-size:32px;font-weight:800}
+#app .ckWorkspace .ckMuted{color:#898c96;font-size:12px;line-height:1.5}
+#app .ckWorkspace .ckExplanation{font-size:11px;color:#858993;line-height:1.7;padding:10px 3px}
+#app .ckWorkspace .ckSubheading{font-size:14px;font-weight:800;margin:23px 0 10px}
+@media(max-width:1000px){#app .ckWorkspace .ckMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){#app .ckWorkspace .ckTwoPanels{grid-template-columns:1fr}#app .ckWorkspace .k26-heading{flex-direction:column;align-items:flex-start}#app .ckWorkspace .ckPanel{padding:13px}#app .ckWorkspace .ckMetric{min-height:120px;padding:13px}#app .ckWorkspace .ckMetric strong{font-size:24px}}

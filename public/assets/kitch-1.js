@@ -410,6 +410,8 @@ const roles={
  production:{name:'Production Staff',label:'Production Staff',nav:['Recipes','Production','Label']}
 };
 let session=null;
+function isCentralKitchenWorkspace(){return session==='manager'&&window.__kitchIsCentralKitchen===true&&!!teamCloudAuth?.staff_name;}
+const CK_PAGES=['Incoming Branch Orders','Production Planning','Dispatch & Deliveries','Ready Product Stock'];
 let dashboardPeriod='30d',dashboardCustomStart='',dashboardCustomEnd='';
 function setDashboardPeriod(p){dashboardPeriod=p;openPage('Dashboard')}
 function setCustomDashboardRange(){const a=document.getElementById('dashStart')?.value,b=document.getElementById('dashEnd')?.value;if(!a||!b)return alert('Choose both start and end dates.');if(new Date(a)>new Date(b))return alert('Start date must be before end date.');dashboardCustomStart=a;dashboardCustomEnd=b;dashboardPeriod='custom';openPage('Dashboard')}
@@ -526,6 +528,10 @@ async function teamLogin(){
   cloud.restaurant_id=row.restaurant_id;cloud.branch_id=row.branch_id;
   await cloudLoadIngredients();
   await kitchLoadSyncedRecipes();
+  window.__kitchIsCentralKitchen=false;
+  if(r==='manager'&&typeof window.kitchCentralKitchenInit==='function'){
+   try{await window.kitchCentralKitchenInit()}catch(e){console.warn('Central Kitchen identification unavailable:',e)}
+  }
   enter(r);
   openPage(roles[r].nav.includes('Dashboard')?'Dashboard':roles[r].nav[0]);
  }catch(e){console.error('KITCH team login error',e);say('Unable to sign in: '+(e?.message||String(e)));}
@@ -534,7 +540,7 @@ async function teamLogin(){
 function enter(r){closePublicModal();session=r;login.classList.add('hidden');document.getElementById('publicLanding')?.classList.add('hidden');app.classList.remove('hidden');userName.textContent=currentStaff?.name||roles[r].name;userRole.textContent=(currentStaff?`${currentStaff.role} · ${currentStaff.location_name||locationName(currentStaff.location_id)}`:roles[r].label);userScope.textContent=currentStaff?.workspace_name||cloud.workspace_code||primaryRestaurantName();renderNav();const firstSetup=r==='manager'&&!window.__kitchInventoryLoadError&&ingredients().length===0;
 openPage('Dashboard' in Object.fromEntries(roles[r].nav.map(x=>[x,true]))?'Dashboard':roles[r].nav[0]);
 if(firstSetup)setTimeout(()=>{if(session==='manager'&&ingredients().length===0&&!document.getElementById('excelFile'))openImport()},180)}
-async function logout(){toggleAppMobileMenu(false);window.__kitchTeamLiveStock=null;try{sessionStorage.removeItem('kitch_last_view');if(cloud.user?.id)sessionStorage.removeItem('kitch_owner_page_'+cloud.user.id)}catch(e){}session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
+async function logout(){window.__kitchIsCentralKitchen=false;if(typeof window.kitchCentralKitchenClear==='function')window.kitchCentralKitchenClear();toggleAppMobileMenu(false);window.__kitchTeamLiveStock=null;try{sessionStorage.removeItem('kitch_last_view');if(cloud.user?.id)sessionStorage.removeItem('kitch_owner_page_'+cloud.user.id)}catch(e){}session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};await sb.auth.signOut();app.classList.add('hidden');login.classList.remove('hidden');closePublicModal()}
 function renderNav(){
  let items=[...roles[session].nav];
  if(!hasCentralStore()){
@@ -552,8 +558,13 @@ function renderNav(){
      items.splice(i,0,...extra);
    }
  }
+ if(isCentralKitchenWorkspace()){
+   items=items.filter(x=>!['Stock Requests','Price Alerts','Supplier Performance','Invoice Matching'].includes(x));
+   items=items.filter(x=>x!=='Ready Products');
+   items.splice(1,0,...CK_PAGES);
+ }
  items=[...new Set(items)];
- const preferred=session==='store'?['Inventory','Ready Products','Receiving','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
+ const preferred=isCentralKitchenWorkspace()?['Dashboard','Incoming Branch Orders','Production Planning','Dispatch & Deliveries']:session==='store'?['Inventory','Ready Products','Receiving','Stock Requests']:session==='production'?['Recipes','Production','Label']:['Dashboard','Inventory','Suppliers & Purchasing','Production'];
  const mainItems=preferred.filter(x=>items.includes(x)).slice(0,4);
  for(const x of items){if(mainItems.length>=4)break;if(!mainItems.includes(x))mainItems.push(x)}
  const extra=items.filter(x=>!mainItems.includes(x)&&!(items.includes('Suppliers & Purchasing')&&x==='Receiving'));
@@ -743,10 +754,11 @@ function kitchLastOwnerPage(){
  try{return sessionStorage.getItem('kitch_owner_page_'+cloud.user?.id)||'Dashboard'}catch(e){return 'Dashboard'}
 }
 function openPage(name){
- if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Ready Products','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}
+ if(session&&session!=='owner'&&!roles[session].nav.includes(name)&&!(isCentralKitchenWorkspace()&&CK_PAGES.includes(name))&&!(session==='manager'&&name==='Stock Requests')&&!(session==='store'&&['Stock Requests','Ready Products','Stock Transfer'].includes(name))){alert('This page is not available for your staff role.');return;}
  if(name==='Stock Requests'&&teamCloudAuth?.staff_name)void kitchRefreshStockRequests();
- if(name==='Ready Products'&&(!hasCentralStore()||session==='production'))return alert('Ready Products are available to authorized KITCH Pro workspaces only.');
- if(name==='Dashboard'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchRefreshProductionDashboard();
+ if(name==='Ready Products'&&(!hasCentralStore()||session==='production')&&!isCentralKitchenWorkspace())return alert('Ready Products are available to authorized KITCH Pro workspaces only.');
+ if(name==='Dashboard'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin&&!isCentralKitchenWorkspace())void kitchRefreshProductionDashboard();
+ if(isCentralKitchenWorkspace()&&(name==='Dashboard'||CK_PAGES.includes(name))&&typeof window.kitchCentralKitchenRefresh==='function')void window.kitchCentralKitchenRefresh();
  if(name==='Label'&&teamCloudAuth?.staff_name&&teamCloudAuth?.pin)void kitchLoadCloudProductionRecords();
  if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}
  void refreshKitchTrialStatus();
@@ -759,7 +771,8 @@ function openPage(name){
  if(name==='Production')void kitchRefreshProductionPageData();
 }
 function page(n){
- if(n==='Dashboard')return session==='owner'?managementDashboard():managerDashboard();
+ if(n==='Dashboard')return isCentralKitchenWorkspace()&&typeof window.kitchCentralKitchenPage==='function'?window.kitchCentralKitchenPage('Dashboard'):session==='owner'?managementDashboard():managerDashboard();
+ if(CK_PAGES.includes(n))return isCentralKitchenWorkspace()&&typeof window.kitchCentralKitchenPage==='function'?window.kitchCentralKitchenPage(n):'<div class="panel">Central Kitchen access required.</div>';
  if(n==='Subscription Setup')return subscriptionPage();
  if(n==='Locations & Departments')return locationsPage();
  if(n==='Staff & Access')return staffAccessPage();

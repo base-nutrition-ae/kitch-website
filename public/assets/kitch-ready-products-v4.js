@@ -9,6 +9,7 @@
  const fmt=n=>Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:3});
  let catalog=[],requests=[],ready=false,loading=false,error='',centralKitchenStaff=false,canDispatch=false;
  let markupPercent=50,defaultMarkup=50,pricingBranches=[],priceLookup=Object.create(null);
+ let ckError='',ckLoading=false;
  const maxImport=500;
  const units=['pcs','portion','pack','kg','g','ltr','ml'];
  const headings=['SKU','Product Name','Category','Unit','Pack Size','Unit Cost AED','Source','Shelf Life Days','Storage','Active'];
@@ -67,9 +68,15 @@
    requests=Array.isArray(result?.requests)?result.requests:[];
    centralKitchenStaff=result?.is_central_kitchen===true;
    canDispatch=result?.can_dispatch===true;
-   ready=true;
-  }catch(e){error=e.message;ready=false;if(showAlert)alert(error)}
-  finally{loading=false;if(typeof pageTitle!=='undefined'&&pageTitle?.textContent==='Ready Products'&&typeof content!=='undefined')content.innerHTML=render()}
+   ready=true;ckError='';
+  }catch(e){error=e.message;ckError=e.message;ready=false;if(showAlert)alert(error)}
+  finally{
+   loading=false;
+   if(typeof pageTitle!=='undefined'&&typeof content!=='undefined'){
+    if(pageTitle?.textContent==='Ready Products')content.innerHTML=render();
+    else if(window.__kitchIsCentralKitchen&&['Dashboard','Incoming Branch Orders','Production Planning','Dispatch & Deliveries','Ready Product Stock'].includes(pageTitle?.textContent))content.innerHTML=window.kitchCentralKitchenPage(pageTitle.textContent);
+   }
+  }
  }
  function productOptions(){return catalog.filter(x=>x.active).map(x=>'<option value="'+escapeHtml(x.sku)+'">'+escapeHtml(x.name)+' · '+escapeHtml(x.unit)+'</option>').join('')}
  function table(items,columns,renderRow,empty){return '<div class="kitchReadyScroll"><table><thead><tr>'+columns.map(c=>'<th>'+escapeHtml(c)+'</th>').join('')+'</tr></thead><tbody>'+(items.length?items.map(renderRow).join(''):'<tr><td colspan="'+columns.length+'" class="empty">'+escapeHtml(empty)+'</td></tr>')+'</tbody></table></div>'}
@@ -90,6 +97,70 @@
   if(x.status==='In Transfer'&&isManager)return '<button class="btn black" onclick="kitchReadyReceive('+id+')">Receive</button>';
   return '—';
  }
+
+ // Central Kitchen view is enabled only after the signed-in staff's cloud
+ // permissions and location type are verified by kitch_ready_product_action.
+ window.kitchCentralKitchenClear=()=>{centralKitchenStaff=false;canDispatch=false;requests=[];ckError='';ready=false;};
+ window.kitchCentralKitchenInit=async()=>{
+  const result=await rpc('overview');
+  centralKitchenStaff=result?.is_central_kitchen===true;
+  canDispatch=result?.can_dispatch===true;
+  window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch;
+  requests=Array.isArray(result?.requests)?result.requests:[];
+  ckError='';ready=true;
+  return window.__kitchIsCentralKitchen;
+ };
+ window.kitchCentralKitchenRefresh=async()=>{
+  if(ckLoading)return;
+  ckLoading=true;
+  try{await refresh(false)}finally{ckLoading=false}
+ };
+ const ckStatuses={requested:'Requested',accepted:'Accepted',transfer:'In Transfer',received:'Received'};
+ function ckTable(rows,kind){
+  if(!rows.length)return '<div class="ckEmpty"><strong>No orders in this stage.</strong><p>Incoming requests will appear here automatically after a branch sends an order.</p></div>';
+  return '<div class="ckTableWrap"><table class="ckTable"><thead><tr><th>ORDER</th><th>BRANCH</th><th>PRODUCT</th><th>QUANTITY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>'+
+   rows.map(x=>{
+    const id=Number(x.id);
+    const action=Number.isSafeInteger(id)&&canDispatch&&x.status==='Requested'?'<button class="ckAction" onclick="kitchReadyAdvance('+id+',\'accept\')">Approve</button>':Number.isSafeInteger(id)&&canDispatch&&x.status==='Accepted'?'<button class="ckAction black" onclick="kitchReadyDispatch('+id+')">Dispatch</button>':'<span class="ckMuted">—</span>';
+    return '<tr><td><strong>#'+escapeHtml(id)+'</strong>'+(x.group_ref?'<small>Group '+escapeHtml(String(x.group_ref).slice(0,8))+'</small>':'')+'</td><td>'+escapeHtml(x.branch_name||'—')+'</td><td>'+escapeHtml(x.product_name||x.sku)+'</td><td>'+fmt(x.qty)+' '+escapeHtml(x.unit)+'</td><td><span class="ckStatus">'+escapeHtml(x.status)+'</span></td><td>'+action+'</td></tr>';
+   }).join('')+'</tbody></table></div>';
+ }
+ window.kitchCentralKitchenPage=view=>{
+  if(!window.__kitchIsCentralKitchen)return '<div class="panel">Central Kitchen access required.</div>';
+  const requested=requests.filter(x=>x.status==='Requested');
+  const accepted=requests.filter(x=>x.status==='Accepted');
+  const transit=requests.filter(x=>x.status==='In Transfer');
+  const finished=requests.filter(x=>x.status==='Received');
+  const open=requests.filter(x=>!['Received','Cancelled','Rejected'].includes(x.status));
+  const heading='<div class="k26-heading"><div><div class="k26-eyebrow">KITCH / CENTRAL KITCHEN / '+escapeHtml(typeof assignedLocationName==='function'?assignedLocationName():'CENTRAL KITCHEN')+'</div><h2>'+escapeHtml(view==='Dashboard'?'Central Kitchen Dashboard':view)+'</h2><p>Branch orders, approved production quantities and finished-goods dispatch are tracked by receiving branch.</p></div><span class="ckLive">● LIVE WORKSPACE</span></div>';
+  const metrics='<div class="ckMetrics">'+[
+   ['INCOMING ORDERS',open.length,'Incoming Branch Orders'],
+   ['PENDING APPROVAL',requested.length,'Incoming Branch Orders'],
+   ['APPROVED / TO PREPARE',accepted.length,'Production Planning'],
+   ['IN TRANSIT',transit.length,'Dispatch & Deliveries']
+  ].map(([label,value,target])=>'<button class="ckMetric" onclick="openPage(\''+target+'\')"><small>'+label+'</small><strong>'+value+'</strong><span>View details ↗</span></button>').join('')+'</div>';
+  const actionHeader='<div class="ckTitle"><h3>Incoming Branch Orders</h3><button class="btn" onclick="kitchCentralKitchenRefresh()">Refresh</button></div>';
+  const stockNote='<p class="ckExplanation">Approving an order does not deduct stock. Record production and QC first; dispatch requires a valid finished batch with available quantity. The branch confirms receipt separately.</p>';
+  if(view==='Dashboard')return '<div class="kitch2026-dashboard ckWorkspace">'+heading+metrics+
+    '<section class="ckPanel">'+actionHeader+ckTable(requests.filter(x=>x.status==='Requested').slice(0,12),'incoming')+'<div class="ckPanelFoot"><button class="btn" onclick="openPage(\'Incoming Branch Orders\')">View all branch orders →</button></div></section>'+
+    '<div class="ckTwoPanels"><section class="ckPanel"><div class="ckTitle"><h3>Production Queue</h3><button class="btn" onclick="openPage(\'Production Planning\')">Open planning</button></div><strong class="ckBig">'+accepted.length+'</strong><p class="ckMuted">Approved order lines awaiting dispatch. Production batches and QC are recorded in Production.</p></section>'+
+    '<section class="ckPanel"><div class="ckTitle"><h3>Dispatch & Receiving</h3><button class="btn" onclick="openPage(\'Dispatch & Deliveries\')">View deliveries</button></div><strong class="ckBig">'+transit.length+'</strong><p class="ckMuted">Lines dispatched to branches and awaiting receipt confirmation.</p></section></div>'+stockNote+'</div>';
+  if(view==='Incoming Branch Orders')return '<div class="kitch2026-dashboard ckWorkspace">'+heading+metrics+'<section class="ckPanel">'+actionHeader+ckTable(requests,'all')+'</section>'+stockNote+'</div>';
+  if(view==='Production Planning'){
+   const quantities=new Map();
+   for(const r of accepted){const key=String(r.sku||r.product_name||r.product_id),q=quantities.get(key)||{name:r.product_name||r.sku,unit:r.unit,qty:0,branches:new Set()};q.qty+=Number(r.qty||0);q.branches.add(r.branch_name||'Unknown');quantities.set(key,q);}
+   return '<div class="kitch2026-dashboard ckWorkspace">'+heading+metrics+'<section class="ckPanel"><div class="ckTitle"><h3>Approved Items to Prepare</h3><button class="btn black" onclick="openPage(\'Production\')">Open Production →</button></div>'+
+    (quantities.size?'<div class="ckTableWrap"><table class="ckTable"><thead><tr><th>PRODUCT</th><th>TOTAL REQUESTED</th><th>DESTINATION BRANCHES</th></tr></thead><tbody>'+[...quantities.values()].map(x=>'<tr><td><strong>'+escapeHtml(x.name)+'</strong></td><td>'+fmt(x.qty)+' '+escapeHtml(x.unit)+'</td><td>'+escapeHtml([...x.branches].join(', '))+'</td></tr>').join('')+'</tbody></table></div>':'<div class="ckEmpty">No approved items awaiting production.</div>')+
+    '<h3 class="ckSubheading">Approved Branch Requests</h3>'+ckTable(accepted,'planning')+'</section>'+stockNote+'</div>';
+  }
+  if(view==='Dispatch & Deliveries')return '<div class="kitch2026-dashboard ckWorkspace">'+heading+metrics+'<section class="ckPanel"><div class="ckTitle"><h3>Ready to Dispatch</h3><button class="btn" onclick="kitchCentralKitchenRefresh()">Refresh</button></div>'+ckTable(accepted,'dispatch')+
+   '<h3 class="ckSubheading">In Transit & Received</h3>'+ckTable([...transit,...finished],'delivery')+'</section>'+stockNote+'</div>';
+  return '<div class="kitch2026-dashboard ckWorkspace">'+heading+
+   '<section class="ckPanel"><div class="ckTitle"><h3>Finished Products</h3><button class="btn black" onclick="openPage(\'Production\')">Open Production →</button></div>'+
+   '<p class="ckMuted">Product catalog is shown below. Physical availability is verified against finished batches by the cloud dispatch action; catalog entries alone are not stock balances.</p>'+
+   (catalog.length?'<div class="ckTableWrap"><table class="ckTable"><thead><tr><th>PRODUCT</th><th>UNIT</th><th>STORAGE</th></tr></thead><tbody>'+catalog.filter(x=>x.active).map(x=>'<tr><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.unit)+'</td><td>'+escapeHtml(x.storage||'—')+'</td></tr>').join('')+'</tbody></table></div>':'<div class="ckEmpty">No prepared products found in the catalog.</div>')+'</section></div>';
+ };
+
  window.kitchReadyRefresh=()=>refresh(true);
  window.kitchReadyProductsPage=()=>{if(!loading)queueMicrotask(()=>refresh(false));return render()};
  window.kitchReadyOpenImport=()=>{
