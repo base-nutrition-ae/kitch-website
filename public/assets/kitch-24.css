@@ -1176,3 +1176,21 @@ html body #app.app:not(.hidden):has(.kitch2026-dashboard)>.main>.top{display:non
 html body #app.app:not(.hidden):has(.kitch2026-dashboard)>.main #content .k26-heading{min-height:79px!important;margin:0 0 13px!important;padding:11px 4px!important}
 html body #app.app:not(.hidden):has(.kitch2026-dashboard)>.main #content .k26-heading h2{font-size:27px!important;font-weight:800!important;letter-spacing:-.055em!important;margin:4px 0!important}
 }
+
+/* KITCH_LOGOUT_PARITY_20261124: same sign-out button footprint in Kitchen and Main Office */
+html body #app.app:not(.hidden) > .side .sideUtility{
+ box-sizing:border-box!important;width:100%!important;min-width:0!important;
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ gap:7px!important;align-items:stretch!important
+}
+html body #app.app:not(.hidden) > .side .sideUtility button[onclick*="logout"]{
+ grid-column:1/-1!important;justify-self:stretch!important;
+ box-sizing:border-box!important;display:flex!important;
+ justify-content:center!important;align-items:center!important;
+ width:100%!important;max-width:none!important;min-width:0!important;
+ height:40px!important;min-height:40px!important;
+ margin:0!important;padding:0 12px!important;
+ font-size:12px!important;font-weight:750!important;line-height:1!important;
+ border:0!important;border-radius:10px!important;
+ background:#272830!important;color:#fff!important
+}

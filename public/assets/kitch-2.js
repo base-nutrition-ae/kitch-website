@@ -126,7 +126,11 @@ function kitchOfficeApplyChatNavigation(html){
   font-size:11px!important;font-weight:600!important;color:#747781!important
 }
 #officeApp .officeChatFooter button{
-  width:100%!important;min-height:39px!important;border-radius:10px!important;
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  box-sizing:border-box!important;width:100%!important;max-width:none!important;
+  height:40px!important;min-height:40px!important;margin:0!important;
+  padding:0 12px!important;font-size:12px!important;font-weight:750!important;
+  line-height:1!important;border:0!important;border-radius:10px!important;
   background:#272830!important;color:#fff!important
 }
 @media(min-width:801px){
