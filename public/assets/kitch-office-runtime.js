@@ -517,7 +517,7 @@ function officePOShow(id){
  officePurchaseEl('officePOConfirmSent').hidden=!!dispatch;
  officePurchaseEl('officePOConfirmSent').disabled=false;
  if(dispatch){officePurchaseEl('officePOSupplier').value=dispatch.supplier_id;officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email||'';officeLastOrderChannel=dispatch.channel||'email';}
- officePurchaseEl('officePOInlineMessage').textContent=dispatch?'Sent to supplier on '+new Date(dispatch.sent_at).toLocaleString()+' · '+dispatch.recipient_email:'';
+ officePurchaseEl('officePOInlineMessage').textContent=dispatch?'Sent via '+(dispatch.channel||'email')+' on '+new Date(dispatch.sent_at).toLocaleString()+' · '+(dispatch.recipient_email||dispatch.recipient_phone||''):'';
  panel.hidden=false;
  officePOUpdateSupplier();
  if(dispatch)officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email||'';
@@ -653,36 +653,67 @@ officePurchaseEl('officePOCancel').addEventListener('click',()=>{
 });
 officePurchaseEl('officePOConfirm').addEventListener('click',()=>{
  const data=officeCurrentKitchenOrder();if(!data)return;
- const email=officePurchaseEl('officePOSupplierEmail').value.trim();
  const message=officePurchaseEl('officePOInlineMessage');
- if(!email||!officePurchaseEl('officePOSupplierEmail').checkValidity()){
-  message.textContent='Enter a valid supplier email address to open the order email.';officePurchaseEl('officePOSupplierEmail').focus();return;
- }
+ let to,cc;
+ try{
+  to=officeValidEmailList([officePurchaseEl('officePOSupplierEmail').value,officePurchaseEl('officePOAdditionalTo').value].filter(Boolean).join(','));
+  cc=officeValidEmailList(officePurchaseEl('officePOCC').value);
+  if(!to.length)throw Error('Enter at least one supplier To email.');
+ }catch(e){message.textContent=e.message;return}
  const subject=(officeRestaurantName||'Restaurant')+' Purchase Order — '+(data.req.request_no||data.req.id);
  const body=officeKitchenOrderText(data.req,data.supplier.name);
- const mailto='mailto:'+encodeURIComponent(email)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
- message.textContent='The email draft will open. After pressing Send in your mail app, return here and click “I Sent This Order” to record Sent status. Opening a draft does not send it.';
+ const params=new URLSearchParams();
+ if(cc.length)params.set('cc',cc.join(','));
+ params.set('subject',subject);params.set('body',body);
+ const mailto='mailto:'+to.map(encodeURIComponent).join(',')+'?'+params.toString();
+ officeLastOrderChannel='email';
+ message.textContent='Email draft opened. Review To, CC, order details and attach the saved PDF manually if needed. After actually sending, return and confirm below.';
  officePurchaseEl('officePOConfirmSent').hidden=false;
  window.location.href=mailto;
+});
+officePurchaseEl('officePOWhatsappSend').addEventListener('click',()=>{
+ const order=officeCurrentKitchenOrder();if(!order)return;
+ const msg=officePurchaseEl('officePOInlineMessage');
+ const phone=String(officePurchaseEl('officePOWhatsapp').value||'').replace(/[^0-9]/g,'');
+ if(!/^[1-9][0-9]{7,14}$/.test(phone)){msg.textContent='Enter a WhatsApp number including country code, e.g. 9715...';return;}
+ officeLastOrderChannel='whatsapp';
+ officePurchaseEl('officePOConfirmSent').hidden=false;
+ const message=officeKitchenOrderText(order.req,order.supplier.name);
+ const link='https://wa.me/'+phone+'?text='+encodeURIComponent(message);
+ const win=window.open(link,'_blank','noopener,noreferrer');
+ if(!win)msg.textContent='Your browser blocked WhatsApp. Allow popups and try again.';
+ else msg.textContent='WhatsApp draft opened. Review and press Send in WhatsApp, then return here to confirm. This does not send automatically.';
 });
 officePurchaseEl('officePOConfirmSent').addEventListener('click',async()=>{
  if(officePurchaseBusy)return;
  const order=officeCurrentKitchenOrder();if(!order)return;
- const email=officePurchaseEl('officePOSupplierEmail').value.trim();
- const el=officePurchaseEl('officePOInlineMessage');
- if(!email||!officePurchaseEl('officePOSupplierEmail').checkValidity()){el.textContent='Enter a valid supplier email.';return}
- if(!confirm('Have you already pressed Send in your email app for '+order.req.request_no+' to '+email+'? This records your confirmation, not automatic email delivery.'))return;
+ const status=officePurchaseEl('officePOInlineMessage');
+ const channel=officeLastOrderChannel;
+ let email=null,phone=null,cc=null;
+ try{
+  if(channel==='email'){
+   const to=officeValidEmailList([officePurchaseEl('officePOSupplierEmail').value,officePurchaseEl('officePOAdditionalTo').value].filter(Boolean).join(','));
+   if(!to.length)throw Error('Enter at least one supplier email.');
+   email=to.join(',');
+   cc=officeValidEmailList(officePurchaseEl('officePOCC').value).join(',')||null;
+  }else{
+   phone=String(officePurchaseEl('officePOWhatsapp').value||'').replace(/[^0-9]/g,'');
+   if(!/^[1-9][0-9]{7,14}$/.test(phone))throw Error('Enter a valid WhatsApp number with country code.');
+  }
+ }catch(e){status.textContent=e.message;return;}
+ if(!confirm('Have you actually sent this order through '+(channel==='email'?'email':'WhatsApp')+'? KITCH records your confirmation, not delivery.'))return;
  const button=officePurchaseEl('officePOConfirmSent');button.disabled=true;officePurchaseBusy=true;
  try{
   const {error}=await db.from('kitch_supplier_order_dispatches').insert({
-    request_id:order.req.id,restaurant_id:officeRid,supplier_id:order.supplier.id,
-    recipient_email:email,confirmed_by:(await db.auth.getUser()).data.user?.id
+   request_id:order.req.id,restaurant_id:officeRid,supplier_id:order.supplier.id,
+   channel,recipient_email:email,recipient_phone:phone,cc_emails:cc,
+   confirmed_by:(await db.auth.getUser()).data.user?.id
   });
   if(error)throw Error(error.message);
   officeSelectedPurchaseRequest=null;officePurchaseEl('officePOComposer').hidden=true;
   await officePurchaseLoad();
-  officePurchaseStatus('Supplier order '+order.req.request_no+' marked Sent (confirmed manually).');
- }catch(e){el.textContent='Could not record Sent status: '+e.message}
+  officePurchaseStatus('Order '+order.req.request_no+' recorded as sent by '+channel+' (confirmed manually).');
+ }catch(e){status.textContent='Could not record sent status: '+e.message}
  finally{officePurchaseBusy=false;button.disabled=false}
 });
 officePurchaseEl('officePOPrint').addEventListener('click',()=>{
