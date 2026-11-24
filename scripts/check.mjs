@@ -127,7 +127,7 @@ console.log('PASS: Desktop navigation and authenticated owner refresh-page resto
 const readySource=fs.readFileSync('public/assets/kitch-ready-products.js','utf8');
 const readySQL=fs.readFileSync('sql/kitch-ready-products-v1.review.sql','utf8');
 const readyChecks=[
- ['Ready Products script tag',page.includes('src="assets/kitch-ready-products.js')],
+ ['Ready Products script tag',page.includes('src="assets/kitch-ready-products-v4.js')],
  ['Ready Products navigation',app.includes("if(n==='Ready Products')")&&app.includes("'Ready Products'")],
  ['Separate import preview',readySource.includes('kitchReadyPreviewImport')],
  ['Dedicated cloud RPC',readySource.includes("sb.rpc('kitch_ready_product_action'")],
