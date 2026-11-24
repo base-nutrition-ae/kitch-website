@@ -37,6 +37,35 @@
    return supplierNorm(ing.supplier||ing.supplier_name)===seller;
  };
  const ingredientList=()=>allIngredients().filter(i=>supplierAllows(i,currentSupplier()));
+ const isProduce=ing=>Boolean(ing&&(produceNames.has(supplierNorm(ing.name))||/fruit|vegetable|produce|herb/.test(supplierNorm(ing.category))));
+ const produceShared={expiry:'',production:'',temperature:''};
+ function updateProducePanel(){
+   const panel=document.getElementById('kmrProduceShared');if(!panel)return;
+   const hasProduce=ingredientList().some(isProduce);
+   panel.hidden=!hasProduce;
+   const supplier=currentSupplier();
+   const note=panel.querySelector('.kmrProduceSupplierNote');
+   if(note)note.textContent=hasProduce?'Apply shared optional details only to fruit, vegetable and herb lines. Other products remain unchanged.':'';
+ }
+ function applyProduceDefaults(line){
+   const ing=findIngredient(line.id);
+   if(!isProduce(ing))return;
+   for(const field of ['expiry','production','temperature'])if(!line[field]&&produceShared[field])line[field]=produceShared[field];
+ }
+ function applyProduceDetails(){
+   if(!currentSupplier())return;
+   const values={expiry:document.getElementById('kmrProduceExpiry')?.value||'',production:document.getElementById('kmrProduceProduction')?.value||'',temperature:document.getElementById('kmrProduceTemp')?.value||''};
+   if(values.expiry&&values.expiry<today())return alert('Expiry date cannot be before today.');
+   if(values.expiry&&values.production&&values.production>values.expiry)return alert('Production/harvest date cannot be after expiry.');
+   if(values.temperature!==''&&!Number.isFinite(Number(values.temperature)))return alert('Enter a valid temperature or leave it blank for ambient receiving.');
+   Object.assign(produceShared,values);
+   let count=0;
+   for(const line of lines)if(isProduce(findIngredient(line.id))){Object.assign(line,values);count++;}
+   draw();
+   const message=document.getElementById('kmrMessage');
+   if(message){message.style.color='#28734b';message.textContent='Shared produce details applied to '+count+' selected item'+(count===1?'':'s')+'. Dates remain optional when the supplier has not provided them.';}
+ }
+
  const packBaseUnit=b=>({l:'ltr'}[String(b||'').toLowerCase()]||String(b||'').toLowerCase());
  const isMilkUnitMismatch=ing=>/\bmilk\b/i.test(ing?.name||'') && ['g','kg'].includes(String(ing?.base_unit||'').toLowerCase());
  const normalizePackSize=(saved,base)=>{
@@ -88,11 +117,13 @@
      '<label>Price / '+safe(line.unit||base)+' (AED) *<input data-field="price" data-key="'+line.key+'" type="number" min="0" step="any" value="'+safe(line.price)+'" placeholder="0"></label>'+
     '</div>'+
     (isPack?'<div class="kmrMasterAction"><span>Package size and price will be remembered when this invoice is confirmed, if permitted.</span></div>':'')+
+    (isProduce(ing)?'<details class="kmrProduceOverride"><summary>Produce receiving details · '+(line.expiry?'Expiry '+safe(line.expiry):'Expiry not specified')+' · Edit this item only</summary>':'')+
     '<div class="kmrQualityGrid">'+
-     '<label>Expiry date<input data-field="expiry" data-key="'+line.key+'" type="date" value="'+safe(line.expiry)+'"></label>'+
-     '<label>Production date<input data-field="production" data-key="'+line.key+'" type="date" value="'+safe(line.production)+'"></label>'+
-     '<label>Receiving temperature (°C)<input data-field="temperature" data-key="'+line.key+'" type="number" step="any" placeholder="Optional" value="'+safe(line.temperature)+'"></label>'+
+     '<label>Expiry date'+(isProduce(ing)?' · if supplied':'')+'<input data-field="expiry" data-key="'+line.key+'" type="date" value="'+safe(line.expiry)+'"></label>'+
+     '<label>Production / harvest date'+(isProduce(ing)?' · if supplied':'')+'<input data-field="production" data-key="'+line.key+'" type="date" value="'+safe(line.production)+'"></label>'+
+     '<label>Actual receiving temperature (°C)<input data-field="temperature" data-key="'+line.key+'" type="number" step="any" placeholder="Optional / ambient" value="'+safe(line.temperature)+'"></label>'+
     '</div>'+
+    (isProduce(ing)?'</details>':'')+
     '<div class="kmrPreview"><span>Accepted stock: <b>'+(stock==null?safe(isMilkUnitMismatch(ing)?'Unit reconciliation needed before saving this ingredient':hint||'Choose a compatible unit / pack size'):Number(stock.toFixed(6))+' '+safe(base))+'</b></span><span>Line total: <b>AED '+((qty>=rej && rej>=0 && Number.isFinite(Number(line.price)))?((qty-rej)*Number(line.price)).toFixed(2):'—')+'</b></span></div>'+
     '</div>';
  }
@@ -211,16 +242,27 @@
    lines=[newLine()];counter=lines[0].key;
    modal('<div class="modalHead"><div><h2>New Receiving</h2><small>One invoice · Multiple ingredients</small></div><button class="close" onclick="closeModal()">×</button></div>'+
     '<style>#modal .modalBox{width:min(940px,calc(100vw - 32px));max-width:940px;box-sizing:border-box;padding:24px 28px;border-radius:24px}#modal .modalHead{margin-bottom:14px}#modal .modalHead h2{font-size:24px;letter-spacing:-.035em;margin:0}.kmrWrap{max-height:76vh;overflow:auto;padding-right:4px}.kmrIntro{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 14px;background:#f6f6f5;color:#777;border-radius:12px;padding:10px 13px;margin:4px 0 16px;font-size:12px}.kmrIntro b{color:#222}.kmrHeader{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:18px;border-bottom:1px solid #eaeaea}.kmrHeader label,.kmrGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrHeader input,.kmrHeader select,.kmrGrid input,.kmrGrid select{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrHeader input:focus,.kmrGrid input:focus,.kmrGrid select:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrLine{border:1px solid #e9e9e9;border-radius:18px;background:#fff;padding:17px 18px;margin:14px 0}.kmrLineTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.kmrLineIdentity{display:flex;gap:10px;align-items:center;font-size:15px}.kmrLineNum{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#fff1eb;color:#db6c36;font-size:11px;font-weight:850}.kmrMasterAction{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}.kmrMasterAction button{border:1px solid #efd8c8;background:#fff7f0;color:#a65a2e;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:750;cursor:pointer}.kmrMasterAction span{font-size:11px;color:#999}.kmrLineTop button{border:0;background:#fafafa;padding:9px 12px;border-radius:20px;color:#b64736;font-weight:700;cursor:pointer;font-size:11px}.kmrMainGrid{display:grid;grid-template-columns:1.6fr .75fr .9fr .85fr;gap:12px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrPackSize input{width:100%!important}.kmrUnitWarning{grid-column:1/-1;border-radius:10px;background:#fff3ed;border:1px solid #f2c5ad;color:#8b371f;font-size:12px;line-height:1.4;padding:10px 12px}.kmrQualityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid #efefef}.kmrQualityGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrQualityGrid input{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrQualityGrid input:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrExtras{margin-top:13px;border-top:1px solid #eee;padding-top:10px}.kmrExtras summary{font-size:12px;font-weight:750;color:#555;cursor:pointer}.kmrExtras summary span{font-weight:400;color:#999;margin-left:8px}.kmrExtras .kmrGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:11px}.kmrPreview{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f7f7f5;border-radius:10px;margin:12px 0 0;padding:11px 13px;color:#666;font-size:12px}.kmrPreview b{color:#111}#kmrAdd{width:auto;background:white;border:1px dashed #bcbcbc;color:#222;padding:11px 18px;border-radius:30px;font-weight:750;cursor:pointer}.kmrSummary{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 10px;padding:15px 16px;background:#f4f4f2;border-radius:13px}.kmrSummary strong{font-size:17px;color:#111}#kmrSubmit{border-radius:999px;min-height:50px}@media(max-width:840px){.kmrMainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.kmrMainGrid .kmrIngredient{grid-column:span 2}}@media(max-width:560px){.kmrQualityGrid{grid-template-columns:1fr 1fr}.kmrQualityGrid label:last-child{grid-column:span 2}#modal .modalBox{padding:18px 16px;width:calc(100vw - 20px)}.kmrHeader,.kmrExtras .kmrGrid{grid-template-columns:1fr}.kmrMainGrid{grid-template-columns:1fr 1fr;gap:10px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrLine{padding:13px}.kmrPreview{display:block}.kmrPreview span{display:block;margin:3px 0}.kmrSummary strong{font-size:14px}}</style>'+
+    '<style> .kmrProduceShared{margin:17px 0 10px;border:1px solid #e5e6eb;border-radius:15px;background:#f6f6f8;padding:15px} .kmrProduceShared[hidden]{display:none!important} .kmrProduceHeading{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap} .kmrProduceHeading strong{display:block;font-size:14px;color:#292a32} .kmrProduceHeading small{display:block;font-size:11px;color:#858691;margin-top:5px} .kmrProduceHeading>span{font-size:10px;letter-spacing:.06em;color:#898b95;font-weight:800} .kmrProduceSupplierNote,.kmrProduceHelp{font-size:11px;color:#828490;line-height:1.6;margin:9px 0} .kmrProduceFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0} .kmrProduceFields label{font-size:11px;color:#666872;font-weight:700} .kmrProduceFields input{box-sizing:border-box;width:100%;height:42px;margin-top:6px;border:1px solid #dfe0e6;border-radius:10px;background:#fff;padding:0 10px;font-size:12px;color:#262730} #kmrApplyProduce{border:0;border-radius:10px;background:#282930;color:#fff;padding:11px 16px;font-size:12px;font-weight:800;cursor:pointer} .kmrProduceOverride{margin-top:13px;border-top:1px solid #eee;padding-top:12px} .kmrProduceOverride summary{cursor:pointer;font-size:11px;font-weight:750;color:#686a76} .kmrProduceOverride .kmrQualityGrid{margin-top:10px} @media(max-width:650px){.kmrProduceFields{grid-template-columns:1fr}.kmrProduceShared{padding:12px}} </style>'+
     '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>'+(LOCAL?'Local test only':'Cloud Receiving · Confirmed stock updates inventory')+'</span></div>'+
     '<div class="kmrHeader"><label>SUPPLIER *<select id="kmrSupplier"><option value="">Choose approved supplier</option>'+receivingSuppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('')+'</select></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="Supplier invoice number"></label></div>'+
+    '<section id="kmrProduceShared" class="kmrProduceShared" hidden><div class="kmrProduceHeading"><div><strong>Vegetables & Herbs · Shared Receiving Details</strong><small>Ambient deliveries: temperature optional; never invent expiry or production dates.</small></div><span>APPLY TO PRODUCE</span></div>'+
+    '<p class="kmrProduceSupplierNote"></p><div class="kmrProduceFields">'+
+    '<label>Expiry date (if provided)<input id="kmrProduceExpiry" type="date"></label>'+
+    '<label>Production / harvest date (if provided)<input id="kmrProduceProduction" type="date"></label>'+
+    '<label>Actual receiving temp °C (optional)<input id="kmrProduceTemp" type="number" step="any" placeholder="Ambient / not measured"></label>'+
+    '</div><button type="button" id="kmrApplyProduce" class="btn">Apply to all produce lines</button><p class="kmrProduceHelp">If an item has a different batch date or requires chilling, open its own receiving details and enter the correct values. Follow its storage requirements.</p></section>'+
     '<div id="kmrLines"></div><button type="button" id="kmrAdd" class="btn">+ Add Ingredient</button>'+
     '<div class="kmrSummary"><span id="kmrCount">1 item</span><strong>Invoice total: <span id="kmrTotal">AED 0.00</span></strong></div>'+
     '<p id="kmrMessage" role="status" aria-live="polite" style="font-size:12px;color:#555"></p>'+
     '<button id="kmrSubmit" class="primary" type="button">Confirm Entire Receiving</button></div>');
    const root=document.getElementById('modal');
+   root.querySelector('#kmrApplyProduce').addEventListener('click',applyProduceDetails);
    root.querySelector('#kmrSupplier').addEventListener('change',()=>{
      // Never carry ingredient quantities from a different supplier.
-     lines=[newLine()];counter=lines[0].key;draw();
+     lines=[newLine()];counter=lines[0].key;
+     Object.assign(produceShared,{expiry:'',production:'',temperature:''});
+     for(const id of ['kmrProduceExpiry','kmrProduceProduction','kmrProduceTemp']){const field=document.getElementById(id);if(field)field.value='';}
+     draw();updateProducePanel();
      const supplier=currentSupplier(),count=ingredientList().length;
      const info=root.querySelector('#kmrMessage');
      if(info){info.style.color=count?'#28734b':'#b42318';info.textContent=supplier?(count+' approved products available from '+supplier.name+(count?'':'. Check supplier product assignments.')):'Choose a supplier to see its products.';}
@@ -257,6 +299,7 @@
      line[field]=target.value;
      if(field==='id'){
        const ing=findIngredient(line.id),saved=packageDefaults.get(String(line.id));
+       applyProduceDefaults(line);
        line.unit=isMilkUnitMismatch(ing)?'ltr':(saved?.purchase_unit||ing?.base_unit||'g');
        line.packUnit=packBaseUnit(isMilkUnitMismatch(ing)?'ltr':ing?.base_unit||'g');
        line.packSize=saved?normalizePackSize(saved,isMilkUnitMismatch(ing)?'ltr':ing?.base_unit):'';
@@ -294,7 +337,7 @@
    }
    root.querySelector('#kmrLines').addEventListener('input',change);
    root.querySelector('#kmrLines').addEventListener('change',e=>{if(e.target.matches('select'))change(e)});
-   draw();
+   draw();updateProducePanel();
  };
 
  // Show one receiving entry per supplier invoice, even when it has several ingredients.
