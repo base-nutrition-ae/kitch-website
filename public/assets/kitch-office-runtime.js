@@ -275,14 +275,25 @@ function bindOfficeLocationOperations(){
 }
 
 function renderLocations(){const target=el('locations')?.querySelector('table tbody');if(!target)return;target.innerHTML=officeBranches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+safe(x.branch_type==='central_store'?'Central Store':x.branch_type==='central_kitchen'?'Central Kitchen':'Restaurant / Branch')+' · '+safe(x.code||'—')+'</td><td>'+ (x.is_active?'Active':'Inactive')+' <button type="button" class="officeMini" data-location-edit="'+safe(x.id)+'">Edit</button> <button type="button" class="officeMini" data-location-toggle="'+safe(x.id)+'">'+(x.is_active?'Deactivate':'Activate')+'</button></td></tr>').join('')||'<tr><td colspan="3">No locations found</td></tr>';target.querySelectorAll('[data-location-edit]').forEach(btn=>btn.onclick=()=>openLocation(officeBranches.find(x=>x.id===btn.dataset.locationEdit)));target.querySelectorAll('[data-location-toggle]').forEach(btn=>btn.onclick=()=>toggleLocation(btn.dataset.locationToggle));}
+function officeHeaderPlanBadge(planStatus){
+ const badge=el('officePlanTopBadge');
+ if(!badge)return;
+ const verified=planStatus&&String(planStatus.restaurant_id)===String(officeRid)&&['active','trialing'].includes(planStatus.subscription_status);
+ const starter=verified&&planStatus.plan==='starter';
+ const pro=verified&&planStatus.plan==='pro';
+ badge.textContent=starter?'◆ KITCH STARTER':pro?'◆ KITCH PRO':'Package not verified';
+ badge.style.background=starter?'#f0f1f3':pro?'#22242a':'#f5f5f5';
+ badge.style.color=starter?'#25282e':pro?'#fff':'#666';
+ badge.title=starter?'Starter · AED 149/month':pro?'Pro · AED 249/month':'Subscription details could not be verified';
+}
 async function officeRefreshPackageStatus(){
  if(!officeRid||!db)return;
  const {data,error}=await db.rpc('kitch_owner_package_status');
  if(error||String(data?.restaurant_id)!==String(officeRid)){
-  officePlanStatus=null;const n=el('officeLocationNote');if(n)n.textContent='Subscription information unavailable. KITCH Cloud checks the plan before permitting any location changes.';
+  officePlanStatus=null;officeHeaderPlanBadge(null);const n=el('officeLocationNote');if(n)n.textContent='Subscription information unavailable. KITCH Cloud checks the plan before permitting any location changes.';
   return;
  }
- officePlanStatus=data;
+ officePlanStatus=data;officeHeaderPlanBadge(data);
  const starter=data.plan==='starter',pro=data.plan==='pro';
  const tag=el('officePackageLabel');if(tag)tag.textContent=starter?'KITCH Starter · 1 restaurant':pro?'KITCH Pro · Multi-location':'Subscription verification required';
  const note=el('officeLocationNote');
@@ -327,7 +338,7 @@ async function start(){
       db=parentClient?.auth?.getSession?parentClient:null;
     }catch(e){db=null;}
     if(!db)db=window.supabase.createClient(URL,KEY);
-    db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officeFlowData=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
+    db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officePlanStatus=null;officeHeaderPlanBadge(null);officeFlowData=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
     window.__kitchOfficeStartupPhase='checking saved session';
     const {data:{session},error}=await Promise.race([
       db.auth.getSession(),
