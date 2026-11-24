@@ -8,6 +8,10 @@ function prepareKitchOffice(){
  });return kitchOfficeDecodePromise;
 }
 function openKitchMainOffice(){
+ if(sessionStorage.getItem('kitch_explicit_signed_out')==='1'){
+  console.info('KITCH: blocked restoring a signed-out Main Office');
+  return;
+ }
  try{sessionStorage.setItem('kitch_last_view','office')}catch(e){}
  const box=document.getElementById('kitchOfficeOverlay'),frame=document.getElementById('kitchOfficeFrame');
  box.classList.add('open');document.body.style.overflow='hidden';
@@ -40,7 +44,7 @@ function openKitchMainOffice(){
  });
 }
 function closeKitchMainOffice(){try{sessionStorage.setItem('kitch_last_view','kitchen')}catch(e){}document.getElementById('kitchOfficeOverlay').classList.remove('open');document.body.style.overflow='';document.getElementById('login')?.classList.remove('hidden')}
-window.addEventListener('message',function(event){
+window.addEventListener('message',async function(event){
   const frame=document.getElementById('kitchOfficeFrame');
   if(!frame||event.source!==frame.contentWindow)return;
   if(event.data?.type==='KITCH_OFFICE_RETURN_TO_TEAM'){
@@ -50,6 +54,14 @@ window.addEventListener('message',function(event){
     return;
   }
   if(event.data?.type!=='KITCH_OFFICE_SIGNED_OUT')return;
+  // Set the logout guard before any asynchronous work; the opener must not
+  // restore an old owner view from browser/page history.
+  try{sessionStorage.setItem('kitch_explicit_signed_out','1');sessionStorage.removeItem('kitch_last_view');}catch(e){}
+  try{
+    // The office iframe may use a different Supabase client. Sign out the
+    // parent client as well to clear its own cached authentication session.
+    if(typeof sb!=='undefined'&&sb?.auth)await sb.auth.signOut({scope:'local'});
+  }catch(e){console.warn('KITCH parent sign out:',e);}
   closeKitchMainOffice();
   // Discard the embedded Main Office login after signing out; the next
   // sign-in must start from KITCH's Management / Team chooser.
@@ -73,6 +85,18 @@ window.addEventListener('message',function(event){
 });
 
 
+
+window.addEventListener('pageshow',()=>{
+ if(sessionStorage.getItem('kitch_explicit_signed_out')!=='1')return;
+ const overlay=document.getElementById('kitchOfficeOverlay');
+ if(overlay)overlay.classList.remove('open');
+ const frame=document.getElementById('kitchOfficeFrame');
+ if(frame){frame.dataset.initialized='';frame.removeAttribute('srcdoc');frame.src='about:blank';}
+ document.getElementById('app')?.classList.add('hidden');
+ document.getElementById('login')?.classList.remove('hidden');
+ document.body.style.overflow='';
+ try{closePublicModal()}catch(e){}
+});
 
 function kitchOfficeApplyChatNavigation(html){
  if(!html.includes('<main class="content">')||!html.includes('</head>')||!html.includes('</body>'))return html;
