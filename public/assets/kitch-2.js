@@ -51,8 +51,15 @@ window.addEventListener('message',function(event){
   }
   if(event.data?.type!=='KITCH_OFFICE_SIGNED_OUT')return;
   closeKitchMainOffice();
-  // The cached office has already reset its signed-out view.
-  // Its own Supabase auth listener controls the signed-out view.
+  // Discard the embedded Main Office login after signing out; the next
+  // sign-in must start from KITCH's Management / Team chooser.
+  try{
+    frame.dataset.initialized='';
+    frame.classList.remove('ready');
+    frame.removeAttribute('srcdoc');
+    frame.src='about:blank';
+    sessionStorage.removeItem('kitch_last_view');
+  }catch(e){console.warn('Unable to reset Main Office frame',e);}
   try{session=null;currentStaff=null;teamCloudAuth=null;cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};}catch(e){}
   try{
     document.getElementById('app')?.classList.add('hidden');
@@ -61,7 +68,7 @@ window.addEventListener('message',function(event){
     document.documentElement.classList.remove('modal-open');
     document.body.classList.remove('modal-open');
   }catch(e){}
-  try{closePublicModal();}catch(e){}
+  try{closePublicModal();openPublicSignIn('management')}catch(e){console.error('Unable to show KITCH sign in',e)}
   window.scrollTo(0,0);
 });
 
