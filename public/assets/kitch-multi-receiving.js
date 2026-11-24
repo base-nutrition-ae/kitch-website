@@ -100,6 +100,7 @@
  function markup(line,i){
    const poLinked=!!activePO;
    const ing=findIngredient(line.id),base=ing?.base_unit||'g',isPack=['pcs','pkt','box','tray'].includes(line.unit)&&line.unit!==base;
+   const poLine=activePO?.lines.find(x=>String(x.item_id)===String(line.po_item_id));
    const displayBase=isMilkUnitMismatch(ing)?'ltr':base;
    line.packUnit=packBaseUnit(displayBase);
    const list=ingredientList().map(x=>'<option value="'+safe(x.cloud_id)+'"'+(String(x.cloud_id)===line.id?' selected':'')+'>'+safe(x.name)+'</option>').join('');
@@ -108,6 +109,7 @@
    const hint=base==='ml'?'Use ml/ltr, or select pkt/box and enter the volume per package.':base==='g'?'Use g/kg, or enter weight per packet/box.':'';
    return '<div class="kmrLine" data-key="'+line.key+'">'+
     '<div class="kmrLineTop"><div class="kmrLineIdentity"><span class="kmrLineNum">'+String(i+1).padStart(2,'0')+'</span><strong>'+safe(ing?.name||'Select ingredient')+'</strong></div>'+(poLinked?'<small style="color:#888">From approved purchase order</small>':'<button type="button" data-action="remove" data-key="'+line.key+'" aria-label="Remove item">Remove</button>')+'</div>'+
+    (poLine?'<div style="background:#f7f7f7;border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:12px"><strong>Ordered: '+safe(poLine.ordered)+' '+safe(poLine.unit)+'</strong> · Previously received: '+safe(poLine.received)+' '+safe(poLine.unit)+' · <strong>Remaining: '+safe(poLine.remaining)+' '+safe(poLine.unit)+'</strong></div>':'')+
     '<div class="kmrGrid kmrMainGrid">'+
      '<label class="kmrIngredient">Ingredient *<select data-field="id" data-key="'+line.key+'"'+(poLinked?' disabled':'')+'><option value="">Choose ingredient</option>'+list+'</select></label>'+
      '<label>Unit *<select data-field="unit" data-key="'+line.key+'"'+(poLinked?' disabled':'')+'>'+options(poLinked?[base]:unitsForBase(base,ing),line.unit)+'</select></label>'+
@@ -159,6 +161,14 @@
      if(delivered<=0||!Number.isFinite(unitPrice))throw Error('Invalid conversion on line '+(i+1));
      return {ingredient_id:ing.cloud_id,delivered,rejected,price:unitPrice,unit:ing.base_unit,expiry:line.expiry||null,production:line.production||null,temperature:line.temperature===''?null:Number(line.temperature)};
    });
+   if(activePO){
+     for(let i=0;i<payload.length;i++){
+       const expected=activePO.lines[i];
+       if(!expected||String(payload[i].ingredient_id)!==String(expected.ingredient_id))throw Error('Purchase order items do not match. Reload Receiving.');
+       const accepted=payload[i].delivered-payload[i].rejected;
+       if(accepted>Number(expected.remaining)+0.000001)throw Error(expected.ingredient+': accepted quantity exceeds remaining purchase order ('+expected.remaining+' '+expected.unit+').');
+     }
+   }
    return {supplier,invoice,payload};
  }
  async function submit(){
