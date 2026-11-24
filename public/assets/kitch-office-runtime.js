@@ -23,6 +23,65 @@ setTimeout(function(){
 },0);
 let db=null;let officeRid=null,officeBranches=[],officeStaff=[];let officeRestaurantName='';
 let officeOpsSnapshot=null, officeOpsLoading=false;
+
+let officeFlowData=null,officeFlowLoading=false;
+function officeFlowInstall(){
+ const root=document.getElementById('overview');
+ if(!root||document.getElementById('officeFlowPanel'))return;
+ root.insertAdjacentHTML('beforeend','<section id="officeFlowPanel" aria-label="Company operations control center">'+
+ '<div class="ofHead"><div><h2>Operations Control Center</h2><p>Central Kitchen orders and ingredient stock requests across locations</p></div>'+
+ '<div class="ofActions"><select id="ofLocation" aria-label="Filter destination location"><option value="all">All locations</option></select><button id="ofRefresh" type="button">Refresh</button></div></div>'+
+ '<div id="ofError"></div><div id="ofKpis" class="ofKpis"></div>'+
+ '<div class="ofCols"><div class="ofPanel"><h3>Central Kitchen Orders</h3><small>Ready-product lines · current month</small><div id="ofReady" class="ofScroll"></div></div>'+
+ '<div class="ofPanel"><h3>Central Store Ingredient Requests</h3><small>Latest 200 stock request lines</small><div id="ofStock" class="ofScroll"></div></div></div>'+
+ '<p class="ofFoot">Read-only company records. Approvals, dispatch and receiving remain in the relevant team workspace.</p></section>');
+ document.getElementById('ofLocation').addEventListener('change',officeFlowRender);
+ document.getElementById('ofRefresh').addEventListener('click',officeFlowRefresh);
+}
+function officeFlowRender(){
+ if(!officeFlowData)return;
+ const filter=document.getElementById('ofLocation')?.value||'all';
+ const ready=(officeFlowData.ready||[]).filter(x=>filter==='all'||String(x.branch_id)===filter);
+ const stock=(officeFlowData.stock||[]).filter(x=>filter==='all'||String(x.branch_id)===filter);
+ const tiles=[
+ ['CK awaiting approval',ready.filter(x=>x.status==='Requested').length],
+ ['CK approved / to dispatch',ready.filter(x=>x.status==='Accepted').length],
+ ['Ready products in transit',ready.filter(x=>x.status==='In Transfer').length],
+ ['Store requests awaiting approval',stock.filter(x=>x.status==='Requested').length]
+ ];
+ document.getElementById('ofKpis').innerHTML=tiles.map(x=>'<div class="ofKpi"><small>'+safe(x[0])+'</small><strong>'+x[1]+'</strong></div>').join('');
+ const rows=(data,kind)=>data.length?
+ '<table><thead><tr><th>REF</th><th>LOCATION</th><th>ITEM / QUANTITY</th><th>STATUS</th></tr></thead><tbody>'+
+ data.slice(0,50).map(x=>'<tr><td>#'+safe(x.id)+(x.group_ref?'<small>Group '+safe(String(x.group_ref).slice(0,8))+'</small>':'')+
+ '</td><td>'+safe(x.branch_name||'—')+'</td><td><strong>'+safe(kind==='ready'?x.product_name:x.ingredient_name)+
+ '</strong><small>'+safe(x.qty)+' '+safe(x.unit)+'</small></td><td><span class="ofStatus">'+safe(x.status)+'</span></td></tr>').join('')+
+ '</tbody></table>':'<div class="ofEmpty">No matching cloud records for this location.</div>';
+ document.getElementById('ofReady').innerHTML=rows(ready,'ready');
+ document.getElementById('ofStock').innerHTML=rows(stock,'stock');
+}
+async function officeFlowRefresh(){
+ if(!officeRid||!db||officeFlowLoading)return;
+ officeFlowInstall();officeFlowLoading=true;
+ const btn=document.getElementById('ofRefresh');if(btn){btn.disabled=true;btn.textContent='Refreshing…'}
+ try{
+  const {data,error}=await db.rpc('kitch_owner_flow_monitor');
+  if(error)throw error;
+  if(String(data?.restaurant_id)!==String(officeRid))throw Error('Company mismatch in operations report');
+  officeFlowData=data;
+  const sel=document.getElementById('ofLocation'),value=sel.value;
+  sel.innerHTML='<option value="all">All locations</option>'+officeBranches.filter(b=>b.is_active).map(b=>'<option value="'+safe(b.id)+'">'+safe(b.name)+'</option>').join('');
+  if([...sel.options].some(x=>x.value===value))sel.value=value;
+  document.getElementById('ofError').textContent='';
+  officeFlowRender();
+ }catch(e){
+  officeFlowData=null;
+  document.getElementById('ofError').textContent='Live operations unavailable: '+String(e.message||e)+'. No estimated totals shown.';
+  document.getElementById('ofKpis').innerHTML='';
+  document.getElementById('ofReady').textContent='Data unavailable';
+  document.getElementById('ofStock').textContent='Data unavailable';
+ }finally{officeFlowLoading=false;if(btn){btn.disabled=false;btn.textContent='Refresh'}}
+}
+
 function say(t){msg.textContent=t||'';}
 function setVisible(on){el('officeAuth').classList.toggle('officeHidden',on);el('officeApp').classList.toggle('officeHidden',!on);}
 function money(n){return 'AED '+Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2,minimumFractionDigits:2});}
@@ -63,6 +122,7 @@ async function loadOwner(initialUser){
  setVisible(true);
  const currentIds=new Set((ings.data||[]).map(x=>String(x.id)));
  const branches=(b.data||[]).filter(x=>x.is_active),team=(staff.data||[]).filter(x=>x.is_active),bal=(inventory.data||[]).filter(x=>currentIds.has(String(x.ingredient_id)));officeBranches=b.data||[];officeStaff=staff.data||[];renderStaff();renderLocations();bindOfficeLocationOperations();refreshOfficeLocationOperations().catch(e=>console.warn('Office location report unavailable',e));
+ officeFlowInstall();void officeFlowRefresh();
  const val=bal.reduce((s,x)=>s+Number(x.quantity_on_hand||0)*Number(x.indicative_unit_cost||0),0);
  if(!bal.length){const note=document.querySelector('#overview .notice');if(note)note.textContent='No inventory rows are visible to this account yet. Check owner inventory permissions before interpreting AED 0.00 as a real balance.';}
  setKpi('Active Locations',String(branches.length).padStart(2,'0'));
@@ -251,7 +311,7 @@ async function start(){
       db=parentClient?.auth?.getSession?parentClient:null;
     }catch(e){db=null;}
     if(!db)db=window.supabase.createClient(URL,KEY);
-    db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
+    db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officeFlowData=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
     window.__kitchOfficeStartupPhase='checking saved session';
     const {data:{session},error}=await Promise.race([
       db.auth.getSession(),

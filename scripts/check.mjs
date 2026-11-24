@@ -167,6 +167,14 @@ const stockMultiChecks=[
  ['multi-ingredient request styling',sharedShell.includes('KITCH multi-ingredient internal stock request')]
 ];
 for(const [label,ok] of stockMultiChecks)if(!ok)throw new Error('Multi-ingredient stock request regression: '+label);
+const officeFlowSource=fs.readFileSync('public/assets/kitch-office-runtime.js','utf8');
+for(const [label,ok] of [
+ ['Owner flow secure RPC',officeFlowSource.includes("db.rpc('kitch_owner_flow_monitor')")],
+ ['Owner flow display',officeFlowSource.includes('function officeFlowInstall()')],
+ ['Owner flow location filter',officeFlowSource.includes('function officeFlowRender()')],
+ ['Owner flow refresh',officeFlowSource.includes('function officeFlowRefresh()')],
+ ['Owner flow guard',officeFlowSource.includes('No estimated totals shown.')]
+])if(!ok)throw new Error('Owner flow dashboard check failed: '+label);
 const ckDashboardChecks=[
  ['verified CK staff workspace flag',app.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")||readySource.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")],
  ['CK-specific sidebar entries',app.includes("items=['Dashboard','Incoming Branch Orders','Production Planning','Production'")],
