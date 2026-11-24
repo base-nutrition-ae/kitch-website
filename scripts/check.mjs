@@ -124,7 +124,7 @@ console.log('PASS: Main Office external runtime loaded and startup contracts pre
 console.log('PASS: Desktop navigation and authenticated owner refresh-page restoration contracts.');
 
 
-const readySource=fs.readFileSync('public/assets/kitch-ready-products.js','utf8');
+const readySource=fs.readFileSync('public/assets/kitch-ready-products-v4.js','utf8');
 const readySQL=fs.readFileSync('sql/kitch-ready-products-v1.review.sql','utf8');
 const readyChecks=[
  ['Ready Products script tag',page.includes('src="assets/kitch-ready-products-v4.js')],
@@ -132,7 +132,7 @@ const readyChecks=[
  ['Separate import preview',readySource.includes('kitchReadyPreviewImport')],
  ['Dedicated cloud RPC',readySource.includes("sb.rpc('kitch_ready_product_action'")],
  ['Batch record workflow',readySource.includes('kitchReadyOpenBatch')&&readySource.includes("rpc('batch'")],
- ['Request, dispatch, receipt',["rpc('create'","rpc('dispatch'","rpc('receive'"].every(t=>readySource.includes(t))],
+ ['Request, dispatch, receipt',["commerce('create_many'","rpc('dispatch'","rpc('receive'"].every(t=>readySource.includes(t))],
  ['Separate tables',["kitch_ready_products","kitch_ready_batches","kitch_ready_requests","kitch_ready_movements"].every(t=>readySQL.includes(t))],
  ['Database RLS',readySQL.includes('enable row level security')],
  ['Single complete SQL function',readySQL.split('create or replace function public.kitch_ready_product_action').length===2&&readySQL.split('$function$;').length===2],
