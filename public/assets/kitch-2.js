@@ -57,12 +57,12 @@ window.addEventListener('message',async function(event){
   // Set the logout guard before any asynchronous work; the opener must not
   // restore an old owner view from browser/page history.
   try{sessionStorage.setItem('kitch_explicit_signed_out','1');sessionStorage.removeItem('kitch_last_view');}catch(e){}
+  closeKitchMainOffice();
   try{
     // The office iframe may use a different Supabase client. Sign out the
     // parent client as well to clear its own cached authentication session.
     if(typeof sb!=='undefined'&&sb?.auth)await sb.auth.signOut({scope:'local'});
   }catch(e){console.warn('KITCH parent sign out:',e);}
-  closeKitchMainOffice();
   // Discard the embedded Main Office login after signing out; the next
   // sign-in must start from KITCH's Management / Team chooser.
   try{
