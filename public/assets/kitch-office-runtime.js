@@ -505,6 +505,9 @@ function officePOShow(id){
  const panel=officePurchaseEl('officePOComposer');
  const estimate=officeOrderEstimate(req);
  officePurchaseEl('officePOEstimatedTotal').textContent=money(estimate.total)+(estimate.unknown.length?' · partial estimate':'')+' (reference prices)';
+ const destination=officeOrderDestination(req);
+ const deliveryPreview=officePurchaseEl('officePODeliveryPreview');
+ if(deliveryPreview)deliveryPreview.textContent=destination.name+' — '+(destination.address||'Address not saved; add one under Locations before ordering')+(destination.instructions?' · '+destination.instructions:'');
  officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredient'+(req.lines.length===1?'':'s');
  const opts=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
  officePurchaseEl('officePOSupplier').innerHTML='<option value="">Select supplier</option>'+opts;
@@ -679,10 +682,7 @@ officePurchaseEl('officePOConfirm').addEventListener('click',()=>{
  }catch(e){message.textContent=e.message;return}
  const subject=(officeRestaurantName||'Restaurant')+' Purchase Order — '+(data.req.request_no||data.req.id);
  const body=officeKitchenOrderText(data.req,data.supplier.name);
- const params=new URLSearchParams();
- if(cc.length)params.set('cc',cc.join(','));
- params.set('subject',subject);params.set('body',body);
- const mailto='mailto:'+to.map(encodeURIComponent).join(',')+'?'+params.toString();
+ const mailto='mailto:'+to.map(encodeURIComponent).join(',')+'?'+(cc.length?'cc='+encodeURIComponent(cc.join(','))+'&':'')+'subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
  officeLastOrderChannel='email';
  message.textContent='Email draft opened. Review To, CC, order details and attach the saved PDF manually if needed. After actually sending, return and confirm below.';
  officePurchaseEl('officePOConfirmSent').hidden=false;
@@ -737,6 +737,7 @@ officePurchaseEl('officePOPrint').addEventListener('click',()=>{
  const data=officeCurrentKitchenOrder();if(!data)return;
  const rows=data.req.lines.map((l,i)=>'<tr><td>'+(i+1)+'</td><td>'+safe(l.ingredient)+'</td><td>'+safe(l.quantity)+'</td><td>'+safe(l.unit)+'</td></tr>').join('');
  const notes=data.req.notes||data.req.note||data.req.request_notes||'None';
+ const destination=officeOrderDestination(data.req);
  const doc='<!doctype html><html><head><meta charset="utf-8"><title>'+safe(officeRestaurantName||'Restaurant')+' Order '+safe(data.req.request_no||data.req.id)+'</title><style>body{font:14px Arial,sans-serif;color:#111;margin:40px}h1{font-size:26px}p{line-height:1.6}.meta{margin:24px 0;padding:20px;background:#f7f7f7;border-radius:10px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border-bottom:1px solid #ddd;padding:12px;text-align:left}th{background:#f5f5f5}footer{margin-top:36px;color:#777;font-size:12px}@media print{body{margin:20mm}}</style></head><body><h1>'+safe(officeRestaurantName||'Restaurant')+' · Purchase Order</h1><div class="meta"><p><b>Request:</b> '+safe(data.req.request_no||data.req.id)+'</p><p><b>Supplier:</b> '+safe(data.supplier.name)+'</p><p><b>Status:</b> Approved kitchen request</p></div><h2>Items ordered</h2><table><thead><tr><th>#</th><th>Ingredient</th><th>Quantity</th><th>Unit</th></tr></thead><tbody>'+rows+'</tbody></table><p><b>Notes:</b> '+safe(notes)+'</p><footer>Generated from the approved kitchen purchase request for '+safe(officeRestaurantName||'Restaurant')+'. Inventory updates only after Receiving.</footer></body></html>';
  const popup=window.open('','_blank');
  if(!popup){officePurchaseEl('officePOInlineMessage').textContent='Allow pop-ups in your browser to print or save this order as a PDF.';return}
