@@ -68,7 +68,7 @@ window.addEventListener('message',function(event){
     document.documentElement.classList.remove('modal-open');
     document.body.classList.remove('modal-open');
   }catch(e){}
-  try{closePublicModal();openPublicSignIn('management')}catch(e){console.error('Unable to show KITCH sign in',e)}
+  try{closePublicModal()}catch(e){console.error('Unable to close KITCH sign in',e)}
   window.scrollTo(0,0);
 });
 
