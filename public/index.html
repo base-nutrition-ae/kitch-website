@@ -3,6 +3,16 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KITCH | Restaurant Operating System</title>
+<style id="kitch-home-header-no-shift">
+/* First-paint desktop navigation: mirror the final unified theme before late CSS loads. */
+@media (min-width:851px){
+ #login.publicLanding .publicTop{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:18px!important;width:100%!important;max-width:none!important;box-sizing:border-box!important}
+ #login.publicLanding .publicTop .publicBrand{flex:0 1 auto!important;min-width:0!important;margin-right:auto!important}
+ #login.publicLanding .publicTop .publicLinks{display:flex!important;align-items:center!important;justify-content:flex-end!important;flex:0 0 auto!important;flex-wrap:nowrap!important;gap:10px!important;width:auto!important;max-width:none!important;margin:0 0 0 auto!important}
+ #login.publicLanding .publicTop .publicLinks :is(button,a){flex:0 0 auto!important;white-space:nowrap!important}
+ #login.publicLanding .publicTop .kitchMobileTopActions{display:none!important}
+}
+</style>
 <link rel="icon" type="image/png" sizes="32x32" href="./kitch-logo.png?v=20261029">
 <link rel="shortcut icon" type="image/png" href="./kitch-logo.png?v=20261029">
 <link rel="apple-touch-icon" href="./kitch-logo.png?v=20261029">
