@@ -9,6 +9,14 @@ const KITCH_AUTH_BUILD='2026-10-02-final-all-in-one-v1';
 let cloud={restaurant_id:null,branch_id:null,workspace_code:null,user:null};
 let teamCloudAuth=null;
 
+async function kitchIsVerifiedMember(userId,restaurantId){
+ if(!userId||!restaurantId)return false;
+ const [office,member]=await Promise.all([
+  sb.from('kitch_office_owners').select('restaurant_id').eq('user_id',userId).eq('restaurant_id',restaurantId).eq('is_active',true).limit(1),
+  sb.from('restaurant_members').select('restaurant_id').eq('user_id',userId).eq('restaurant_id',restaurantId).eq('is_active',true).limit(1)
+ ]);
+ return (!office.error&&!!office.data?.length)||(!member.error&&!!member.data?.length);
+}
 async function loadCloudWorkspace(){
  // Never replace the PIN-verified Team workspace with a stale owner browser session.
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return true;
@@ -21,7 +29,7 @@ async function loadCloudWorkspace(){
  const cachedRestaurant=localStorage.getItem(cachePrefix+'restaurant_id');
  const cachedBranch=localStorage.getItem(cachePrefix+'branch_id');
  const cachedWorkspaceCode=localStorage.getItem(cachePrefix+'workspace_code');
- if(cachedRestaurant){
+ if(cachedRestaurant&&await kitchIsVerifiedMember(user.id,cachedRestaurant)){
   cloud.restaurant_id=cachedRestaurant;cloud.branch_id=cachedBranch||null;cloud.workspace_code=cachedWorkspaceCode||null;
   await syncPackageFromCloud();
   restoreScopedStaff();
@@ -32,7 +40,7 @@ async function loadCloudWorkspace(){
  try{
   const {data:rows,error}=await sb.rpc('kitch_current_workspace');
   const w=Array.isArray(rows)?rows[0]:rows;
-  if(!error&&w?.restaurant_id){
+  if(!error&&w?.restaurant_id&&await kitchIsVerifiedMember(user.id,w.restaurant_id)){
    cloud.restaurant_id=w.restaurant_id;
    cloud.branch_id=w.branch_id||null;
    cloud.workspace_code=w.workspace_code||null;
@@ -52,8 +60,12 @@ async function loadCloudWorkspace(){
  // Read only the signed-in user's permitted owner row; never grant access from browser cache.
  try{
   const {data:officeRows,error:officeError}=await sb.from('kitch_office_owners')
-   .select('restaurant_id').eq('user_id',user.id).eq('is_active',true).limit(1);
-  const office=officeRows?.[0];
+   .select('restaurant_id').eq('user_id',user.id).eq('is_active',true);
+  const preferred=sessionStorage.getItem('kitch_office_selected_'+user.id);
+  const office=(officeRows||[]).length===1?officeRows[0]:(officeRows||[]).find(row=>String(row.restaurant_id)===preferred);
+  if((officeRows||[]).length>1&&!office){
+   window.__kitchWorkspaceError='Select your workspace in Main Office before using the kitchen';return false;
+  }
   if(!officeError&&office?.restaurant_id){
    const {data:branches,error:branchError}=await sb.from('branches')
     .select('id,name,branch_type,is_active').eq('restaurant_id',office.restaurant_id).eq('is_active',true);
@@ -102,7 +114,7 @@ async function loadCloudWorkspace(){
  // 4) Last safe browser fallback: use IDs previously resolved for this signed-in session.
  const fallbackRestaurant=localStorage.getItem(cachePrefix+'restaurant_id');
  const fallbackBranch=localStorage.getItem(cachePrefix+'branch_id');
- if(fallbackRestaurant){
+ if(fallbackRestaurant&&await kitchIsVerifiedMember(user.id,fallbackRestaurant)){
   cloud.restaurant_id=fallbackRestaurant;cloud.branch_id=fallbackBranch||null;
   await syncPackageFromCloud();
   window.__kitchWorkspaceError='';return true;
@@ -113,19 +125,22 @@ async function loadCloudWorkspace(){
 
 function activateWorkspaceBrowserScope(){
  if(!cloud.restaurant_id)return;
- const scopeKey='kitch_active_workspace_scope_v1';
- const previous=localStorage.getItem(scopeKey);
- const current=String(cloud.restaurant_id);
- // Browser demo/operational records belong to exactly one restaurant workspace.
- // When a different customer/workspace signs in, remove ALL prior KITCH demo data
- // so inventory, receiving, recipes, production, waste, counts, transfers, activity
- // and staff can never leak from the previous customer.
- if(previous!==current){
-   Object.keys(localStorage).filter(k=>k.startsWith('kitch_demo_')).forEach(k=>localStorage.removeItem(k));
-   localStorage.setItem(scopeKey,current);
+ const key='kitch_active_workspace_scope_v1', previous=localStorage.getItem(key), current=String(cloud.restaurant_id);
+ if(previous===current)return;
+ const demoKeys=Object.keys(localStorage).filter(k=>k.startsWith('kitch_demo_'));
+ const snapshot=Object.fromEntries(demoKeys.map(k=>[k,localStorage.getItem(k)]));
+ if(demoKeys.length){
+  const snapshotKey='kitch_workspace_snapshot_v1_'+(previous||'unassigned');
+  try{localStorage.setItem(snapshotKey,JSON.stringify(snapshot));}
+  catch(e){console.error('Cannot archive previous workspace local data',e);throw e;}
  }
+ demoKeys.forEach(k=>localStorage.removeItem(k));
+ try{
+  const saved=JSON.parse(localStorage.getItem('kitch_workspace_snapshot_v1_'+current)||'{}');
+  Object.entries(saved).filter(([k])=>k.startsWith('kitch_demo_')).forEach(([k,v])=>localStorage.setItem(k,String(v)));
+ }catch(e){console.error('Cannot restore workspace browser cache',e);}
+ localStorage.setItem(key,current);
 }
-
 async function syncPackageFromCloud(){
  if(!cloud.restaurant_id)return false;
  activateWorkspaceBrowserScope();
@@ -133,9 +148,17 @@ async function syncPackageFromCloud(){
   const {data:branches,error}=await sb.from('branches').select('id,name,branch_type,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('created_at');
   if(error)throw error;
   const rows=branches||[];
-  const hasStore=rows.some(b=>String(b.branch_type||'').toLowerCase()==='central_store');
+  // Package is validated by cloud, not inferred from central-store existence.
   const restaurantBranch=rows.find(b=>String(b.branch_type||'').toLowerCase()!=='central_store')||rows[0]||null;
-  localStorage.setItem(PACKAGE_KEY,hasStore?'multi':'restaurant');
+  const {data:verifiedPlan,error:planError}=await sb.rpc('kitch_owner_package_status');
+  if(!planError&&verifiedPlan&&String(verifiedPlan.restaurant_id)===String(cloud.restaurant_id)&&['starter','pro'].includes(verifiedPlan.plan)){
+   localStorage.setItem(PACKAGE_KEY,verifiedPlan.plan==='pro'?'multi':'restaurant');
+   window.__kitchVerifiedPlan=verifiedPlan.plan;
+  }else{
+   window.__kitchVerifiedPlan=null;
+   localStorage.removeItem(PACKAGE_KEY);
+   console.warn('KITCH package not verified from cloud');
+  }
   if(restaurantBranch&&!teamCloudAuth?.staff_name){
    cloud.branch_id=restaurantBranch.id;
    localStorage.setItem('kitch_cloud_branch_name',restaurantBranch.name||'Main Restaurant');
@@ -440,6 +463,42 @@ function applyActivatedSubscription(payload){
  // A newly activated workspace must not inherit another account's browser demo structure.
  [LOCATION_KEY,DEPT_KEY,STAFF_KEY].forEach(k=>localStorage.removeItem(k));
  ensureStructure();
+}
+async function kitchRequestPasswordReset(){
+ const field=document.getElementById('email');
+ const em=String(field?.value||'').trim().toLowerCase();
+ if(!em||!/^\\S+@\\S+\\.\\S+$/.test(em)){alert('Enter your email address first.');field?.focus();return;}
+ try{
+  const redirectTo=window.location.origin+window.location.pathname;
+  const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo});
+  if(error)throw error;
+  alert('If this email is registered, a password-reset link will be sent. Check your inbox and spam folder.');
+ }catch(e){alert('Unable to send reset link: '+String(e.message||e));}
+}
+function kitchShowPasswordRecovery(){
+ const id='kitchPasswordRecoveryOverlay';
+ if(document.getElementById(id))return;
+ const overlay=document.createElement('div');overlay.id=id;
+ Object.assign(overlay.style,{position:'fixed',inset:'0',zIndex:'999999',background:'rgba(0,0,0,.65)',display:'grid',placeItems:'center',padding:'20px'});
+ const panel=document.createElement('div');Object.assign(panel.style,{background:'#fff',color:'#222',width:'min(420px,100%)',padding:'28px',borderRadius:'20px',boxShadow:'0 10px 45px #0003'});
+ const heading=document.createElement('h2');heading.textContent='Create a new KITCH password';
+ const label=document.createElement('label');label.textContent='New password (minimum 8 characters)';label.setAttribute('for','kitchNewRecoveryPassword');
+ const input=document.createElement('input');input.id='kitchNewRecoveryPassword';input.type='password';input.minLength=8;input.autocomplete='new-password';Object.assign(input.style,{display:'block',width:'100%',boxSizing:'border-box',padding:'12px',margin:'10px 0 16px',borderRadius:'10px',border:'1px solid #ccc'});
+ const submit=document.createElement('button');submit.textContent='Save new password';Object.assign(submit.style,{background:'#252525',color:'#fff',border:'0',borderRadius:'10px',padding:'12px 18px',cursor:'pointer'});
+ const status=document.createElement('p');status.setAttribute('role','status');
+ submit.onclick=async()=>{
+  if(input.value.length<8){status.textContent='Password must be at least 8 characters.';return;}
+  submit.disabled=true;
+  try{
+   const {error}=await sb.auth.updateUser({password:input.value});
+   if(error)throw error;
+   status.textContent='Password changed. You can now sign in.';
+   input.value='';
+   setTimeout(()=>{overlay.remove();},1200);
+  }catch(e){status.textContent=String(e.message||e);}
+  finally{submit.disabled=false;}
+ };
+ panel.append(heading,label,input,submit,status);overlay.append(panel);document.body.append(overlay);input.focus();
 }
 async function managementLogin(){
  const em=email.value.trim().toLowerCase(),pw=password.value;if(!em||!pw)return alert('Enter email and password.');
@@ -816,7 +875,7 @@ function toggleMobileMenu(open){
  m.classList.toggle('open',!!open);
  document.body.classList.toggle('kitch-menu-open',!!open);
 }
-function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" onclick="closePublicModal();openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" onclick="closePublicModal();openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button type="button" id="kitchTeamSubmit" class="primary" onclick="teamLogin()">Team sign in</button><div id="kitchTeamStatus" role="status" aria-live="polite" style="display:none;margin-top:12px;font-size:13px;line-height:1.5"></div>`}`)}
+function openPublicSignIn(mode='management'){publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:28px"><b>KITCH</b><span>RESTAURANT OPERATING SYSTEM</span></div><h2 style="font-size:42px;margin-bottom:10px">Sign in</h2><p class="muted">Management = Main Office / Owner · Team = operational staff</p><div class="actions loginTabs" style="margin:22px 0"><button class="btn ${mode==='management'?'black':''}" onclick="closePublicModal();openPublicSignIn('management')">Management</button><button class="btn ${mode==='team'?'black':''}" onclick="closePublicModal();openPublicSignIn('team')">Team</button></div>${mode==='management'?`<div class="field"><label>EMAIL</label><input id="email" autocomplete="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="password" type="password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePassword('password',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="managementLogin()">Management sign in</button><button type="button" onclick="kitchRequestPasswordReset()" style="display:block;margin:10px auto 0;border:0;background:transparent;color:#333;text-decoration:underline;cursor:pointer;font-size:13px">Forgot password?</button><p class="muted" style="text-align:center;margin-top:14px">New to KITCH? Use <b>Subscribe Now</b> to create your account and workspace.</p>`:`<div class="field"><label>STAFF NAME</label><input id="teamStaffName" autocomplete="username" placeholder="Enter staff name"></div><div class="field"><label>STAFF PIN</label><div class="passwordWrap"><input id="pin" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="Enter 4-digit PIN"><button type="button" class="passwordEye" onclick="togglePassword('pin',this)" aria-label="Show PIN"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button type="button" id="kitchTeamSubmit" class="primary" onclick="teamLogin()">Team sign in</button><div id="kitchTeamStatus" role="status" aria-live="polite" style="display:none;margin-top:12px;font-size:13px;line-height:1.5"></div>`}`)}
 function openCreateWorkspace(){closePublicModal();publicModal(`<div class="publicBrand" style="color:#111;margin-bottom:24px"><b>KITCH</b><span>NEW WORKSPACE</span></div><h2>Create your KITCH</h2><div class="field"><label>COMPANY / RESTAURANT NAME</label><input id="newCompany"></div><div class="field"><label>FIRST BRANCH NAME</label><input id="newBranch" placeholder="e.g. Main Branch"></div><div class="field"><label>EMAIL</label><input id="newEmail" type="email"></div><div class="field"><label>PASSWORD</label><div class="passwordWrap"><input id="newPassword" type="password" minlength="8"><button type="button" class="passwordEye" onclick="togglePassword('newPassword',this)" aria-label="Show password"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5c1.7 1.8 4.5 2.9 8 2.9s6.3-1.1 8-2.9"/><path d="M6.4 12.1 5 14.5M9.9 13.1l-.4 2.8M14.1 13.1l.4 2.8M17.6 12.1l1.4 2.4"/></svg></button></div></div><button class="primary" onclick="createWorkspace()">Create workspace</button>`)}
 async function createWorkspace(){
  const company=newCompany.value.trim(),branch=newBranch.value.trim(),em=newEmail.value.trim(),pw=newPassword.value;
@@ -4772,6 +4831,7 @@ async function completeStripeReturn(){
  }
 })();
 sb.auth.onAuthStateChange((event,authSession)=>{
+ if(event==='PASSWORD_RECOVERY'){setTimeout(kitchShowPasswordRecovery,0);return;}
  // Team and owner sessions have different server-verified location scopes.
  // Owner authentication refresh must never alter an active PIN staff session.
  if(teamCloudAuth?.staff_name&&teamCloudAuth?.pin)return;
