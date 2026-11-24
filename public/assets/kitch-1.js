@@ -767,10 +767,14 @@ function openPage(name){
  if(name==='Recipes'&&((cloud?.user?.id&&cloud?.restaurant_id)||teamCloudAuth?.pin)){void kitchLoadSyncedRecipes().then(()=>{if(pageTitle.textContent==='Recipes')content.innerHTML=page('Recipes')}).catch(err=>console.warn('Recipe sync',err));}
  void refreshKitchTrialStatus();
  pageTitle.textContent=name;
+ const label=document.querySelector('#app>.main>.top .sub');
+ if(label)label.textContent=isCentralKitchenWorkspace()?'CENTRAL KITCHEN WORKSPACE':session==='store'?'CENTRAL STORE WORKSPACE':session==='manager'?'RESTAURANT WORKSPACE':'KITCH OPERATIONS';
  kitchRememberOwnerPage(name);
  [...nav.children].forEach(b=>b.classList.toggle('active',b.dataset.page===name));
  document.querySelectorAll('#kitchIconRail [data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
  content.innerHTML=page(name);
+ const mainScroller=document.querySelector('#app>.main');
+ if(mainScroller)mainScroller.scrollTop=0;
  if(window.innerWidth<=850)toggleAppMobileMenu(false);
  if(name==='Production')void kitchRefreshProductionPageData();
 }

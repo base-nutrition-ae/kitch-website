@@ -149,6 +149,15 @@ if(!readySource.includes('centralKitchenStaff||!ready'))throw new Error('Central
 if(!officeSource.includes('<option value="central_kitchen">'))throw new Error('Central Kitchen location type missing from Main Office.');
 if(!officeRuntime.includes("x.branch_type==='central_kitchen'?'Central Kitchen'"))throw new Error('Central Kitchen location label missing.');
 console.log('PASS: Central Kitchen locations, dispatch permissions and multi-location UI contracts.');
+const sharedShell=fs.readFileSync('design/mobile-unified.css','utf8');
+const layoutChecks=[
+ ['unified workspace viewport shell',sharedShell.includes('KITCH_SINGLE_LAYOUT_SHELL_20261124')],
+ ['kitchen independent scroll',sharedShell.includes('overflow-y:auto!important;overflow-x:hidden!important')],
+ ['fixed mobile navigation',sharedShell.includes('position:fixed!important;top:0!important;bottom:0!important')],
+ ['modal viewport centring',sharedShell.includes('html body.modal-open #modal.modal')],
+ ['CK workspace label',app.includes("'CENTRAL KITCHEN WORKSPACE'")]
+];
+for(const [label,ok] of layoutChecks)if(!ok)throw new Error('Layout contract missing: '+label);
 const ckDashboardChecks=[
  ['verified CK staff workspace flag',app.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")||readySource.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")],
  ['CK-specific sidebar entries',app.includes("items=['Dashboard','Incoming Branch Orders','Production Planning','Production'")],

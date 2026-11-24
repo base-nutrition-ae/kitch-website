@@ -172,3 +172,147 @@
  .kitchReadyPage .kitchReadyHeading .actions button{white-space:normal;min-height:42px}
  .kitchReadyPage .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 }
+
+
+/* KITCH_SINGLE_LAYOUT_SHELL_20261124
+ * One scroll model for every Kitchen, Central Kitchen, Store, Branch and
+ * Main Office screen. Sidebar does not participate in page scrolling.
+ * Apply after all earlier graphite, shared and mobile rules.
+ */
+@media (min-width:851px){
+ html body #app.app:not(.hidden){
+  display:grid!important;grid-template-columns:228px minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;gap:18px!important;
+  position:relative!important;box-sizing:border-box!important;
+  width:100%!important;max-width:100%!important;
+  height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+  padding:16px!important;margin:0!important;overflow:hidden!important;
+ }
+ html body #app.app:not(.hidden)>.side{
+  position:relative!important;grid-column:1!important;grid-row:1!important;
+  top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
+  width:228px!important;min-width:0!important;max-width:228px!important;
+  height:100%!important;min-height:0!important;max-height:100%!important;
+  padding:16px 13px!important;margin:0!important;overflow:hidden!important;
+  display:flex!important;flex-direction:column!important;
+  transform:none!important;visibility:visible!important;opacity:1!important;
+ }
+ html body #app.app:not(.hidden)>.main{
+  position:relative!important;grid-column:2!important;grid-row:1!important;
+  box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;
+  height:100%!important;min-height:0!important;max-height:100%!important;
+  padding:0 7px 28px 0!important;margin:0!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  overscroll-behavior:contain!important;scrollbar-gutter:stable!important;
+ }
+ html body #app.app:not(.hidden)>#kitchIconRail{display:none!important}
+ html body:has(#officeApp:not(.officeHidden)) #officeApp.frame{
+  box-sizing:border-box!important;width:100%!important;max-width:100%!important;
+  height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+  padding:16px!important;margin:0!important;overflow:hidden!important;
+ }
+ html body #officeApp:not(.officeHidden)>.app{
+  display:grid!important;grid-template-columns:228px minmax(0,1fr)!important;
+  grid-template-rows:minmax(0,1fr)!important;gap:18px!important;
+  width:100%!important;max-width:100%!important;height:100%!important;min-height:0!important;
+  overflow:hidden!important;padding:0!important;align-items:stretch!important;
+ }
+ html body #officeApp:not(.officeHidden) .officeSidebar,
+ html body #officeApp:not(.officeHidden) .officeChatSidebar{
+  position:relative!important;grid-column:1!important;grid-row:1!important;
+  top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
+  box-sizing:border-box!important;width:228px!important;min-width:0!important;max-width:228px!important;
+  height:100%!important;min-height:0!important;max-height:100%!important;
+  margin:0!important;padding:16px 13px!important;overflow:hidden!important;
+  display:flex!important;flex-direction:column!important;
+ }
+ html body #officeApp:not(.officeHidden) .content{
+  position:relative!important;grid-column:2!important;grid-row:1!important;
+  width:100%!important;min-width:0!important;max-width:100%!important;
+  height:100%!important;min-height:0!important;max-height:100%!important;
+  margin:0!important;padding:0 6px 28px 0!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  overscroll-behavior:contain!important;scrollbar-gutter:stable!important;
+ }
+}
+@media (max-width:850px){
+ html body #app.app:not(.hidden){
+  display:block!important;position:relative!important;
+  width:100%!important;max-width:100%!important;
+  height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+  padding:0!important;margin:0!important;overflow:hidden!important;
+ }
+ html body #app.app:not(.hidden)>.main{
+  display:block!important;position:relative!important;
+  width:100%!important;max-width:100%!important;min-width:0!important;
+  height:100%!important;min-height:0!important;max-height:100%!important;
+  margin:0!important;
+  padding:calc(72px + env(safe-area-inset-top,0px)) 12px calc(24px + env(safe-area-inset-bottom,0px))!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  -webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;
+ }
+ /* Keep the existing mobile drawer interaction; never pin it to page scroll. */
+ html body #app.app:not(.hidden)>.side{
+  position:fixed!important;top:0!important;bottom:0!important;
+  height:100dvh!important;max-height:100dvh!important;min-height:0!important;
+  display:flex!important;flex-direction:column!important;
+  overflow:hidden!important;z-index:1510!important;
+ }
+ html body #officeApp:not(.officeHidden).frame{
+  height:100dvh!important;min-height:0!important;max-height:100dvh!important;
+  margin:0!important;padding:0!important;overflow:hidden!important;
+ }
+ html body #officeApp:not(.officeHidden)>.app{
+  height:100%!important;min-height:0!important;overflow:hidden!important;
+ }
+ html body #officeApp:not(.officeHidden) .content{
+  box-sizing:border-box!important;height:100%!important;min-height:0!important;
+  max-height:100%!important;overflow-y:auto!important;overflow-x:hidden!important;
+  -webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;
+ }
+}
+html body #app.app:not(.hidden)>.side #nav.nav,
+html body #officeApp:not(.officeHidden) :is(.topnav,.officeChatNav){
+ flex:1 1 auto!important;min-height:0!important;
+ overflow-y:auto!important;overflow-x:hidden!important;
+ overscroll-behavior:contain!important;scrollbar-width:thin!important;
+}
+html body #app.app:not(.hidden)>.side :is(.user,.sideUtility,.sideLogoWrap,.upgradeNav),
+html body #officeApp:not(.officeHidden) :is(.officeSidebarBrand,.officeSidebarFooter,.officeChatBrand,.officeChatFooter){
+ flex-shrink:0!important;
+}
+html body #app.app:not(.hidden)>.side .user{margin-top:auto!important}
+html body #app.app:not(.hidden)>.main #content,
+html body #app.app:not(.hidden)>.main #content :is(.panel,.card,.formGrid),
+html body #officeApp:not(.officeHidden) .content .section{
+ box-sizing:border-box!important;min-width:0!important;max-width:100%!important;
+}
+html body #app.app:not(.hidden)>.main #content :is(.inventoryTableWrap,.productionTableWrap,.kitchReceivingTableWrap,.kitchReadyScroll,.ckTableWrap),
+html body #officeApp:not(.officeHidden) .content :is(.tableWrap,.overview-scroll){
+ max-width:100%!important;overflow-x:auto!important;-webkit-overflow-scrolling:touch!important;
+}
+/* Modal is viewport-centred, never relative to a scrolled sidebar or page. */
+html body.modal-open #modal.modal{
+ position:fixed!important;inset:0!important;z-index:2147483200!important;
+ width:100vw!important;height:100dvh!important;max-width:100vw!important;
+ box-sizing:border-box!important;margin:0!important;
+ padding:clamp(8px,2vw,20px)!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ overflow:hidden!important;overscroll-behavior:contain!important;
+}
+html body.modal-open #modal.modal>.modalBox{
+ box-sizing:border-box!important;position:relative!important;
+ width:min(900px,100%)!important;max-width:100%!important;
+ height:auto!important;min-height:0!important;
+ max-height:calc(100dvh - 2 * clamp(8px,2vw,20px))!important;
+ margin:0 auto!important;overflow-y:auto!important;overflow-x:auto!important;
+ overscroll-behavior:contain!important;-webkit-overflow-scrolling:touch!important;
+}
+@media(max-width:650px){
+ html body.modal-open #modal.modal{padding:8px!important}
+ html body.modal-open #modal.modal>.modalBox{
+  max-height:calc(100dvh - 16px)!important;max-width:100%!important;
+  padding:18px 15px!important;border-radius:18px!important;
+ }
+ html body.modal-open #modal .formGrid{grid-template-columns:minmax(0,1fr)!important}
+}
