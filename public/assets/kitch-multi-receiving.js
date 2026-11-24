@@ -15,7 +15,7 @@
  const safe = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
  const options=(values,selected)=>values.map(u=>'<option value="'+u+'"'+(u===selected?' selected':'')+'>'+u+'</option>').join('');
- let lines=[],counter=0,saving=false,packageDefaults=new Map(),receivingSuppliers=[];
+ let lines=[],counter=0,saving=false,packageDefaults=new Map(),receivingSuppliers=[],activePO=null;
  const newLine=()=>({key:++counter,id:'',unit:'',qty:'',rejected:'0',price:'',packSize:'',packUnit:'',expiry:'',temperature:'',production:''});
  const allIngredients=()=>ingredients().filter(i=>i.cloud_id).sort((a,b)=>a.name.localeCompare(b.name));
  const findIngredient=id=>allIngredients().find(x=>String(x.cloud_id)===String(id));
@@ -98,6 +98,7 @@
    return null;
  }
  function markup(line,i){
+   const poLinked=!!activePO;
    const ing=findIngredient(line.id),base=ing?.base_unit||'g',isPack=['pcs','pkt','box','tray'].includes(line.unit)&&line.unit!==base;
    const displayBase=isMilkUnitMismatch(ing)?'ltr':base;
    line.packUnit=packBaseUnit(displayBase);
@@ -106,10 +107,10 @@
    const stock=(baseQty!=null&&qty>=rej && rej>=0)?(qty-rej)*baseQty:null;
    const hint=base==='ml'?'Use ml/ltr, or select pkt/box and enter the volume per package.':base==='g'?'Use g/kg, or enter weight per packet/box.':'';
    return '<div class="kmrLine" data-key="'+line.key+'">'+
-    '<div class="kmrLineTop"><div class="kmrLineIdentity"><span class="kmrLineNum">'+String(i+1).padStart(2,'0')+'</span><strong>'+safe(ing?.name||'Select ingredient')+'</strong></div><button type="button" data-action="remove" data-key="'+line.key+'" aria-label="Remove item">Remove</button></div>'+
+    '<div class="kmrLineTop"><div class="kmrLineIdentity"><span class="kmrLineNum">'+String(i+1).padStart(2,'0')+'</span><strong>'+safe(ing?.name||'Select ingredient')+'</strong></div>'+(poLinked?'<small style="color:#888">From approved purchase order</small>':'<button type="button" data-action="remove" data-key="'+line.key+'" aria-label="Remove item">Remove</button>')+'</div>'+
     '<div class="kmrGrid kmrMainGrid">'+
-     '<label class="kmrIngredient">Ingredient *<select data-field="id" data-key="'+line.key+'"><option value="">Choose ingredient</option>'+list+'</select></label>'+
-     '<label>Unit *<select data-field="unit" data-key="'+line.key+'">'+options(unitsForBase(base,ing),line.unit)+'</select></label>'+
+     '<label class="kmrIngredient">Ingredient *<select data-field="id" data-key="'+line.key+'"'+(poLinked?' disabled':'')+'><option value="">Choose ingredient</option>'+list+'</select></label>'+
+     '<label>Unit *<select data-field="unit" data-key="'+line.key+'"'+(poLinked?' disabled':'')+'>'+options(poLinked?[base]:unitsForBase(base,ing),line.unit)+'</select></label>'+
      (isPack?'<label class="kmrPackSize">Size per '+safe(line.unit)+' ('+safe(packBaseUnit(displayBase))+') *<input data-field="packSize" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.packSize)+'" placeholder="Enter package size"></label>':'')+
      
      '<label>Delivered *<input data-field="qty" data-key="'+line.key+'" type="number" min="0.000001" step="any" value="'+safe(line.qty)+'" placeholder="0"></label>'+
@@ -136,7 +137,8 @@
  }
  function validate(){
    const selected=currentSupplier(),supplier=selected?.name||'',invoice=document.getElementById('kmrInvoice')?.value.trim();
-   if(!selected||!invoice)throw Error('Select an approved supplier and enter the invoice number.');
+   if(!selected||!invoice)throw Error('Supplier and invoice number are required.');
+   if(activePO && supplierNorm(selected.name)!==supplierNorm(activePO.supplier))throw Error('PO supplier cannot be changed.');
    if(!lines.length||lines.length>100)throw Error('Add between 1 and 100 ingredients.');
    const used=new Set();
    const payload=lines.map((line,i)=>{
@@ -188,9 +190,12 @@
        message.textContent='Ingredient Master unit automatically updated to '+target+'.';
      }
      const {supplier,invoice,payload}=validate();
-     if(!confirm('Save '+payload.length+' receiving lines under invoice '+invoice+'? All lines will save together.'))return;
+     if(activePO && (payload.length!==activePO.lines.length || payload.some((p,i)=>String(p.ingredient_id)!==String(activePO.lines[i].ingredient_id))))throw Error('Items must match the selected purchase order.');
+     if(!confirm('Confirm '+payload.length+' actual receiving lines under '+(activePO?activePO.po_no+' · ':'')+'invoice '+invoice+'? Only accepted stock will be added to inventory.'))return;
      saving=true;button.disabled=true;message.textContent=LOCAL?'Saving all lines to local database…':'Saving invoice and accepted stock to KITCH cloud…';
-     const {data,error}=await sb.rpc(LOCAL?'kitch_team_receive_invoice_demo':'kitch_team_receive_invoice',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice:invoice,p_lines:payload});
+     const {data,error}=activePO
+       ?await sb.rpc('kitch_team_receive_purchase_order_invoice',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_po_id:activePO.po_id,p_invoice:invoice,p_lines:payload.map((x,i)=>({...x,po_item_id:activePO.lines[i].item_id}))})
+       :await sb.rpc(LOCAL?'kitch_team_receive_invoice_demo':'kitch_team_receive_invoice',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_supplier:supplier,p_invoice:invoice,p_lines:payload});
      if(error)throw error;
      // Receiving is already committed atomically. Save valid package/price
      // defaults afterwards, without ever retrying the invoice on default errors.
@@ -221,7 +226,7 @@
    }catch(e){if(message){message.style.color='#b42318';message.textContent='Not saved: '+(e?.message||e)}}
    finally{saving=false;if(button)button.disabled=false}
  }
- window.openKitchNewReceiving=async function(){
+ window.openKitchNewReceiving=async function(poItemId=null,manual=false){
    if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin||!cloud?.branch_id)return alert('Sign in to your assigned KITCH location first.');
    if(!allIngredients().length)return alert('Import Ingredient Master first.');
    receivingSuppliers=[];
@@ -239,11 +244,25 @@
      const result=await sb.rpc(LOCAL?'kitch_team_local_package_defaults':'kitch_team_package_defaults',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
      if(!result.error&&Array.isArray(result.data))packageDefaults=new Map(result.data.map(x=>[String(x.ingredient_id),x]));
    } catch(err){console.warn('Local package master defaults unavailable',err)}
-   lines=[newLine()];counter=lines[0].key;
+   activePO=null;
+   if(!manual){
+     const {data:pending,error:pendingError}=await sb.rpc('kitch_team_pending_receiving_orders',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin});
+     if(pendingError)return alert('Cannot load orders awaiting receiving: '+pendingError.message);
+     const available=Array.isArray(pending)?pending:[];
+     const poItem=poItemId?available.find(x=>String(x.item_id)===String(poItemId)):available[0];
+     if(poItemId&&!poItem)return alert('Selected purchase order item is no longer awaiting receiving. Refresh Receiving.');
+     if(!poItem){
+       return alert('No purchase orders awaiting receiving. Use “Direct Receiving (No PO)” only for deliveries without an approved purchase order.');
+     }
+     activePO={po_id:poItem.po_id,po_no:poItem.po_no,supplier:poItem.supplier,
+       lines:available.filter(x=>String(x.po_id)===String(poItem.po_id))};
+   }
+   lines=activePO?activePO.lines.map(x=>({...newLine(),id:String(x.ingredient_id),unit:x.unit,qty:'',price:String(x.unit_price),po_item_id:x.item_id})): [newLine()];
+   counter=lines[lines.length-1].key;
    modal('<div class="modalHead"><div><h2>New Receiving</h2><small>One invoice · Multiple ingredients</small></div><button class="close" onclick="closeModal()">×</button></div>'+
     '<style>#modal .modalBox{width:min(940px,calc(100vw - 32px));max-width:940px;box-sizing:border-box;padding:24px 28px;border-radius:24px}#modal .modalHead{margin-bottom:14px}#modal .modalHead h2{font-size:24px;letter-spacing:-.035em;margin:0}.kmrWrap{max-height:76vh;overflow:auto;padding-right:4px}.kmrIntro{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px 14px;background:#f6f6f5;color:#777;border-radius:12px;padding:10px 13px;margin:4px 0 16px;font-size:12px}.kmrIntro b{color:#222}.kmrHeader{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:18px;border-bottom:1px solid #eaeaea}.kmrHeader label,.kmrGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrHeader input,.kmrHeader select,.kmrGrid input,.kmrGrid select{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrHeader input:focus,.kmrGrid input:focus,.kmrGrid select:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrLine{border:1px solid #e9e9e9;border-radius:18px;background:#fff;padding:17px 18px;margin:14px 0}.kmrLineTop{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px}.kmrLineIdentity{display:flex;gap:10px;align-items:center;font-size:15px}.kmrLineNum{display:grid;place-items:center;width:28px;height:28px;border-radius:8px;background:#fff1eb;color:#db6c36;font-size:11px;font-weight:850}.kmrMasterAction{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0}.kmrMasterAction button{border:1px solid #efd8c8;background:#fff7f0;color:#a65a2e;border-radius:999px;padding:8px 12px;font-size:11px;font-weight:750;cursor:pointer}.kmrMasterAction span{font-size:11px;color:#999}.kmrLineTop button{border:0;background:#fafafa;padding:9px 12px;border-radius:20px;color:#b64736;font-weight:700;cursor:pointer;font-size:11px}.kmrMainGrid{display:grid;grid-template-columns:1.6fr .75fr .9fr .85fr;gap:12px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrPackSize input{width:100%!important}.kmrUnitWarning{grid-column:1/-1;border-radius:10px;background:#fff3ed;border:1px solid #f2c5ad;color:#8b371f;font-size:12px;line-height:1.4;padding:10px 12px}.kmrQualityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;padding-top:13px;border-top:1px solid #efefef}.kmrQualityGrid label{display:block;min-width:0;color:#555;font-size:11px;font-weight:750;line-height:1.4}.kmrQualityGrid input{width:100%;height:42px;box-sizing:border-box;background:white;color:#171717;padding:0 12px;border:1px solid #e1e1e1;border-radius:10px;margin-top:6px;font-size:13px;min-width:0}.kmrQualityGrid input:focus{outline:2px solid #dedede;outline-offset:1px;border-color:#777}.kmrExtras{margin-top:13px;border-top:1px solid #eee;padding-top:10px}.kmrExtras summary{font-size:12px;font-weight:750;color:#555;cursor:pointer}.kmrExtras summary span{font-weight:400;color:#999;margin-left:8px}.kmrExtras .kmrGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:11px}.kmrPreview{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;background:#f7f7f5;border-radius:10px;margin:12px 0 0;padding:11px 13px;color:#666;font-size:12px}.kmrPreview b{color:#111}#kmrAdd{width:auto;background:white;border:1px dashed #bcbcbc;color:#222;padding:11px 18px;border-radius:30px;font-weight:750;cursor:pointer}.kmrSummary{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:18px 0 10px;padding:15px 16px;background:#f4f4f2;border-radius:13px}.kmrSummary strong{font-size:17px;color:#111}#kmrSubmit{border-radius:999px;min-height:50px}@media(max-width:840px){.kmrMainGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.kmrMainGrid .kmrIngredient{grid-column:span 2}}@media(max-width:560px){.kmrQualityGrid{grid-template-columns:1fr 1fr}.kmrQualityGrid label:last-child{grid-column:span 2}#modal .modalBox{padding:18px 16px;width:calc(100vw - 20px)}.kmrHeader,.kmrExtras .kmrGrid{grid-template-columns:1fr}.kmrMainGrid{grid-template-columns:1fr 1fr;gap:10px}.kmrMainGrid .kmrIngredient{grid-column:span 2}.kmrLine{padding:13px}.kmrPreview{display:block}.kmrPreview span{display:block;margin:3px 0}.kmrSummary strong{font-size:14px}}</style>'+
     '<style> .kmrProduceShared{margin:17px 0 10px;border:1px solid #e5e6eb;border-radius:15px;background:#f6f6f8;padding:15px} .kmrProduceShared[hidden]{display:none!important} .kmrProduceHeading{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap} .kmrProduceHeading strong{display:block;font-size:14px;color:#292a32} .kmrProduceHeading small{display:block;font-size:11px;color:#858691;margin-top:5px} .kmrProduceHeading>span{font-size:10px;letter-spacing:.06em;color:#898b95;font-weight:800} .kmrProduceSupplierNote,.kmrProduceHelp{font-size:11px;color:#828490;line-height:1.6;margin:9px 0} .kmrProduceFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0} .kmrProduceFields label{font-size:11px;color:#666872;font-weight:700} .kmrProduceFields input{box-sizing:border-box;width:100%;height:42px;margin-top:6px;border:1px solid #dfe0e6;border-radius:10px;background:#fff;padding:0 10px;font-size:12px;color:#262730} #kmrApplyProduce{border:0;border-radius:10px;background:#282930;color:#fff;padding:11px 16px;font-size:12px;font-weight:800;cursor:pointer} .kmrProduceOverride{margin-top:13px;border-top:1px solid #eee;padding-top:12px} .kmrProduceOverride summary{cursor:pointer;font-size:11px;font-weight:750;color:#686a76} .kmrProduceOverride .kmrQualityGrid{margin-top:10px} @media(max-width:650px){.kmrProduceFields{grid-template-columns:1fr}.kmrProduceShared{padding:12px}} </style>'+
-    '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>'+(LOCAL?'Local test only':'Cloud Receiving · Confirmed stock updates inventory')+'</span></div>'+
+    '<div class="kmrWrap"><div class="kmrIntro"><span>Location: <b>'+safe(assignedLocationName())+'</b></span><span>'+(activePO?'Receiving '+safe(activePO.po_no):LOCAL?'Local test only':'Direct receiving · No purchase order')+'</span></div>'+
     '<div class="kmrHeader"><label>SUPPLIER *<select id="kmrSupplier"><option value="">Choose approved supplier</option>'+receivingSuppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('')+'</select></label><label>INVOICE NUMBER *<input id="kmrInvoice" placeholder="Supplier invoice number"></label></div>'+
     '<section id="kmrProduceShared" class="kmrProduceShared" hidden><div class="kmrProduceHeading"><div><strong>Vegetables & Herbs · Shared Receiving Details</strong><small>Ambient deliveries: temperature optional; never invent expiry or production dates.</small></div><span>APPLY TO PRODUCE</span></div>'+
     '<p class="kmrProduceSupplierNote"></p><div class="kmrProduceFields">'+
@@ -251,12 +270,22 @@
     '<label>Production / harvest date (if provided)<input id="kmrProduceProduction" type="date"></label>'+
     '<label>Actual receiving temp °C (optional)<input id="kmrProduceTemp" type="number" step="any" placeholder="Ambient / not measured"></label>'+
     '</div><button type="button" id="kmrApplyProduce" class="btn">Apply to all produce lines</button><p class="kmrProduceHelp">If an item has a different batch date or requires chilling, open its own receiving details and enter the correct values. Follow its storage requirements.</p></section>'+
-    '<div id="kmrLines"></div><button type="button" id="kmrAdd" class="btn">+ Add Ingredient</button>'+
+    '<div id="kmrLines"></div>'+(activePO?'':'<button type="button" id="kmrAdd" class="btn">+ Add Ingredient</button>')+
     '<div class="kmrSummary"><span id="kmrCount">1 item</span><strong>Invoice total: <span id="kmrTotal">AED 0.00</span></strong></div>'+
     '<p id="kmrMessage" role="status" aria-live="polite" style="font-size:12px;color:#555"></p>'+
     '<button id="kmrSubmit" class="primary" type="button">Confirm Entire Receiving</button></div>');
    const root=document.getElementById('modal');
    root.querySelector('#kmrApplyProduce').addEventListener('click',applyProduceDetails);
+   if(activePO){
+     const supplier=receivingSuppliers.find(x=>supplierNorm(x.name)===supplierNorm(activePO.supplier));
+     if(!supplier)return alert('Approved supplier profile missing for '+activePO.supplier);
+     const select=root.querySelector('#kmrSupplier');select.value=supplier.id;select.style.display='none';
+     const readonly=document.createElement('input');readonly.value=supplier.name;readonly.readOnly=true;
+     readonly.setAttribute('aria-label','Approved PO supplier');
+     select.parentElement.appendChild(readonly);
+     const message=root.querySelector('#kmrMessage');
+     if(message)message.textContent='Linked purchase order '+activePO.po_no+'. Supplier and ingredients are locked. Enter actual delivered quantities, invoice number, prices and batch details.';
+   }
    root.querySelector('#kmrSupplier').addEventListener('change',()=>{
      // Never carry ingredient quantities from a different supplier.
      lines=[newLine()];counter=lines[0].key;
@@ -267,12 +296,12 @@
      const info=root.querySelector('#kmrMessage');
      if(info){info.style.color=count?'#28734b':'#b42318';info.textContent=supplier?(count+' approved products available from '+supplier.name+(count?'':'. Check supplier product assignments.')):'Choose a supplier to see its products.';}
    });
-   root.querySelector('#kmrAdd').addEventListener('click',()=>{if(!currentSupplier())return alert('Choose a supplier first');if(!ingredientList().length)return alert('No products assigned to this supplier');if(lines.length>=100)return alert('Maximum 100 items');lines.push(newLine());draw()});
+   root.querySelector('#kmrAdd')?.addEventListener('click',()=>{if(!currentSupplier())return alert('Choose a supplier first');if(!ingredientList().length)return alert('No products assigned to this supplier');if(lines.length>=100)return alert('Maximum 100 items');lines.push(newLine());draw()});
    root.querySelector('#kmrSubmit').addEventListener('click',submit);
    root.querySelector('#kmrLines').addEventListener('click',async e=>{
      const button=e.target.closest('[data-action]');if(!button)return;
      const line=lines.find(x=>x.key===Number(button.dataset.key));
-     if(button.dataset.action==='remove'){lines=lines.filter(x=>x!==line);draw();return;}
+     if(button.dataset.action==='remove'){if(activePO)return;lines=lines.filter(x=>x!==line);draw();return;}
      if(button.dataset.action!=='saveDefault'||!line)return;
      const ing=findIngredient(line.id),status=document.getElementById('kmrMessage');
      if(!ing||!['pcs','pkt','box'].includes(line.unit)||!(Number(line.packSize)>0)||factor(line,ing.base_unit)==null||line.price===''||!Number.isFinite(Number(line.price))||Number(line.price)<0){
@@ -296,6 +325,7 @@
      const target=e.target,field=target.dataset.field,key=Number(target.dataset.key);
      if(!field)return;
      const line=lines.find(l=>l.key===key);if(!line)return;
+     if(activePO&&['id','unit'].includes(field))return;
      line[field]=target.value;
      if(field==='id'){
        const ing=findIngredient(line.id),saved=packageDefaults.get(String(line.id));
