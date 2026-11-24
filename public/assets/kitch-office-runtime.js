@@ -704,7 +704,10 @@ function officeSupplierProfileForm(id){
  '<form id="officeSupplierProfileForm" class="officeSupplierProfileForm"><div class="officeSupplierFormGrid">'+
  '<label>Supplier / Company Name *<input required maxlength="120" name="name" placeholder="Supplier company name"></label>'+
  '<label>Contact Person<input maxlength="120" name="contact" placeholder="Full name"></label>'+
- '<label>Supplier Email<input type="email" maxlength="320" name="email" placeholder="orders@supplier.com"></label>'+
+ '<label>Primary email (To)<input type="email" maxlength="320" name="email" placeholder="orders@supplier.com"></label>'+
+ '<label class="wide">Additional To emails (comma-separated)<input maxlength="640" name="more_to" placeholder="sales@supplier.com"></label>'+
+ '<label class="wide">CC emails (comma-separated)<input maxlength="640" name="cc" placeholder="accounts@supplier.com"></label>'+
+ '<label>Supplier WhatsApp number (with country code)<input type="tel" maxlength="30" name="whatsapp" placeholder="+971501234567"></label>'+
  '<label>Phone / WhatsApp<input type="tel" maxlength="50" name="phone" placeholder="+971 ..."></label>'+
  '<label class="wide">Business Address<textarea maxlength="600" name="address" rows="2" placeholder="Street, area, city"></textarea></label>'+
  '<label>Trade License / TRN (optional)<input maxlength="120" name="license" placeholder="Reference number"></label>'+
@@ -713,7 +716,7 @@ function officeSupplierProfileForm(id){
  document.getElementById('officeSupplierProfileOverlay')?.remove();
  document.body.appendChild(overlay);
  const form=overlay.querySelector('form');
- const fields={name:'name',contact_name:'contact',email:'email',phone:'phone',address:'address',trade_license:'license',notes:'notes'};
+ const fields={name:'name',contact_name:'contact',email:'email',phone:'phone',address:'address',trade_license:'license',notes:'notes',additional_to_emails:'more_to',cc_emails:'cc',whatsapp_phone:'whatsapp'};
  if(supplier)for(const [key,field] of Object.entries(fields))form.elements[field].value=supplier[key]||'';
  const close=()=>overlay.remove();
  overlay.querySelector('#officeSupplierClose').onclick=close;
@@ -725,6 +728,7 @@ function officeSupplierProfileForm(id){
   const button=overlay.querySelector('#officeSupplierSave');
   const err=overlay.querySelector('#officeSupplierFormError');
   const name=form.elements.name.value.trim(),email=form.elements.email.value.trim();
+  try{officeValidEmailList(form.elements.more_to.value);officeValidEmailList(form.elements.cc.value)}catch(e){err.textContent=e.message;return;}
   if(!name){err.textContent='Supplier company name is required.';return}
   button.disabled=true;err.textContent='Saving supplier…';
   try{
@@ -735,7 +739,15 @@ function officeSupplierProfileForm(id){
     p_trade_license:form.elements.license.value.trim(),p_notes:form.elements.notes.value.trim()
    });
    if(error)throw Error(error.message);
-   close();await officePurchaseLoad();officePurchaseStatus('Supplier '+name+' saved in KITCH Supplier Master.');
+   const supplierId=data?.id||officeSupplierProfileEditing;
+   if(!supplierId)throw Error('Supplier saved, but contact channels could not be linked. Refresh and retry.');
+   const {error:channelsError}=await db.rpc('kitch_supplier_channels',{
+    p_action:'save',p_restaurant_id:officeRid,p_supplier_id:supplierId,
+    p_additional_to:form.elements.more_to.value.trim(),
+    p_cc:form.elements.cc.value.trim(),p_whatsapp:form.elements.whatsapp.value.trim()
+   });
+   if(channelsError)throw Error('Supplier saved; additional contacts were not saved: '+channelsError.message);
+   close();await officePurchaseLoad();officePurchaseStatus('Supplier '+name+' and contact channels saved.');
   }catch(ex){err.textContent='Supplier not saved: '+ex.message}
   finally{button.disabled=false}
  };
