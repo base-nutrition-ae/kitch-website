@@ -88,16 +88,42 @@ function setVisible(on){el('officeAuth').classList.toggle('officeHidden',on);el(
 function money(n){return 'AED '+Number(n||0).toLocaleString('en-AE',{maximumFractionDigits:2,minimumFractionDigits:2});}
 function setKpi(label,value){const cards=[...document.querySelectorAll('#overview .overview-kpis .card')];const card=cards.find(c=>c.querySelector('small')?.textContent.trim()===label);if(card)card.querySelector('.number').textContent=value;}
 function safe(t){return String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function officeSetPackageBadge(data){
+ const tag=el('officePlanTopBadge');
+ if(!tag)return;
+ const valid=data&&data.restaurant_id&&String(data.restaurant_id)===String(officeRid);
+ tag.textContent=!valid?'Package not verified':data.plan==='starter'?'KITCH Starter · AED 149/month':data.plan==='pro'?'KITCH Pro · AED 249/month':'Package not verified';
+}
+function officeShowWorkspaceChoices(choices,userId){
+ document.getElementById('officeWorkspacePicker')?.remove();
+ const panel=document.createElement('div');panel.id='officeWorkspacePicker';panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Select KITCH workspace');
+ Object.assign(panel.style,{position:'fixed',inset:'0',zIndex:'99999',background:'#f8f8f8',display:'flex',flexDirection:'column',justifyContent:'center',alignItems:'center',gap:'12px',padding:'24px'});
+ const heading=document.createElement('h2');heading.textContent='Select your KITCH workspace';panel.append(heading);
+ const note=document.createElement('p');note.textContent='Select the workspace to manage. Existing data will not be changed.';panel.append(note);
+ choices.forEach((choice,index)=>{
+ const b=document.createElement('button');b.type='button';b.textContent='Workspace '+(index+1)+' · '+String(choice.restaurant_id).slice(0,8);
+ Object.assign(b.style,{padding:'12px 20px',borderRadius:'12px',background:'#222',color:'#fff',border:'0',cursor:'pointer'});
+ b.onclick=()=>{sessionStorage.setItem('kitch_office_selected_'+userId,String(choice.restaurant_id));location.reload();};panel.append(b);
+ });
+ document.body.append(panel);
+}
 async function loadOwner(initialUser){
  // Reuse the already-validated session user. A second getUser() network request
  // during embedded startup can stall before the owner workspace is shown.
  let user=initialUser;
  if(!user){const result=await db.auth.getUser();user=result.data?.user;if(result.error||!user){setVisible(false);return;}}
  if(!user){setVisible(false);return;}
- const {data:members,error:me}=await db.from('kitch_office_owners').select('restaurant_id,role').eq('user_id',user.id).eq('is_active',true).limit(1);
+ const {data:members,error:me}=await db.from('kitch_office_owners').select('restaurant_id,role').eq('user_id',user.id).eq('is_active',true);
  if(me){setVisible(false);say('Main Office database setup is required. Run the supplied SQL and assign your owner account. '+me.message);return;}
  if(!members?.length){setVisible(false);say('Your email is signed in but has not been assigned as a KITCH Main Office owner. Ask the administrator to link your account.');return;}
- const rid=members[0].restaurant_id;officeRid=rid;
+ const choices=[...new Map(members.map(m=>[String(m.restaurant_id),m])).values()];
+ const scopeKey='kitch_office_selected_'+user.id;
+ let chosen=sessionStorage.getItem(scopeKey);
+ if(choices.length===1){chosen=String(choices[0].restaurant_id);sessionStorage.setItem(scopeKey,chosen);}
+ if(choices.length>1&&!choices.some(m=>String(m.restaurant_id)===chosen)){setVisible(false);officeShowWorkspaceChoices(choices,user.id);return;}
+ if(!chosen||!choices.some(m=>String(m.restaurant_id)===chosen)){setVisible(false);say('Workspace access not verified');return;}
+ const rid=chosen;officeRid=rid;officePlanStatus=null;officeSetPackageBadge(null);
+ document.getElementById('officeWorkspacePicker')?.remove();
  // Owner access is confirmed; show the workspace immediately. KPI and inventory
  // requests populate asynchronously and must not keep the full-screen boot visible.
  window.__kitchOfficeStartupPhase='loading dashboard data';
@@ -279,12 +305,12 @@ async function officeRefreshPackageStatus(){
  if(!officeRid||!db)return;
  const {data,error}=await db.rpc('kitch_owner_package_status');
  if(error||String(data?.restaurant_id)!==String(officeRid)){
-  officePlanStatus=null;const n=el('officeLocationNote');if(n)n.textContent='Subscription information unavailable. KITCH Cloud checks the plan before permitting any location changes.';
+  officePlanStatus=null;officeSetPackageBadge(null);const n=el('officeLocationNote');if(n)n.textContent='Subscription information unavailable. KITCH Cloud checks the plan before permitting any location changes.';
   return;
  }
  officePlanStatus=data;
  const starter=data.plan==='starter',pro=data.plan==='pro';
- const tag=el('officePackageLabel');if(tag)tag.textContent=starter?'KITCH Starter · 1 restaurant':pro?'KITCH Pro · Multi-location':'Subscription verification required';
+ const tag=el('officePackageLabel');if(tag)tag.textContent=starter?'KITCH Starter · 1 restaurant':pro?'KITCH Pro · Multi-location':'Subscription verification required';officeSetPackageBadge(data);
  const note=el('officeLocationNote');
  if(note)note.textContent=starter?'KITCH Starter includes one complete Restaurant Kitchen. Main Office controls purchasing, recipes, inventory, receiving, production and reports. Upgrade to Pro to add locations.':pro?'KITCH Pro includes unlimited locations. Add Restaurant Branch, Central Kitchen or Central Store only when needed. Each has separate stock and staff permissions.':'Your package is not yet mapped. Contact KITCH support before adding locations.';
  const add=el('officeAddLocation');
@@ -327,7 +353,7 @@ async function start(){
       db=parentClient?.auth?.getSession?parentClient:null;
     }catch(e){db=null;}
     if(!db)db=window.supabase.createClient(URL,KEY);
-    db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officeFlowData=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
+    db.auth.onAuthStateChange(event=>{if(event==='SIGNED_OUT'){setVisible(false);officeRid=null;officePlanStatus=null;officeSetPackageBadge(null);document.getElementById('officeWorkspacePicker')?.remove();officeFlowData=null;officeIngredients=[];document.querySelectorAll('dialog[open]').forEach(x=>x.close());}});
     window.__kitchOfficeStartupPhase='checking saved session';
     const {data:{session},error}=await Promise.race([
       db.auth.getSession(),
