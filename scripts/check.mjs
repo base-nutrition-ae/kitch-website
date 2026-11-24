@@ -149,6 +149,19 @@ if(!readySource.includes('centralKitchenStaff||!ready'))throw new Error('Central
 if(!officeSource.includes('<option value="central_kitchen">'))throw new Error('Central Kitchen location type missing from Main Office.');
 if(!officeRuntime.includes("x.branch_type==='central_kitchen'?'Central Kitchen'"))throw new Error('Central Kitchen location label missing.');
 console.log('PASS: Central Kitchen locations, dispatch permissions and multi-location UI contracts.');
+const ckDashboardChecks=[
+ ['verified CK staff workspace flag',app.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")||readySource.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")],
+ ['CK-specific sidebar entries',app.includes("items.splice(1,0,...CK_PAGES)")],
+ ['CK dashboard route',app.includes("window.kitchCentralKitchenPage('Dashboard')")],
+ ['CK live request rendering',readySource.includes("window.kitchCentralKitchenPage=view=>")],
+ ['branch-specific order rows',readySource.includes("escapeHtml(x.branch_name||'—')")],
+ ['CK cloud approval',readySource.includes("kitchReadyAdvance('+id+")],
+ ['CK dispatch route',readySource.includes("kitchReadyDispatch('+id+")],
+ ['CK production planning',readySource.includes("Approved Items to Prepare")],
+ ['CK stylesheet',finalKitchenCss.includes("Central Kitchen dashboard — same KITCH operational UI")]
+];
+for(const [label,ok] of ckDashboardChecks)if(!ok)throw new Error('Central Kitchen release regression: '+label);
+console.log('PASS: Central Kitchen dashboard, live order tracking, approval and dispatch routes.');
 
 console.log('PASS: Ready Products catalog, requests, batch flow and isolated SQL migration staged.');
 
