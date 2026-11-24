@@ -113,19 +113,22 @@ async function loadCloudWorkspace(){
 
 function activateWorkspaceBrowserScope(){
  if(!cloud.restaurant_id)return;
- const scopeKey='kitch_active_workspace_scope_v1';
- const previous=localStorage.getItem(scopeKey);
- const current=String(cloud.restaurant_id);
- // Browser demo/operational records belong to exactly one restaurant workspace.
- // When a different customer/workspace signs in, remove ALL prior KITCH demo data
- // so inventory, receiving, recipes, production, waste, counts, transfers, activity
- // and staff can never leak from the previous customer.
- if(previous!==current){
-   Object.keys(localStorage).filter(k=>k.startsWith('kitch_demo_')).forEach(k=>localStorage.removeItem(k));
-   localStorage.setItem(scopeKey,current);
+ const key='kitch_active_workspace_scope_v1', previous=localStorage.getItem(key), current=String(cloud.restaurant_id);
+ if(previous===current)return;
+ const demoKeys=Object.keys(localStorage).filter(k=>k.startsWith('kitch_demo_'));
+ const snapshot=Object.fromEntries(demoKeys.map(k=>[k,localStorage.getItem(k)]));
+ if(demoKeys.length){
+  const snapshotKey='kitch_workspace_snapshot_v1_'+(previous||'unassigned');
+  try{localStorage.setItem(snapshotKey,JSON.stringify(snapshot));}
+  catch(e){console.error('Cannot archive previous workspace local data',e);throw e;}
  }
+ demoKeys.forEach(k=>localStorage.removeItem(k));
+ try{
+  const saved=JSON.parse(localStorage.getItem('kitch_workspace_snapshot_v1_'+current)||'{}');
+  Object.entries(saved).filter(([k])=>k.startsWith('kitch_demo_')).forEach(([k,v])=>localStorage.setItem(k,String(v)));
+ }catch(e){console.error('Cannot restore workspace browser cache',e);}
+ localStorage.setItem(key,current);
 }
-
 async function syncPackageFromCloud(){
  if(!cloud.restaurant_id)return false;
  activateWorkspaceBrowserScope();
@@ -133,9 +136,17 @@ async function syncPackageFromCloud(){
   const {data:branches,error}=await sb.from('branches').select('id,name,branch_type,is_active').eq('restaurant_id',cloud.restaurant_id).eq('is_active',true).order('created_at');
   if(error)throw error;
   const rows=branches||[];
-  const hasStore=rows.some(b=>String(b.branch_type||'').toLowerCase()==='central_store');
+  // Package is validated by cloud, not inferred from central-store existence.
   const restaurantBranch=rows.find(b=>String(b.branch_type||'').toLowerCase()!=='central_store')||rows[0]||null;
-  localStorage.setItem(PACKAGE_KEY,hasStore?'multi':'restaurant');
+  const {data:verifiedPlan,error:planError}=await sb.rpc('kitch_owner_package_status');
+  if(!planError&&verifiedPlan&&String(verifiedPlan.restaurant_id)===String(cloud.restaurant_id)&&['starter','pro'].includes(verifiedPlan.plan)){
+   localStorage.setItem(PACKAGE_KEY,verifiedPlan.plan==='pro'?'multi':'restaurant');
+   window.__kitchVerifiedPlan=verifiedPlan.plan;
+  }else{
+   window.__kitchVerifiedPlan=null;
+   localStorage.removeItem(PACKAGE_KEY);
+   console.warn('KITCH package not verified from cloud');
+  }
   if(restaurantBranch&&!teamCloudAuth?.staff_name){
    cloud.branch_id=restaurantBranch.id;
    localStorage.setItem('kitch_cloud_branch_name',restaurantBranch.name||'Main Restaurant');
