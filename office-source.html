@@ -327,7 +327,10 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
   </div>
   <div class="kitchPOFields">
     <label class="kitchPOField"><span>Approved supplier</span><select id="officePOSupplier"></select></label>
-    <label class="kitchPOField"><span>Supplier email</span><input id="officePOSupplierEmail" type="email" autocomplete="email" placeholder="Select a supplier to load saved email"></label>
+    <label class="kitchPOField"><span>Primary email (To)</span><input id="officePOSupplierEmail" type="email" autocomplete="email" placeholder="Saved supplier email"></label>
+    <label class="kitchPOField"><span>Other To emails (comma-separated)</span><input id="officePOAdditionalTo" type="text" placeholder="Second supplier email"></label>
+    <label class="kitchPOField"><span>CC emails (comma-separated)</span><input id="officePOCC" type="text" placeholder="CC recipients"></label>
+    <label class="kitchPOField"><span>WhatsApp (country code)</span><input id="officePOWhatsapp" type="tel" placeholder="9715..."></label>
   </div>
   <div id="officePOSupplierContact" class="officeSupplierPreview">Choose a supplier to view saved contact details.</div><p style="font-size:12px;color:#777;margin:14px 0 15px">Chef's approved ingredient list · No prices or quantities to re-enter.</p>
   <div id="officePOLines" style="display:grid;gap:8px;margin:0 0 18px"></div>
@@ -337,15 +340,15 @@ html,body{width:100%;min-width:0;margin:0!important;background:#f8f8f8!important
       <div><span>Request number</span><strong id="officePORequestNo">—</strong></div>
       <div><span>Ingredients</span><strong id="officePOItem">—</strong></div>
       <div><span>Requested quantities</span><strong id="officePOQuantity">—</strong></div>
-      <div><span>Supplier</span><strong id="officePOSupplierText">—</strong></div>
+      <div><span>Supplier</span><strong id="officePOSupplierText">—</strong></div><div><span>Estimated cost (reference prices)</span><strong id="officePOEstimatedTotal">—</strong></div>
     </div>
   </div>
-  <p class="kitchPONote">Sending this request does not change inventory. Confirmed Receiving updates stock. Email opens in your mail app and must be sent there.</p>
+  <p class="kitchPONote">Sending this request does not change inventory. Confirmed Receiving updates stock. Email and WhatsApp open drafts only. Send externally, then confirm here.</p>
   <p id="officePOInlineMessage" role="status" aria-live="polite"></p>
   <div class="kitchPOActions">
     <button type="button" class="kitchPOBtn kitchPOBtnSecondary" id="officePOCancel">Cancel</button>
     <button type="button" class="kitchPOBtn kitchPOBtnSecondary" id="officePOPrint">Print / Save PDF</button>
-    <button type="button" class="kitchPOBtn kitchPOBtnPrimary" id="officePOConfirm">Email Supplier</button>
+    <button type="button" class="kitchPOBtn kitchPOBtnPrimary" id="officePOConfirm">Email Supplier</button><button type="button" class="kitchPOBtn kitchPOBtnSecondary" id="officePOWhatsappSend">Open WhatsApp Draft</button>
     <button type="button" class="kitchPOBtn kitchPOBtnPrimary" id="officePOConfirmSent" hidden>I Sent This Order</button>
   </div>
 </div></div>
