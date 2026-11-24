@@ -145,14 +145,19 @@
   catch(e){alert('Batch was not saved: '+e.message)}
  };
 
+
  window.kitchReadyNewRequest=()=>{
   if(session!=='manager'||centralKitchenStaff||!ready||!catalog.some(x=>x.active&&x.salePrice!=null))return alert('No price-ready recipes found. Check ingredient costs and recipe yields.');
-  modal('<div class="modalHead"><h2>Request Ready Products</h2><button class="close" onclick="closeModal()">×</button></div>'+
-   '<div class="note"><b>From:</b> Central Kitchen · <b>To:</b> '+escapeHtml(currentBranchName())+'<p class="muted">Select several items, order by kg or litre. Company markup: +'+fmt(markupPercent)+'%.</p></div>'+
-   '<div id="kitchReadyCartLines" style="display:grid;gap:10px;margin:16px 0"></div>'+
-   '<button class="btn" onclick="kitchReadyAddLine()">+ Add Item</button>'+
-   '<div id="kitchReadyCartTotal" class="note" style="margin:16px 0;font-size:16px;font-weight:750">Total AED 0.00</div>'+
-   '<button class="primary" id="kitchReadyCartSubmit" onclick="kitchReadySaveRequest()">Send Multi-Item Request</button>');
+  modal('<div class="kitchReadyRequestForm">'+
+   '<div class="modalHead"><div><div class="readyCartEyebrow">KITCH / BRANCH ORDERS</div><h2>Request Ready Products</h2></div><button class="close" aria-label="Close request" onclick="closeModal()">×</button></div>'+
+   '<div class="readyCartRoute"><div><span class="routeLabel">FROM · PRODUCTION</span><strong>Central Kitchen</strong></div><span class="routeArrow">→</span><div><span class="routeLabel">TO · RECEIVING</span><strong>'+escapeHtml(currentBranchName())+'</strong></div></div>'+
+   '<p class="readyCartHint">Choose multiple finished products. Quantities use each item’s kg or litre unit. Company markup: +'+fmt(markupPercent)+'%.</p>'+
+   '<div class="readyCartSectionHeading"><strong>Order items</strong><span>Up to 30 products</span></div>'+
+   '<div id="kitchReadyCartLines"></div>'+
+   '<button class="readyCartAdd" type="button" onclick="kitchReadyAddLine()">+ Add Another Product</button>'+
+   '<div class="readyCartSummary"><span class="totalLabel" id="kitchReadyCartCount">ORDER TOTAL · 1 ITEM</span><strong class="totalAmount" id="kitchReadyCartTotal">AED 0.00</strong></div>'+
+   '<button class="primary" type="button" id="kitchReadyCartSubmit" onclick="kitchReadySaveRequest()">Send Request to Central Kitchen</button>'+
+   '<div class="readyCartFootnote">Central Kitchen reviews and approves the order before dispatch.</div></div>');
   kitchReadyAddLine();
  };
  window.kitchReadyAddLine=()=>{
@@ -162,11 +167,10 @@
    .map(x=>'<option value="'+escapeHtml(x.sku)+'">'+escapeHtml(x.name)+' · '+escapeHtml(x.unit)+'</option>').join('');
   const line=document.createElement('div');
   line.className='kitchReadyCartLine';
-  line.style.cssText='display:grid;grid-template-columns:minmax(0,2fr) minmax(110px,1fr) auto;gap:12px;padding:14px;border:1px solid #e5e5e8;border-radius:16px;background:#fafafa;align-items:end';
-  line.innerHTML='<div class="field" style="margin:0;min-width:0"><label>PREPARED ITEM</label><select class="readyCartSku" onchange="kitchReadyUpdateTotals()">'+opts+'</select></div>'+
-    '<div class="field" style="margin:0;min-width:0"><label>QUANTITY</label><input class="readyCartQty" type="number" step="0.001" min="0.001" placeholder="2.5" oninput="kitchReadyUpdateTotals()"></div>'+
-    '<button class="btn" aria-label="Remove item" onclick="this.closest(\'.kitchReadyCartLine\').remove();kitchReadyUpdateTotals()">Remove</button>'+
-    '<div class="readyCartPrice muted" style="grid-column:1/-1"></div>';
+  line.innerHTML='<div class="field"><label>PREPARED PRODUCT</label><select class="readyCartSku" onchange="kitchReadyUpdateTotals()">'+opts+'</select></div>'+
+    '<div class="field"><label>QUANTITY</label><input class="readyCartQty" type="number" step="0.001" min="0.001" placeholder="e.g. 2.5" oninput="kitchReadyUpdateTotals()"></div>'+
+    '<button class="readyCartRemove" type="button" aria-label="Remove item" onclick="this.closest(\'.kitchReadyCartLine\').remove();kitchReadyUpdateTotals()">Remove</button>'+
+    '<div class="readyCartPrice muted"></div>';
   wrap.appendChild(line);kitchReadyUpdateTotals();
  };
  window.kitchReadyUpdateTotals=()=>{
@@ -180,9 +184,10 @@
    const ok=Boolean(item&&raw&&Number.isFinite(qty)&&qty>0&&qty<=100000&&item.salePrice!=null&&!duplicate);
    if(!ok)valid=false;
    const amount=ok?Number((item.salePrice*qty).toFixed(2)):0;total+=amount;
-   line.querySelector('.readyCartPrice').textContent=duplicate?'Select a different item; duplicates are not allowed.':(item?money(item.salePrice)+' / '+item.unit+' · Line total '+money(ok?amount:null):'Select a product');
+   line.querySelector('.readyCartPrice').textContent=duplicate?'Select a different product; duplicates are not allowed.':(item?money(item.salePrice)+' / '+item.unit+' · Line total '+(ok?money(amount):'—'):'Select a product');
   }
-  const display=$('kitchReadyCartTotal');if(display)display.textContent='Order Total: '+money(total)+' · '+lines.length+' item(s)';
+  const display=$('kitchReadyCartTotal');if(display)display.textContent=money(total);
+  const counter=$('kitchReadyCartCount');if(counter)counter.textContent='ORDER TOTAL · '+lines.length+' '+(lines.length===1?'ITEM':'ITEMS');
   const btn=$('kitchReadyCartSubmit');if(btn)btn.disabled=!valid;
  };
  window.kitchReadySaveRequest=async()=>{
