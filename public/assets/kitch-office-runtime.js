@@ -508,7 +508,11 @@ function officePOShow(id){
  officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredients · '+(req.chef_supplier_name||'Legacy request: choose supplier');
  officePurchaseEl('officePOSupplierEmail').value='';
  officeLastOrderChannel='email';
- officePurchaseEl('officePOLines').innerHTML=req.lines.map((l,i)=>'<div class="kitchPOLine" style="display:flex;justify-content:space-between;align-items:center;gap:15px"><div><strong>'+(i+1)+'. '+safe(l.ingredient)+'</strong><small>Requested by kitchen</small></div><b style="font-size:14px;white-space:nowrap">'+safe(l.quantity)+' '+safe(l.unit)+'</b></div>').join('');
+ officePurchaseEl('officePOLines').innerHTML=req.lines.map((l,i)=>{
+  const item=officePurchaseState.ingredientPrices.get(String(l.ingredient||'').trim().toLowerCase());
+  const reference=item?' · Reference AED '+Number(item.reference_cost||0).toFixed(2)+' / '+safe(item.base_unit):' · Price not recorded';
+  return '<div class="kitchPOLine" style="display:flex;justify-content:space-between;align-items:center;gap:15px"><div><strong>'+(i+1)+'. '+safe(l.ingredient)+'</strong><small>Requested by kitchen'+reference+'</small></div><b style="font-size:14px;white-space:nowrap">'+safe(l.quantity)+' '+safe(l.unit)+'</b></div>';
+ }).join('');
  officePurchaseEl('officePORequestNo').textContent=req.request_no||req.id;
  officePurchaseEl('officePOItem').textContent=req.lines.map(x=>x.ingredient).join(', ');
  officePurchaseEl('officePOQuantity').textContent=req.lines.map(x=>x.quantity+' '+x.unit).join(' · ');
