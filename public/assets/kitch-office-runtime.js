@@ -209,7 +209,7 @@ async function loadOwner(initialUser){
 
  const locRows=el('overview').querySelector('.overview-scroll tbody');if(locRows)locRows.innerHTML=branches.map(x=>'<tr><td>'+safe(x.name)+'</td><td>'+money(bal.filter(y=>y.branch_id===x.id).reduce((s,y)=>s+Number(y.quantity_on_hand||0)*Number(y.indicative_unit_cost||0),0))+'</td><td>—</td><td>'+'—'+'</td><td>Active</td></tr>').join('')||'<tr><td colspan="5">No locations</td></tr>';
  const title=el('officeApp').querySelector('.profile');if(title)title.setAttribute('title',(r.data?.name||'KITCH')+' · '+user.email);
- const logout=el('officeSidebarLogout');if(logout)logout.onclick=async()=>{logout.disabled=true;try{const {error}=await db.auth.signOut({scope:'local'});if(error)throw error;setVisible(false);officeRid=null;officeRestaurantName='';officeIngredients=[];window.parent.postMessage({type:'KITCH_OFFICE_SIGNED_OUT'},'*');}catch(e){say('Log out failed: '+e.message);}finally{logout.disabled=false;}};
+ const logout=el('officeSidebarLogout');if(logout)logout.onclick=async()=>{logout.disabled=true;try{window.parent.postMessage({type:'KITCH_OFFICE_SIGNED_OUT'},window.location.origin);const {error}=await db.auth.signOut({scope:'local'});if(error)console.warn('KITCH office sign-out:',error.message);officeRid=null;officeRestaurantName='';officeIngredients=[];}catch(e){console.warn('KITCH office sign-out:',e);}finally{logout.disabled=false;}};
 }
 
 
