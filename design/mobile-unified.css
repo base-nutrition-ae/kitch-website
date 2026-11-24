@@ -316,3 +316,43 @@ html body.modal-open #modal.modal>.modalBox{
  }
  html body.modal-open #modal .formGrid{grid-template-columns:minmax(0,1fr)!important}
 }
+
+
+/* KITCH multi-ingredient internal stock request — shared across branches and CK. */
+#modal .modalBox:has(.kitchStockCart){width:min(900px,100%)!important;max-width:900px!important;padding:24px 26px!important}
+#modal .kitchStockCart .modalHead{border-bottom:1px solid #e8e8ed;padding:0 0 18px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+#modal .kitchStockCart .modalHead h2{font-size:25px;letter-spacing:-.045em;margin:4px 0}
+#modal .kitchStockCart .stockCartOverline{font-size:10px;color:#9395a0;letter-spacing:.14em;font-weight:800}
+#modal .kitchStockCart .stockCartRoute{display:grid;grid-template-columns:minmax(0,1fr) 22px minmax(0,1fr);gap:12px;align-items:center;padding:15px 17px;background:#f4f4f6;border:1px solid #e8e8ed;border-radius:14px}
+#modal .kitchStockCart .stockCartRoute div{min-width:0}
+#modal .kitchStockCart .stockCartRoute small{display:block;font-size:10px;letter-spacing:.06em;color:#8b8c96;margin-bottom:5px;font-weight:750}
+#modal .kitchStockCart .stockCartRoute strong{font-size:13px;color:#282932;overflow-wrap:anywhere}
+#modal .kitchStockCart .stockCartRoute>span{text-align:center;color:#858791}
+#modal .kitchStockCart .stockCartHint,#modal .kitchStockCart .stockCartFoot{font-size:11px;color:#878995;line-height:1.5;margin:12px 1px 18px}
+#modal .kitchStockCart .stockCartTitle{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:15px 0 10px}
+#modal .kitchStockCart .stockCartTitle strong{font-size:15px;color:#272830}
+#modal .kitchStockCart .stockCartTitle span{font-size:11px;color:#898b93}
+#modal #stockCartLines{display:grid;gap:10px}
+#modal .stockCartLine{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(115px,.6fr) minmax(92px,.4fr) 78px;gap:10px;align-items:end;padding:14px;background:#fafafa;border:1px solid #e7e7ed;border-radius:14px;min-width:0}
+#modal .stockCartLine .field{min-width:0;margin:0!important}
+#modal .stockCartLine .field label{display:block;margin:0 0 7px;font-size:10px;color:#858793;font-weight:800}
+#modal .stockCartLine .field select,#modal .stockCartLine .field input{box-sizing:border-box;width:100%!important;min-width:0;height:44px!important;min-height:44px!important;border:1px solid #dedfe5!important;border-radius:10px!important;background:#fff!important;padding:0 10px!important;margin:0!important;font-size:12px!important;color:#282932!important}
+#modal .stockCartLine .stockCartRemove{box-sizing:border-box;height:44px;border:1px solid #e0e1e6;border-radius:10px;background:#fff;color:#5c5e68;font-weight:750;font-size:11px;cursor:pointer}
+#modal .stockCartLine .stockCartLineHint{grid-column:1/-1;color:#858793;font-size:10px}
+#modal .stockCartLine.invalid{border-color:#e5b0b0}
+#modal .stockCartLine.invalid .stockCartLineHint{color:#b12a2a}
+#modal .kitchStockCart .stockCartAdd{display:inline-flex;align-items:center;justify-content:center;min-height:40px;background:#fff;border:1px solid #dedfe5;border-radius:11px;padding:0 16px;margin:13px 0 18px;font-size:12px;font-weight:750;color:#292b32;cursor:pointer}
+#modal .kitchStockCart .stockCartSummary{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px;background:#f3f3f5;border:1px solid #e5e5eb;border-radius:12px;margin-bottom:13px;color:#555963;font-size:12px}
+#modal .kitchStockCart .stockCartSummary strong{font-size:12px;color:#272830;text-align:right}
+#modal .kitchStockCart #stockCartSubmit{display:block;width:100%;min-height:49px;background:#25262e;color:#fff;border:0;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer}
+#modal .kitchStockCart #stockCartSubmit:disabled{opacity:.45;cursor:not-allowed}
+#modal .kitchStockCart .stockCartFoot{text-align:center;margin:12px 0 0}
+@media(max-width:650px){
+ #modal .modalBox:has(.kitchStockCart){padding:18px 14px!important}
+ #modal .stockCartLine{grid-template-columns:minmax(0,1fr) minmax(85px,.5fr);gap:9px;padding:12px}
+ #modal .stockCartLine .stockCartUnit{grid-column:1}
+ #modal .stockCartLine .stockCartRemove{grid-column:2;height:42px}
+ #modal .stockCartLine .stockCartLineHint{grid-column:1/-1}
+ #modal .kitchStockCart .stockCartSummary{flex-direction:column;align-items:flex-start}
+ #modal .kitchStockCart .modalHead h2{font-size:21px}
+}

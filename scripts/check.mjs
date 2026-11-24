@@ -158,6 +158,15 @@ const layoutChecks=[
  ['CK workspace label',app.includes("'CENTRAL KITCHEN WORKSPACE'")]
 ];
 for(const [label,ok] of layoutChecks)if(!ok)throw new Error('Layout contract missing: '+label);
+const stockMultiChecks=[
+ ['multi-ingredient stock cart',app.includes('function stockRequestAddLine()')],
+ ['stock cart quantity validation',app.includes('function stockRequestUpdateTotals()')],
+ ['atomic cloud stock request',app.includes("sb.rpc('kitch_team_stock_request_many'")],
+ ['stock request group reference',app.includes('x.group_ref?')],
+ ['CK stock request location filtering',app.includes("x.branch===assignedLocationName()")],
+ ['multi-ingredient request styling',sharedShell.includes('KITCH multi-ingredient internal stock request')]
+];
+for(const [label,ok] of stockMultiChecks)if(!ok)throw new Error('Multi-ingredient stock request regression: '+label);
 const ckDashboardChecks=[
  ['verified CK staff workspace flag',app.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")||readySource.includes("window.__kitchIsCentralKitchen=centralKitchenStaff&&canDispatch")],
  ['CK-specific sidebar entries',app.includes("items=['Dashboard','Incoming Branch Orders','Production Planning','Production'")],

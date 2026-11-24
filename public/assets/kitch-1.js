@@ -2647,12 +2647,12 @@ async function kitchRefreshStockRequests(){
  try{
   const rows=await kitchStockRpc('list',null);
   const previous=getArr(STOCK_REQUEST_KEY),byId=new Map(previous.filter(x=>x.cloud_saved).map(x=>[String(x.id),x]));
-  const branches=locations().filter(b=>b.type==='Branch'||b.type==='Central Store');
+  const branches=locations();
   const updated=(rows||[]).map(x=>{
    const prior=byId.get(String(x.id))||{};
    const ing=ingredients().find(i=>i.sku===x.sku);
    const b=branches.find(b=>String(b.cloud_id||b.id)===String(x.branch_id));
-   return {...prior,...x,id:Number(x.id),ref:'REQ-'+String(x.id).slice(-6),branch:b?.name||prior.branch||currentBranchName(),ingredient:ing?.name||x.sku,requested_by:prior.requested_by||'KITCH Team',cloud_saved:true,...(x.details||{})};
+   return {...prior,...x,id:Number(x.id),ref:'REQ-'+String(x.id).slice(-6),branch:b?.name||((String(x.branch_id)===String(cloud?.branch_id||currentStaff?.location_id))?assignedLocationName():prior.branch)||'Unknown location',ingredient:ing?.name||x.sku,requested_by:x.details?.requested_by||prior.requested_by||'KITCH Team',cloud_saved:true,...(x.details||{})};
   });
   setArr(STOCK_REQUEST_KEY,updated);
   if(pageTitle?.textContent==='Stock Requests')content.innerHTML=page('Stock Requests','Ready Products');
@@ -2701,7 +2701,7 @@ function requestTimeline(x){
 }
 function stockRequestsPage(){
  if(!hasCentralStore())return `<div class="panel"><h2>Stock Requests</h2><p class="muted">Stock Requests are available in Business only.</p></div>`;
- const all=getArr(STOCK_REQUEST_KEY),req=(session==='manager'?all.filter(x=>x.branch===currentBranchName()):all).slice().reverse(),isBranch=session==='manager',isStore=session==='store',isOwner=session==='owner';
+ const all=getArr(STOCK_REQUEST_KEY),req=(session==='manager'?all.filter(x=>String(x.branch_id)===String(cloud?.branch_id||currentStaff?.location_id)||x.branch===assignedLocationName()):all).slice().reverse(),isBranch=session==='manager',isStore=session==='store',isOwner=session==='owner';
  const open=req.filter(x=>!['Received','Completed'].includes(x.status)).length,done=req.filter(x=>['Received','Completed'].includes(x.status)).length;
  return `<div class="grid"><div class="card"><span>OPEN PROCESS</span><b>${open}</b></div><div class="card"><span>COMPLETED</span><b>${done}</b></div><div class="card"><span>FLOW</span><b style="font-size:14px">Request → Store → Receive</b></div><div class="card"><span>PACKAGE</span><b style="font-size:16px">Business</b></div></div>
  <div class="panel"><div class="actions" style="justify-content:flex-end"><button class="btn" onclick="openPage('Ready Products')">Ready Products · Central Kitchen →</button></div><h2>${isBranch?'Internal Stock Requests & Receiving':isStore?'Internal Branch Stock Requests':'Internal Stock Request Control'}</h2><p class="muted">${isOwner?'Main Office sees the complete request, dispatch and restaurant receiving audit trail.':isBranch?'Request existing inventory from Central Store (not an external supplier order), then confirm the stock physically received at your restaurant.':'Accept branch requests, then send the stock. Branch inventory updates only after the restaurant confirms receipt.'}</p>${isBranch?'<div class="actions"><button class="btn black" onclick="openStockRequest()">+ Request from Central Store</button></div>':''}
@@ -2710,17 +2710,97 @@ function stockRequestsPage(){
  if(isStore&&x.status==='Requested')action=`<button class="btn black" onclick="acceptStockRequest(${x.id})">Accept</button> `+action;
  if(isStore&&x.status==='Accepted')action=`<button class="btn black" onclick="sendStockRequest(${x.id})">Send Stock</button> `+action;
  if(isBranch&&x.status==='In Transfer')action=`<button class="btn black" onclick="openTransferReceiving(${x.id})">Confirm Receipt</button> `+action;
- return `<tr><td><b>${esc(x.ref)}</b></td><td>${esc(x.branch)}</td><td><b>${esc(x.ingredient)}</b></td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td><b>${esc(requestStatusLabel(x))}</b></td><td>${esc(x.requested_by||'—')}</td><td>${action}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No stock requests yet.</td></tr>'}</table></div>`;
+ return `<tr><td><b>${esc(x.ref)}</b>${x.group_ref?`<div class="muted" style="font-size:10px">Group ${esc(String(x.group_ref).slice(0,8))}</div>`:''}</td><td>${esc(x.branch)}</td><td><b>${esc(x.ingredient)}</b></td><td>${cleanQty(x.qty)} ${esc(x.unit)}</td><td><b>${esc(requestStatusLabel(x))}</b></td><td>${esc(x.requested_by||'—')}</td><td>${action}</td></tr>`}).join('')||'<tr><td colspan="7" class="empty">No stock requests yet.</td></tr>'}</table></div>`;
 }
+
 function openStockRequest(){
  if(session!=='manager'||!hasCentralStore())return;
- const a=sortedIngredients(),branch=currentBranch();if(!a.length)return alert('Ingredient Master is empty.');if(!branch)return alert('No branch is assigned.');
- modal(`<div class="modalHead"><h2>Request Stock</h2><button class="close" onclick="closeModal()">×</button></div><div class="note"><b>From:</b> Central Store<br><b>To:</b> ${esc(branch.name)}</div><div class="formGrid"><div class="field"><label>INGREDIENT</label><select id="srIng" class="ingredientSelect" onchange="stockRequestIngredientChanged()">${a.map(x=>`<option value="${esc(x.sku)}">${esc(x.name)} · ${esc(x.base_unit)}</option>`).join('')}</select></div><div class="field"><label>QUANTITY</label><input id="srQty" type="number" min="0" step=".001"></div><div class="field"><label>UNIT</label><select id="srUnit"></select></div></div><button class="primary" onclick="saveStockRequest()">Send Stock Request</button>`);stockRequestIngredientChanged();
+ const available=sortedIngredients().filter(x=>['kg','g','ltr','ml','pcs'].includes(unit(x.base_unit)));
+ if(!available.length)return alert('No ingredients with transferable units in Ingredient Master.');
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Sign in with your KITCH team account first.');
+ const destination=assignedLocationName();
+ if(!destination||destination==='—')return alert('Assigned receiving location is unavailable.');
+ modal('<div class="kitchStockCart">'+
+  '<div class="modalHead"><div><div class="stockCartOverline">KITCH / INTERNAL STOCK</div><h2>Request Ingredients</h2></div><button class="close" aria-label="Close request" onclick="closeModal()">×</button></div>'+
+  '<div class="stockCartRoute"><div><small>FROM</small><strong>Central Store</strong></div><span aria-hidden="true">→</span><div><small>TO</small><strong>'+esc(destination)+'</strong></div></div>'+
+  '<p class="stockCartHint">Add multiple ingredients in one request. The Store approves and dispatches each item separately, while all lines remain under one order reference.</p>'+
+  '<div class="stockCartTitle"><strong>Requested ingredients</strong><span>Up to 30 items</span></div>'+
+  '<div id="stockCartLines"></div>'+
+  '<button type="button" class="stockCartAdd" onclick="stockRequestAddLine()">+ Add Ingredient</button>'+
+  '<div class="stockCartSummary"><span id="stockCartCount">0 items selected</span><strong>Central Store → '+esc(destination)+'</strong></div>'+
+  '<button type="button" id="stockCartSubmit" class="primary" onclick="saveStockRequest()" disabled>Send Multi-Item Request</button>'+
+  '<p class="stockCartFoot">Requesting ingredients does not alter inventory. Stock moves only through Store dispatch and receiving.</p></div>');
+ stockRequestAddLine();
 }
-function stockRequestIngredientChanged(){const x=ingredients().find(i=>i.sku===document.getElementById('srIng')?.value),e=document.getElementById('srUnit');if(x&&e)e.innerHTML=stockTransferUnitOptions(x,stockTransferUnits(x)[0]);}
+function stockRequestAddLine(){
+ const wrap=document.getElementById('stockCartLines');if(!wrap)return;
+ if(wrap.children.length>=30)return alert('Maximum 30 ingredients per request.');
+ const options=sortedIngredients().filter(x=>['kg','g','ltr','ml','pcs'].includes(unit(x.base_unit))).map(x=>'<option value="'+esc(x.sku)+'">'+esc(x.name)+' · '+esc(x.base_unit)+'</option>').join('');
+ const row=document.createElement('div');row.className='stockCartLine';
+ row.innerHTML='<div class="field stockCartIngredient"><label>INGREDIENT</label><select class="srIng ingredientSelect" onchange="stockRequestIngredientChanged(this)">'+options+'</select></div>'+
+  '<div class="field stockCartQty"><label>QUANTITY</label><input class="srQty" type="number" min=".001" max="100000" step=".001" placeholder="e.g. 2.5" oninput="stockRequestUpdateTotals()"></div>'+
+  '<div class="field stockCartUnit"><label>UNIT</label><select class="srUnit" onchange="stockRequestUpdateTotals()"></select></div>'+
+  '<button type="button" class="stockCartRemove" onclick="this.closest(\'.stockCartLine\').remove();stockRequestUpdateTotals()">Remove</button>'+
+  '<div class="stockCartLineHint" role="status"></div>';
+ wrap.appendChild(row);stockRequestIngredientChanged(row.querySelector('.srIng'));
+}
+function stockRequestIngredientChanged(select){
+ const row=select?.closest('.stockCartLine');if(!row)return;
+ const item=ingredients().find(i=>i.sku===select.value);
+ const unitSelect=row.querySelector('.srUnit');
+ if(item&&unitSelect)unitSelect.innerHTML=stockTransferUnitOptions(item,stockTransferUnits(item).filter(u=>u!=='box')[0]);
+ stockRequestUpdateTotals();
+}
+function stockRequestUpdateTotals(){
+ const rows=[...document.querySelectorAll('#stockCartLines .stockCartLine')];
+ const seen=new Set();let valid=rows.length>0;
+ for(const row of rows){
+  const sku=row.querySelector('.srIng')?.value;
+  const raw=row.querySelector('.srQty')?.value;
+  const qty=Number(raw),unitValue=row.querySelector('.srUnit')?.value;
+  const item=ingredients().find(i=>i.sku===sku);
+  const duplicated=seen.has(sku);seen.add(sku);
+  const supported=unitValue!=='box'&&['kg','g','ltr','ml','pcs'].includes(unitValue);
+  const ok=Boolean(item&&raw&&Number.isFinite(qty)&&qty>0&&qty<=100000&&supported&&!duplicated&&stockTransferCanonical(qty,unitValue,item)!==null);
+  if(!ok)valid=false;
+  const hint=row.querySelector('.stockCartLineHint');
+  if(hint)hint.textContent=duplicated?'This ingredient is already selected.':!raw?'Enter a quantity to request.':!ok?'Check quantity and compatible unit.':'Ready to request';
+  row.classList.toggle('invalid',Boolean(raw&&!ok)||duplicated);
+ }
+ const count=document.getElementById('stockCartCount');if(count)count.textContent=rows.length+' '+(rows.length===1?'ingredient':'ingredients')+' in this request';
+ const button=document.getElementById('stockCartSubmit');if(button)button.disabled=!valid||button.dataset.saving==='yes';
+}
 async function saveStockRequest(){
- const sku=document.getElementById('srIng')?.value,x=ingredients().find(i=>i.sku===sku),q=Number(document.getElementById('srQty')?.value||0),u=document.getElementById('srUnit')?.value,branch=currentBranch();if(!x||stockTransferCanonical(q,u,x)===null)return alert('Enter a valid quantity and compatible unit.');if(!branch)return alert('Branch not found.');
- let a=getArr(STOCK_REQUEST_KEY),id=Date.now(),now=new Date().toISOString();a.push({id,ref:'REQ-'+String(a.length+1).padStart(4,'0'),branch_id:branch.id,branch:branch.name,sku:x.sku,ingredient:x.name,qty:q,unit:u,requested_by:currentActor(),requested_at:now,created_at:now,status:'Requested'});try{await kitchStockRpc('create',a[a.length-1],q)}catch(e){return alert('Cloud request failed: '+e.message)}a[a.length-1].cloud_saved=true;setArr(STOCK_REQUEST_KEY,a);closeModal();openPage('Stock Requests','Ready Products');
+ const button=document.getElementById('stockCartSubmit');if(!button||button.dataset.saving==='yes')return;
+ const rows=[...document.querySelectorAll('#stockCartLines .stockCartLine')];
+ if(!rows.length)return alert('Add at least one ingredient.');
+ const items=[];const seen=new Set();
+ for(const row of rows){
+  const sku=row.querySelector('.srIng')?.value;
+  const input=row.querySelector('.srQty');
+  const qty=Number(input?.value),raw=input?.value;
+  const u=row.querySelector('.srUnit')?.value;
+  const ingredient=ingredients().find(i=>i.sku===sku);
+  if(!ingredient||!raw||!Number.isFinite(qty)||qty<=0||qty>100000||seen.has(sku)||u==='box'||!['kg','g','ltr','ml','pcs'].includes(u)||stockTransferCanonical(qty,u,ingredient)===null)return alert('Check each ingredient, quantity and unit. Duplicate ingredients are not allowed.');
+  if(!/^\d+(?:\.\d{1,3})?$/.test(raw))return alert('Enter quantities with up to three decimal places.');
+  seen.add(sku);items.push({sku,qty,unit:u});
+ }
+ if(!teamCloudAuth?.staff_name||!teamCloudAuth?.pin)return alert('Sign in again to submit a stock request.');
+ button.dataset.saving='yes';button.disabled=true;button.textContent='Submitting request…';
+ try{
+  const {data,error}=await sb.rpc('kitch_team_stock_request_many',{p_staff_name:teamCloudAuth.staff_name,p_pin:teamCloudAuth.pin,p_items:items});
+  if(error)throw Error(error.message);
+  if(!data?.saved||!Array.isArray(data.items)||data.items.length!==items.length)throw Error('Request was not confirmed by the cloud. Refresh to check the saved requests.');
+  closeModal();
+  await kitchRefreshStockRequests();
+  openPage('Stock Requests');
+ }catch(e){
+  alert('Unable to send ingredient request: '+e.message);
+  if(document.getElementById('stockCartSubmit')){
+   button.dataset.saving='no';button.disabled=false;button.textContent='Send Multi-Item Request';
+   stockRequestUpdateTotals();
+  }
+ }
 }
 async function acceptStockRequest(id){
  if(session!=='store'||!centralStockReady())return;let req=getArr(STOCK_REQUEST_KEY),r=req.find(x=>x.id===id);if(!r||r.status!=='Requested')return;
