@@ -453,6 +453,8 @@ async function managementLogin(){
   return alert(error.message);
  }
  if(!loginData?.session)return alert('Sign in did not create a session. Please try again.');
+ // Explicit user login re-enables the office; never re-enable on passive restore.
+ try{sessionStorage.removeItem('kitch_explicit_signed_out');}catch(e){}
  const pending=JSON.parse(sessionStorage.getItem('kitch_pending_subscription')||'null');
  let ok=false;
  if(pending&&String(pending.email||'').toLowerCase()===em.toLowerCase()){
@@ -4756,6 +4758,7 @@ async function completeStripeReturn(){
    return;
   }
   const lastPage=kitchLastOwnerPage();
+  if(sessionStorage.getItem('kitch_explicit_signed_out')==='1'){session=null;currentStaff=null;app.classList.add('hidden');login.classList.remove('hidden');return;}
   const lastView=(()=>{try{return sessionStorage.getItem('kitch_last_view')}catch(e){return null}})();
   currentStaff=null;
   enter('owner');
