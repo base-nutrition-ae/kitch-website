@@ -713,8 +713,7 @@ officePurchaseEl('officePOConfirm').addEventListener('click',()=>{
  officePurchaseEl('officePOConfirmSent').hidden=false;
  // Close the KITCH composer when the external email draft is opened.
  officePurchaseEl('officePOComposer').hidden=true;
- officePurchaseStatus('Email draft opened. After sending in Mail, click “I Sent This Order” in the request row. KITCH cannot detect delivery automatically.');
- officePurchaseLoad();
+ officePurchaseLoad().then(()=>officePurchaseStatus('Email draft opened. After sending in Mail, click “I Sent This Order” in the request row. KITCH cannot detect delivery automatically.')).catch(e=>officePurchaseStatus(e.message));
  window.location.href=mailto;
 });
 officePurchaseEl('officePOWhatsappSend').addEventListener('click',()=>{
@@ -730,8 +729,7 @@ officePurchaseEl('officePOWhatsappSend').addEventListener('click',()=>{
  if(!win){msg.textContent='Your browser blocked WhatsApp. Allow popups and try again.';return;}
  officeDraftAwaitingConfirmation={restaurant_id:officeRid,request_id:order.req.id,channel:'whatsapp',recipient_phone:phone};
  officePurchaseEl('officePOComposer').hidden=true;
- officePurchaseStatus('WhatsApp draft opened. After sending, click “I Sent This Order” in the request row.');
- officePurchaseLoad();
+ officePurchaseLoad().then(()=>officePurchaseStatus('WhatsApp draft opened. After sending, click “I Sent This Order” in the request row.')).catch(e=>officePurchaseStatus(e.message));
 });
 officePurchaseEl('officePOConfirmSent').addEventListener('click',async()=>{
  if(officePurchaseBusy)return;
