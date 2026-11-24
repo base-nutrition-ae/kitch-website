@@ -389,7 +389,8 @@ function normalizeImportRows(rows){
 ig('officeIngredientImport').onchange=async e=>{const file=e.target.files[0];if(!file)return;let done=0;try{await refreshIngredients();let rows;if(/\.xlsx?$/i.test(file.name)){const reader=window.parent.XLSX;if(!reader)throw Error('Excel reader unavailable. Check connection and retry.');const wb=reader.read(await file.arrayBuffer(),{type:'array'});rows=reader.utils.sheet_to_json(wb.Sheets[wb.SheetNames.includes('Ingredient Master')?'Ingredient Master':wb.SheetNames[0]],{defval:''});}else{const csv=parseCSV(await file.text());if(!csv.length)throw Error('Empty file');const headers=csv.shift();rows=csv.map(r=>Object.fromEntries(headers.map((k,i)=>[k,r[i]??''])));}const items=normalizeImportRows(rows);if(!items.length||items.length>500)throw Error('Import must contain 1–500 ingredients');if(!confirm('Import '+items.length+' ingredients? Prices are AED per listed base unit. Missing fields on existing ingredients will be preserved. Stock quantities will not change.'))return;for(const x of items){await saveIngredient(x);done++;ig('officeIngredientStatus').textContent='Imported '+done+' of '+items.length;}await officeSyncSuppliersFromIngredients();await refreshIngredients();alert('Imported and verified '+done+' ingredients; suppliers synchronized.');}catch(err){ig('officeIngredientStatus').textContent='Import stopped after '+done+' verified rows: '+err.message;}finally{e.target.value='';}};
 const oldShowPage=showPage;showPage=function(page){oldShowPage(page);if(page==='ingredients'&&officeRid)refreshIngredients().catch(err=>{ig('officeIngredientCount').textContent='Load failed';ig('officeIngredientStatus').textContent=err.message;});};
 
-const officePurchaseState={requests:[],orders:[],suppliers:[],dispatches:[],requestSuppliers:[]};
+const officePurchaseState={requests:[],orders:[],suppliers:[],dispatches:[],requestSuppliers:[],ingredientPrices:new Map()};
+let officeLastOrderChannel='email';
 let officeSupplierProfileEditing=null;
 let officePurchaseBusy=false;
 const officePurchaseEl=id=>document.getElementById(id);
@@ -411,10 +412,15 @@ async function officePurchaseLoad(){
   const {data:profileRows,error:profileError}=await db.rpc('kitch_office_supplier_profile',{p_action:'list',p_restaurant_id:officeRid});
   if(profileError)throw Error('Supplier Master unavailable: '+profileError.message);
   const suppliers=Array.isArray(profileRows)?profileRows.filter(x=>x.is_approved&&x.is_active):[];
+  const {data:channelRows,error:channelError}=await db.rpc('kitch_supplier_channels',{p_action:'list',p_restaurant_id:officeRid});
+  if(channelError)throw Error('Supplier channels unavailable: '+channelError.message);
+  const contacts=new Map((Array.isArray(channelRows)?channelRows:[]).map(x=>[String(x.id),x]));
+  for(const supplier of suppliers)Object.assign(supplier,contacts.get(String(supplier.id))||{});
   const {data:supplierItems,error:supplierItemsError}=await db.from('ingredients')
-   .select('name,category,supplier_name,preferred_supplier_id')
+   .select('name,category,supplier_name,preferred_supplier_id,base_unit,reference_cost')
    .eq('restaurant_id',officeRid).eq('is_active',true).eq('is_current_master',true);
   if(supplierItemsError)throw new Error('Supplier ingredient catalog unavailable: '+supplierItemsError.message);
+  officePurchaseState.ingredientPrices=new Map((supplierItems||[]).map(x=>[String(x.name||'').trim().toLowerCase(),x]));
   const supplierCatalog=new Map();
   for(const ingredient of supplierItems||[]){
    const key=String(ingredient.preferred_supplier_id||'');
@@ -432,7 +438,7 @@ async function officePurchaseLoad(){
   const {data:supplierLinks,error:supplierLinksError}=await db.rpc('kitch_purchase_supplier_view',{p_restaurant_id:officeRid});
   if(supplierLinksError)throw Error('Could not load chef-selected suppliers: '+supplierLinksError.message);
   officePurchaseState.requestSuppliers=Array.isArray(supplierLinks?.request_suppliers)?supplierLinks.request_suppliers:[];
-  const {data:sentRows,error:sentError}=await db.from('kitch_supplier_order_dispatches').select('request_id,supplier_id,recipient_email,sent_at').eq('restaurant_id',officeRid);
+  const {data:sentRows,error:sentError}=await db.from('kitch_supplier_order_dispatches').select('request_id,supplier_id,recipient_email,recipient_phone,channel,cc_emails,sent_at').eq('restaurant_id',officeRid);
   if(sentError)throw Error('Supplier dispatch history unavailable: '+sentError.message);
   officePurchaseState.dispatches=sentRows||[];
   const requestGroups=new Map();
@@ -489,6 +495,8 @@ function officePOShow(id){
  if(!req||req.status!=='approved')return officePurchaseStatus('Only approved kitchen requests can be sent. Refresh first.');
  officeSelectedPurchaseRequest=req.id;
  const panel=officePurchaseEl('officePOComposer');
+ const estimate=officeOrderEstimate(req);
+ officePurchaseEl('officePOEstimatedTotal').textContent=money(estimate.total)+(estimate.unknown.length?' · partial estimate':'')+' (reference prices)';
  officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredient'+(req.lines.length===1?'':'s');
  const opts=officePurchaseState.suppliers.map(x=>'<option value="'+safe(x.id)+'">'+safe(x.name)+'</option>').join('');
  officePurchaseEl('officePOSupplier').innerHTML='<option value="">Select supplier</option>'+opts;
@@ -499,6 +507,7 @@ function officePOShow(id){
  officePurchaseEl('officePOSupplier').disabled=!!req.chef_supplier_id;
  officePurchaseEl('officePOComposerSummary').textContent=req.request_no+' · '+req.lines.length+' ingredients · '+(req.chef_supplier_name||'Legacy request: choose supplier');
  officePurchaseEl('officePOSupplierEmail').value='';
+ officeLastOrderChannel='email';
  officePurchaseEl('officePOLines').innerHTML=req.lines.map((l,i)=>'<div class="kitchPOLine" style="display:flex;justify-content:space-between;align-items:center;gap:15px"><div><strong>'+(i+1)+'. '+safe(l.ingredient)+'</strong><small>Requested by kitchen</small></div><b style="font-size:14px;white-space:nowrap">'+safe(l.quantity)+' '+safe(l.unit)+'</b></div>').join('');
  officePurchaseEl('officePORequestNo').textContent=req.request_no||req.id;
  officePurchaseEl('officePOItem').textContent=req.lines.map(x=>x.ingredient).join(', ');
@@ -507,11 +516,11 @@ function officePOShow(id){
  officePurchaseEl('officePOConfirm').hidden=!!dispatch;
  officePurchaseEl('officePOConfirmSent').hidden=!!dispatch;
  officePurchaseEl('officePOConfirmSent').disabled=false;
- if(dispatch){officePurchaseEl('officePOSupplier').value=dispatch.supplier_id;officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email;}
+ if(dispatch){officePurchaseEl('officePOSupplier').value=dispatch.supplier_id;officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email||'';officeLastOrderChannel=dispatch.channel||'email';}
  officePurchaseEl('officePOInlineMessage').textContent=dispatch?'Sent to supplier on '+new Date(dispatch.sent_at).toLocaleString()+' · '+dispatch.recipient_email:'';
  panel.hidden=false;
  officePOUpdateSupplier();
- if(dispatch)officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email;
+ if(dispatch)officePurchaseEl('officePOSupplierEmail').value=dispatch.recipient_email||'';
  panel.scrollIntoView({block:'nearest',behavior:'smooth'});
  officePurchaseStatus('');
 }
@@ -593,8 +602,33 @@ function officePOUpdateSupplier(){
  const supplier=officePurchaseState.suppliers.find(x=>String(x.id)===String(id));
  officePurchaseEl('officePOSupplierText').textContent=supplier?.name||'Select supplier';
  officePurchaseEl('officePOSupplierEmail').value=supplier?.email||'';
+ officePurchaseEl('officePOAdditionalTo').value=supplier?.additional_to_emails||'';
+ officePurchaseEl('officePOCC').value=supplier?.cc_emails||'';
+ officePurchaseEl('officePOWhatsapp').value=supplier?.whatsapp_phone||supplier?.phone||'';
  const preview=officePurchaseEl('officePOSupplierContact');
  if(preview)preview.innerHTML=supplier?'<div><span>CONTACT PERSON</span><strong>'+safe(supplier.contact_name||'Not provided')+'</strong></div><div><span>PHONE</span><strong>'+safe(supplier.phone||'Not provided')+'</strong></div><div><span>SUPPLIER ADDRESS</span><strong>'+safe(supplier.address||'Not provided')+'</strong></div>':'Choose a supplier to view saved contact details.';
+}
+function officeValidEmailList(value){
+ const values=String(value||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
+ if(values.some(x=>!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(x)))throw Error('Enter valid email addresses separated by commas.');
+ return [...new Set(values.map(x=>x.toLowerCase()))];
+}
+function officeOrderEstimate(req){
+ let total=0,unknown=[];
+ for(const line of req.lines){
+  const item=officePurchaseState.ingredientPrices.get(String(line.ingredient||'').trim().toLowerCase());
+  const units=String(line.unit||'').toLowerCase(),base=String(item?.base_unit||'').toLowerCase();
+  const qty=Number(line.quantity);
+  if(!item||!Number.isFinite(qty)||qty<0){unknown.push(line.ingredient);continue;}
+  let scale=1;
+  if(units!==base){
+   if(units==='g'&&base==='kg'||units==='ml'&&base==='ltr')scale=.001;
+   else if(units==='kg'&&base==='g'||units==='ltr'&&base==='ml')scale=1000;
+   else {unknown.push(line.ingredient);continue;}
+  }
+  total+=qty*scale*Number(item.reference_cost||0);
+ }
+ return {total,unknown};
 }
 function officeKitchenOrderText(req,supplierName){
  const restaurant=officeRestaurantName||'Restaurant';
