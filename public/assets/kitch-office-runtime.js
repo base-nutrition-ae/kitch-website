@@ -301,13 +301,21 @@ async function officeRefreshPackageStatus(){
  const add=el('officeAddLocation');
  if(add){add.disabled=!pro || data.subscription_status==='not_active';add.title=starter?'Starter includes one full kitchen. Pro is required to add more locations.':pro?'Add another location': 'Verify subscription first';}
 }
-function openLocation(x){const d=el('officeLocationDialog');el('officeLocationForm').reset();el('officeLocationId').value=x?.id||'';el('officeLocationTitle').textContent=x?'Edit Location':'Add Location';el('officeLocationName').value=x?.name||'';el('officeLocationCode').value=x?.code||'';el('officeLocationType').value=x?.branch_type==='restaurant'?'branch':(x?.branch_type||'branch');el('officeLocationMessage').textContent='';d.showModal();}
-async function refreshLocations(){const [br,staff]=await Promise.all([db.from('branches').select('id,name,code,branch_type,is_active').eq('restaurant_id',officeRid),db.from('staff_access').select('id,staff_name,role,section,branch_id,is_active').eq('restaurant_id',officeRid)]);if(br.error){alert(br.error.message);return;}officeBranches=br.data||[];if(!staff.error)officeStaff=staff.data||[];renderLocations();renderStaff();setKpi('Active Locations',String(officeBranches.filter(x=>x.is_active).length).padStart(2,'0'));await loadOwner();}
+function openLocation(x){const d=el('officeLocationDialog');el('officeLocationForm').reset();el('officeLocationId').value=x?.id||'';el('officeLocationTitle').textContent=x?'Edit Location':'Add Location';el('officeLocationName').value=x?.name||'';el('officeLocationCode').value=x?.code||'';el('officeLocationType').value=x?.branch_type==='restaurant'?'branch':(x?.branch_type||'branch');el('officeLocationDeliveryAddress').value=x?.delivery_address||'';el('officeLocationDeliveryInstructions').value=x?.delivery_instructions||'';el('officeLocationMessage').textContent='';d.showModal();}
+async function refreshLocations(){const [br,staff]=await Promise.all([db.from('branches').select('id,name,code,branch_type,is_active,delivery_address,delivery_instructions').eq('restaurant_id',officeRid),db.from('staff_access').select('id,staff_name,role,section,branch_id,is_active').eq('restaurant_id',officeRid)]);if(br.error){alert(br.error.message);return;}officeBranches=br.data||[];if(!staff.error)officeStaff=staff.data||[];renderLocations();renderStaff();setKpi('Active Locations',String(officeBranches.filter(x=>x.is_active).length).padStart(2,'0'));await loadOwner();}
 async function toggleLocation(id){const x=officeBranches.find(y=>y.id===id);if(!x)return;const action=x.is_active?'deactivate':'activate';if(!confirm((x.is_active?'Deactivate ':'Activate ')+x.name+'?'))return;const {error}=await db.rpc('kitch_office_manage_location',{p_action:action,p_restaurant_id:officeRid,p_branch_id:id});if(error){alert(error.message);return;}await refreshLocations();}
 el('officeAddLocation').onclick=()=>{if(officePlanStatus?.plan!=='pro')return alert('KITCH Pro is required to create additional locations.');openLocation(null);};
 el('officeLocationCancel').onclick=()=>el('officeLocationDialog').close();
 el('officeLocationX').onclick=()=>el('officeLocationDialog').close();
-el('officeLocationForm').onsubmit=async e=>{e.preventDefault();if(!el('officeLocationId').value&&officePlanStatus?.plan!=='pro')return alert('Only Pro can add additional locations.');const btn=el('officeLocationSave'),id=el('officeLocationId').value;btn.disabled=true;el('officeLocationMessage').textContent='Saving…';const {error}=await db.rpc('kitch_office_manage_location',{p_action:id?'update':'create',p_restaurant_id:officeRid,p_branch_id:id||null,p_name:el('officeLocationName').value.trim(),p_code:el('officeLocationCode').value.trim()||null,p_branch_type:el('officeLocationType').value});btn.disabled=false;if(error){el('officeLocationMessage').textContent=error.message;return;}el('officeLocationDialog').close();await refreshLocations();};
+el('officeLocationForm').onsubmit=async e=>{e.preventDefault();if(!el('officeLocationId').value&&officePlanStatus?.plan!=='pro')return alert('Only Pro can add additional locations.');const btn=el('officeLocationSave'),id=el('officeLocationId').value;btn.disabled=true;el('officeLocationMessage').textContent='Saving…';const {error}=await db.rpc('kitch_office_manage_location',{p_action:id?'update':'create',p_restaurant_id:officeRid,p_branch_id:id||null,p_name:el('officeLocationName').value.trim(),p_code:el('officeLocationCode').value.trim()||null,p_branch_type:el('officeLocationType').value});btn.disabled=false;if(error){el('officeLocationMessage').textContent=error.message;return;}
+ const savedAddress=el('officeLocationDeliveryAddress').value.trim(),savedInstructions=el('officeLocationDeliveryInstructions').value.trim();
+ const {data:branches,error:branchError}=await db.from('branches').select('id,name').eq('restaurant_id',officeRid);
+ if(branchError){el('officeLocationMessage').textContent='Location saved but delivery details could not be loaded: '+branchError.message;return;}
+ const matching=id?branches.find(x=>String(x.id)===String(id)):branches.filter(x=>x.name===el('officeLocationName').value.trim()).at(-1);
+ if(!matching){el('officeLocationMessage').textContent='Location saved, but delivery address could not be linked. Refresh and edit this location.';return;}
+ const {error:deliveryError}=await db.rpc('kitch_office_location_delivery',{p_action:'save',p_restaurant_id:officeRid,p_branch_id:matching.id,p_address:savedAddress,p_instructions:savedInstructions});
+ if(deliveryError){el('officeLocationMessage').textContent='Location saved, but delivery address failed: '+deliveryError.message;return;}
+ el('officeLocationDialog').close();await refreshLocations();};
 const staffRoles=['executive_chef','kitchen_manager','store_manager','production_staff','receiving_staff'];
 const staffRoleLabels={executive_chef:'Executive Chef',kitchen_manager:'Kitchen Manager',store_manager:'Store Manager',production_staff:'Production Staff',receiving_staff:'Receiving Staff'};
 const staffRoleLabel=r=>staffRoleLabels[r]||String(r||'').replaceAll('_',' ');
@@ -634,11 +642,16 @@ function officeOrderEstimate(req){
  }
  return {total,unknown};
 }
+function officeOrderDestination(req){
+ const loc=officeBranches.find(x=>String(x.id)===String(req.branch_id));
+ return {name:loc?.name||'Location not found',address:loc?.delivery_address||'',instructions:loc?.delivery_instructions||''};
+}
 function officeKitchenOrderText(req,supplierName){
  const restaurant=officeRestaurantName||'Restaurant';
  const items=req.lines.map((l,i)=>(i+1)+'. '+l.ingredient+' — '+l.quantity+' '+l.unit).join('\n');
+ const destination=officeOrderDestination(req);
  return restaurant+' — PURCHASE ORDER\nRequest: '+(req.request_no||req.id)+
- '\nStatus: Approved\nSupplier: '+supplierName+'\n\nINGREDIENTS & QUANTITIES\n'+items+
+ '\nStatus: Approved\nSupplier: '+supplierName+'\nDelivery location: '+destination.name+'\nDelivery address: '+(destination.address||'Not provided — confirm before sending')+(destination.instructions?'\nDelivery instructions: '+destination.instructions:'')+'\n\nINGREDIENTS & QUANTITIES\n'+items+
  '\n\nNotes: '+(req.notes||req.note||req.request_notes||'None')+
  '\n\nPlease confirm availability and delivery details.\n\n'+restaurant+' Purchasing';
 }
