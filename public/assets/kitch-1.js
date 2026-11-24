@@ -444,7 +444,7 @@ function applyActivatedSubscription(payload){
 async function kitchRequestPasswordReset(){
  const field=document.getElementById('email');
  const address=String(field?.value||'').trim().toLowerCase();
- if(!/^\\S+@\\S+\\.\\S+$/.test(address)){alert('Enter your email address above, then select Forgot password.');field?.focus();return;}
+ if(!/^\S+@\S+\.\S+$/.test(address)){alert('Enter your email address above, then select Forgot password.');field?.focus();return;}
  const resetButton=document.querySelector('#publicModal button[onclick="kitchRequestPasswordReset()"]');
  if(resetButton){resetButton.disabled=true;resetButton.textContent='Sending reset link…';}
  try{
